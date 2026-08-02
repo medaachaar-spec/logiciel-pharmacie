@@ -8,7 +8,7 @@ Date de mise à jour : 2026-08-02
 - Phase 2 fonctionnelle : PASS.
 - Phase 3 modèle de données : PASS.
 - Phase 4 UX/UI : PASS.
-- Phase 5 code-first : plan validé, exécution non démarrée.
+- Phase 5 code-first : fondation technique Sprint 1 créée ; aucun module métier ni persistance démarré.
 
 ## État du développement
 
@@ -16,10 +16,10 @@ Date de mise à jour : 2026-08-02
 - Dépôt réel : `C:\Users\HP\Desktop\Logiciel pharmacie`.
 - Branche active : `main`.
 - Sprint 0 : `IMPLEMENTED — FOUNDATION READY WITH WARNINGS` après correction de classification Sprint 0.1.
-- Git : dépôt local initialisé, zéro commit et zéro remote.
-- Solution .NET créée : NON.
-- Code frontend : NON DÉMARRÉ.
-- Code backend : NON DÉMARRÉ.
+- Git : dépôt local sur le commit initial `9b8da35`, zéro remote ; changements Sprint 1 laissés non stagés pour revue.
+- Solution .NET créée : OUI — `Pharmacy.slnx`, six projets .NET 10.
+- Code frontend : SOCLE TECHNIQUE — hôte WPF/Blazor Hybrid et écran diagnostique local, sans fonctionnalité métier.
+- Code backend : COUCHES VIDES — Domain, Application et Infrastructure contiennent uniquement leurs marqueurs techniques.
 - Base SQL Server métier : NON CRÉÉE pour ce projet.
 - CI : NON DÉMARRÉE.
 
@@ -30,7 +30,7 @@ Date de mise à jour : 2026-08-02
 - MSBuild 18.6.11 et WebView2 150.0.4078.105 : PASS.
 - Windows 11 Famille x64 : WARNING pour les fondations ; Windows 11 Pro x64 reste obligatoire avant certification du poste pilote.
 - Visual Studio / Build Tools : absent — WARNING non bloquant tant que `dotnet` CLI et MSBuild fonctionnent.
-- Workloads .NET Desktop/WPF et ASP.NET/web : absents — WARNING non bloquant pour Sprint 1 ; preuve attendue par smoke build.
+- Workloads .NET Desktop/WPF et ASP.NET/web : absents — WARNING non bloquant confirmé par le smoke build Sprint 1 réussi via CLI/MSBuild.
 - SQL Server 2025 Express : absent ; édition Developer 17.0.1125.2 détectée — WARNING/différé pour les fondations, BLOCKING avant persistance SQL et production pilote.
 - Espace libre : environ 32 Go lors de la réexécution 0.1 — PASS par rapport aux 25 Go recommandés ; la mesure manuelle antérieure était d’environ 16,15 Go.
 - Confiance TLS SQL locale : validation standard en échec — WARNING différé au sprint de persistance ; aucune exception permanente autorisée.
@@ -51,11 +51,11 @@ Date de mise à jour : 2026-08-02
 
 ## Prochaine étape autorisée
 
-Démarrer le Sprint 1 de fondation selon son prompt dédié. La preuve attendue est un smoke build réel de création, restore et compilation WPF/Blazor Hybrid via `dotnet` CLI/MSBuild. Ne pas démarrer la persistance SQL avant disponibilité de SQL Server 2025 Express et traitement contrôlé du TLS. Ne pas certifier le poste pilote avant conformité Windows 11 Pro x64 et SQL Server 2025 Express.
+Effectuer la revue manuelle de la fenêtre Sprint 1, du rendu à 1366 × 768 et du bouton d’interactivité, puis joindre une capture à la revue. Ne pas démarrer de module métier ou de persistance sans prompt de sprint dédié. Ne pas démarrer la persistance SQL avant disponibilité de SQL Server 2025 Express et traitement contrôlé du TLS. Ne pas certifier le poste pilote avant conformité Windows 11 Pro x64 et SQL Server 2025 Express.
 
 ## Interdictions actuelles
 
-- Ne pas implémenter de fonctionnalité métier avant le Sprint 0 validé.
+- Ne pas implémenter de fonctionnalité métier hors d’un sprint explicitement autorisé.
 - Ne pas utiliser de données réelles.
 - Ne pas créer de migration de production.
 - Ne pas commit/push sans validation explicite.
@@ -70,3 +70,15 @@ Démarrer le Sprint 1 de fondation selon son prompt dédié. La preuve attendue 
 - Risques différés : édition Windows pour le pilote, Visual Studio/workloads à confirmer par smoke build, SQL Express pour la persistance/pilote et TLS local au sprint de persistance.
 - Working tree : fichiers initiaux et Sprint 0 visibles pour revue, aucun `git add`, commit ou push.
 - Prochaine action unique : Sprint 1 de fondation avec smoke build ; aucune persistance SQL ni certification pilote à ce stade.
+
+## Mise à jour après le Sprint 1
+
+- Statut : `IMPLEMENTED — AUTOMATED CHECKS PASS — MANUAL UI REVIEW REQUIRED`.
+- Solution : un fichier `Pharmacy.slnx` et six projets ciblant les frameworks imposés.
+- Architecture : graphe Domain → aucune couche ; Application → Domain ; Infrastructure → Application et Domain ; Desktop → Application et Infrastructure.
+- Desktop : WPF natif, Blazor Hybrid local, WebView2, DI et écran de diagnostic sans serveur HTTP ni ressource externe.
+- Packages directs : `Microsoft.AspNetCore.Components.WebView.Wpf` 10.0.10 et `xunit.v3.mtp-v2` 3.2.2.
+- Validation Debug : build réussi avec 0 avertissement et 0 erreur ; 12/12 tests réussis.
+- Validation Release : build réussi avec 0 avertissement et 0 erreur ; 12/12 tests réussis.
+- Démarrage : processus stable, fenêtre WPF et WebView2 détectés, fermeture normale ; revue visuelle humaine encore requise.
+- Aucun module métier, base de données, fichier SQL, secret, remote, commit ou push ajouté.

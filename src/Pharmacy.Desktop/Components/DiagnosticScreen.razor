@@ -1,0 +1,121 @@
+<PageTitle>Logiciel Pharmacie — Diagnostic Sprint 1</PageTitle>
+
+<main class="app-shell">
+    <header class="hero" aria-labelledby="page-title">
+        <div>
+            <p class="eyebrow">Socle desktop local</p>
+            <h1 id="page-title">Logiciel Pharmacie</h1>
+            <p class="subtitle">Fondations techniques — Sprint 1</p>
+        </div>
+        <div class="ready-badge" role="status">
+            <span class="ready-dot" aria-hidden="true"></span>
+            Socle initialisé
+        </div>
+    </header>
+
+    <section aria-labelledby="technical-status-title">
+        <div class="section-heading">
+            <div>
+                <p class="section-kicker">Contrôle de démarrage</p>
+                <h2 id="technical-status-title">État technique</h2>
+            </div>
+            <p>Exécution locale, sans service web.</p>
+        </div>
+
+        <div class="status-grid">
+            <article class="status-card">
+                <div class="status-icon" aria-hidden="true">W</div>
+                <div>
+                    <h3>WPF</h3>
+                    <p class="status-ok"><span aria-hidden="true">●</span> Opérationnel</p>
+                </div>
+            </article>
+            <article class="status-card">
+                <div class="status-icon" aria-hidden="true">B</div>
+                <div>
+                    <h3>Blazor Hybrid</h3>
+                    <p class="status-ok"><span aria-hidden="true">●</span> Opérationnel</p>
+                </div>
+            </article>
+            <article class="status-card">
+                <div class="status-icon" aria-hidden="true">V</div>
+                <div>
+                    <h3>WebView2</h3>
+                    <p class="status-ok"><span aria-hidden="true">●</span> Chargé</p>
+                </div>
+            </article>
+        </div>
+    </section>
+
+    <section class="details-panel" aria-labelledby="environment-title">
+        <div>
+            <p class="section-kicker">Environnement détecté</p>
+            <h2 id="environment-title">Informations d’exécution</h2>
+        </div>
+        <dl class="environment-grid">
+            <div>
+                <dt>Version .NET</dt>
+                <dd>@RuntimeInformation.FrameworkDescription</dd>
+            </div>
+            <div>
+                <dt>Architecture</dt>
+                <dd>@RuntimeInformation.ProcessArchitecture</dd>
+            </div>
+            <div>
+                <dt>Système d’exploitation</dt>
+                <dd>@RuntimeInformation.OSDescription</dd>
+            </div>
+            <div>
+                <dt>Environnement de build</dt>
+                <dd>@BuildConfiguration</dd>
+            </div>
+        </dl>
+    </section>
+
+    <section class="interaction-panel" aria-labelledby="interaction-title">
+        <div>
+            <p class="section-kicker">Événements Razor</p>
+            <h2 id="interaction-title">Test interactif</h2>
+            <p>Cette action met à jour le composant sans recharger la fenêtre.</p>
+        </div>
+        <div class="interaction-action">
+            <button type="button" @onclick="TestInteractivity" aria-describedby="interaction-result">
+                Tester l’interactivité
+            </button>
+            <output id="interaction-result" class="interaction-result" aria-live="polite">
+                @InteractionMessage
+            </output>
+        </div>
+    </section>
+
+    <footer class="scope-notes" aria-label="Limites du socle technique">
+        <span>Données synthétiques uniquement</span>
+        <span>Aucune base de données connectée</span>
+        <span>Aucun module métier chargé</span>
+    </footer>
+</main>
+
+@code {
+    private int interactionCount;
+
+    private string InteractionMessage => interactionCount == 0
+        ? "Test non exécuté"
+        : $"Interactivité confirmée — clic n° {interactionCount}";
+
+    private static string BuildConfiguration
+    {
+        get
+        {
+#if DEBUG
+            return "Debug";
+#else
+            return "Release";
+#endif
+        }
+    }
+
+    private void TestInteractivity()
+    {
+        interactionCount++;
+    }
+}

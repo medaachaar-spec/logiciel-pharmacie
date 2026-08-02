@@ -31,3 +31,14 @@ En cas de contradiction, Codex doit arrêter uniquement la partie concernée, si
 2. Vérifier les noms et l’ouverture de tous les PDF.
 3. Mettre à jour `CURRENT_STATE.md` avec le chemin réel du dépôt, la branche et les outils installés.
 4. Ne pas lancer Codex avant validation du premier prompt de sprint.
+
+## Développement local
+
+Depuis la racine du dépôt :
+
+```powershell
+dotnet restore .\Pharmacy.slnx
+dotnet build .\Pharmacy.slnx -c Debug --no-restore
+dotnet test .\Pharmacy.slnx -c Debug --no-build
+dotnet run --project .\src\Pharmacy.Desktop\Pharmacy.Desktop.csproj -c Debug
+```
