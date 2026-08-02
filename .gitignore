@@ -1,0 +1,110 @@
+# Build outputs
+[Bb]in/
+[Oo]bj/
+artifacts/
+
+# Visual Studio and IDE user state
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.rsuser
+*.userprefs
+.vscode/*.log
+.idea/
+_ReSharper*/
+*.DotSettings.user
+
+# Tests and generated coverage
+TestResults/
+**/TestResults/
+*.trx
+*.coverage
+*.coveragexml
+*.opencover.xml
+coverage/
+coverage-results/
+coverage-report/
+
+# Logs, traces, crash dumps, and diagnostics
+logs/
+log/
+*.log
+*.dmp
+*.etl
+*.trace
+*.diag
+*.wer
+diagnostics/
+crash-dumps/
+support-bundles/
+support-bundle-*
+
+# Temporary files and local caches
+tmp/
+temp/
+.cache/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Local environment and sensitive configuration
+.env
+.env.*
+!.env.example
+!.env.template
+appsettings.Local.json
+appsettings.*.Local.json
+appsettings.local.json
+appsettings.*.local.json
+local.settings.json
+secrets.json
+*.secrets.json
+credentials.local.json
+*.credentials.local.json
+
+# Certificates, private keys, and signing material
+*.pfx
+*.p12
+*.pem
+*.key
+*.cer
+*.crt
+*.pvk
+*.snk
+
+# SQL Server local data and backups
+*.mdf
+*.ndf
+*.ldf
+*.bak
+*.trn
+*.dif
+
+# Restored packages and package outputs
+packages/
+.packages/
+*.nupkg
+*.snupkg
+
+# Generated publishing and installer outputs
+publish/
+published/
+*.msi
+*.msix
+*.msixbundle
+*.appx
+*.appxbundle
+*.wixpdb
+*.cab
+*Setup.exe
+*.bootstrapper.exe
+
+# Operating-system metadata
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store

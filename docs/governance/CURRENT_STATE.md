@@ -1,0 +1,72 @@
+# CURRENT_STATE - Logiciel Pharmacie
+
+Date de mise à jour : 2026-08-02
+
+## État fonctionnel et architectural
+
+- Phase 1 ADR : PASS.
+- Phase 2 fonctionnelle : PASS.
+- Phase 3 modèle de données : PASS.
+- Phase 4 UX/UI : PASS.
+- Phase 5 code-first : plan validé, exécution non démarrée.
+
+## État du développement
+
+- Documentation : INSTALLÉE ; package de gouvernance complet et cinq PDF de référence présents.
+- Dépôt réel : `C:\Users\HP\Desktop\Logiciel pharmacie`.
+- Branche active : `main`.
+- Sprint 0 : `IMPLEMENTED — FOUNDATION READY WITH WARNINGS` après correction de classification Sprint 0.1.
+- Git : dépôt local initialisé, zéro commit et zéro remote.
+- Solution .NET créée : NON.
+- Code frontend : NON DÉMARRÉ.
+- Code backend : NON DÉMARRÉ.
+- Base SQL Server métier : NON CRÉÉE pour ce projet.
+- CI : NON DÉMARRÉE.
+
+## Prérequis détectés au Sprint 0
+
+- Git 2.55.0 et branche `main` : PASS.
+- SDK .NET 10 stable `10.0.302` et runtimes 10.0.10 : PASS.
+- MSBuild 18.6.11 et WebView2 150.0.4078.105 : PASS.
+- Windows 11 Famille x64 : WARNING pour les fondations ; Windows 11 Pro x64 reste obligatoire avant certification du poste pilote.
+- Visual Studio / Build Tools : absent — WARNING non bloquant tant que `dotnet` CLI et MSBuild fonctionnent.
+- Workloads .NET Desktop/WPF et ASP.NET/web : absents — WARNING non bloquant pour Sprint 1 ; preuve attendue par smoke build.
+- SQL Server 2025 Express : absent ; édition Developer 17.0.1125.2 détectée — WARNING/différé pour les fondations, BLOCKING avant persistance SQL et production pilote.
+- Espace libre : environ 32 Go lors de la réexécution 0.1 — PASS par rapport aux 25 Go recommandés ; la mesure manuelle antérieure était d’environ 16,15 Go.
+- Confiance TLS SQL locale : validation standard en échec — WARNING différé au sprint de persistance ; aucune exception permanente autorisée.
+
+## Readiness après correction Sprint 0.1
+
+- `FoundationReadiness = READY WITH WARNINGS`.
+- `PersistenceReadiness = REMEDIATION REQUIRED`.
+- `PilotProductionReadiness = REMEDIATION REQUIRED`.
+
+## Fichiers du Sprint 0
+
+- Protections racine : `.gitignore`, `.gitattributes`, `.editorconfig`.
+- SDK reproductible : `global.json` épinglé sur `10.0.302` stable.
+- Audit : `scripts/Verify-Environment.ps1`.
+- Rapports : `docs/reports/sprint-00/environment-audit.md` et `codex-report.md`.
+- Aucun code applicatif, solution, projet, migration ou base métier créé.
+
+## Prochaine étape autorisée
+
+Démarrer le Sprint 1 de fondation selon son prompt dédié. La preuve attendue est un smoke build réel de création, restore et compilation WPF/Blazor Hybrid via `dotnet` CLI/MSBuild. Ne pas démarrer la persistance SQL avant disponibilité de SQL Server 2025 Express et traitement contrôlé du TLS. Ne pas certifier le poste pilote avant conformité Windows 11 Pro x64 et SQL Server 2025 Express.
+
+## Interdictions actuelles
+
+- Ne pas implémenter de fonctionnalité métier avant le Sprint 0 validé.
+- Ne pas utiliser de données réelles.
+- Ne pas créer de migration de production.
+- Ne pas commit/push sans validation explicite.
+- Ne pas changer la stack ou les ADR.
+
+## Mise à jour après le Sprint 0.1
+
+- Statut : correction de classification implémentée ; fondations prêtes avec avertissements.
+- Vérification principale : `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Verify-Environment.ps1`.
+- Résultat automatisé corrigé : 20 PASS, 6 WARNING, 0 MISSING, 0 BLOCKING techniques globaux ; code de sortie fondation 1.
+- Test `.gitignore` : 22/22 chemins fictifs conformes.
+- Risques différés : édition Windows pour le pilote, Visual Studio/workloads à confirmer par smoke build, SQL Express pour la persistance/pilote et TLS local au sprint de persistance.
+- Working tree : fichiers initiaux et Sprint 0 visibles pour revue, aucun `git add`, commit ou push.
+- Prochaine action unique : Sprint 1 de fondation avec smoke build ; aucune persistance SQL ni certification pilote à ce stade.

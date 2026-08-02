@@ -1,0 +1,14 @@
+README.md
+docs/governance/CODEX_WORKFLOW.md
+docs/governance/CURRENT_STATE.md
+docs/governance/DECISIONS_REGISTER.md
+docs/governance/PROJECT_CONTEXT.md
+docs/governance/SCOPE.md
+docs/reference/01_Dossier_ADR_Logiciel_Pharmacie_V1.0.pdf
+docs/reference/02_Dossier_Phase_2_Modelisation_Fonctionnelle_Complete_V0.1.pdf
+docs/reference/03_Dossier_Phase_3_Conception_Modele_Donnees_V0.1.pdf
+docs/reference/04_Dossier_Phase_4_Conception_Parcours_UX_UI_V0.1.pdf
+docs/reference/05_Dossier_Phase_5_Code_First_Vibe_Coding_V0.1.pdf
+docs/reports/README.md
+docs/templates/CODEX_PROMPT_TEMPLATE.md
+docs/templates/CODEX_REPORT_TEMPLATE.md

@@ -1,0 +1,57 @@
+# Normalize text files and keep repository content deterministic.
+* text=auto
+
+# Repository text formats use LF unless a Windows-specific format requires CRLF.
+*.md text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.xml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.cs text eol=lf
+*.razor text eol=lf
+*.xaml text eol=lf
+*.csproj text eol=lf
+*.props text eol=lf
+*.targets text eol=lf
+*.sln text eol=crlf
+*.ps1 text eol=crlf
+*.psm1 text eol=crlf
+*.psd1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.sh text eol=lf
+
+# Documents and images are binary.
+*.pdf -text
+*.png -text
+*.jpg -text
+*.jpeg -text
+*.gif -text
+*.bmp -text
+*.ico -text
+*.webp -text
+*.tif -text
+*.tiff -text
+*.svg -text
+
+# Archives, packages, databases, and installers must not be transformed.
+*.zip -text
+*.7z -text
+*.rar -text
+*.tar -text
+*.gz -text
+*.bz2 -text
+*.xz -text
+*.nupkg -text
+*.snupkg -text
+*.mdf -text
+*.ndf -text
+*.ldf -text
+*.bak -text
+*.trn -text
+*.dif -text
+*.msi -text
+*.msix -text
+*.appx -text
+*.cab -text

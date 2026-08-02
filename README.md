@@ -1,0 +1,33 @@
+# Package documentaire Codex - Logiciel Pharmacie
+
+Version : V0.1  
+Date : 2026-08-02
+
+## Objectif
+
+Ce dossier est la source de contexte permanente utilisée pour préparer et exécuter les sprints Codex du projet **Logiciel Pharmacie**.
+
+## Ordre de priorité des sources
+
+1. Prompt du sprint actuel.
+2. `docs/governance/DECISIONS_REGISTER.md`.
+3. `docs/governance/CURRENT_STATE.md`.
+4. `docs/governance/SCOPE.md`.
+5. PDF de référence dans `docs/reference/`.
+6. Code existant.
+
+En cas de contradiction, Codex doit arrêter uniquement la partie concernée, signaler le conflit et ne pas arbitrer silencieusement.
+
+## Contenu
+
+- `docs/reference/` : dossiers PDF validés des Phases 1 à 5.
+- `docs/governance/` : contexte, décisions, périmètre, état courant et workflow Codex.
+- `docs/templates/` : modèle de prompt et modèle de rapport.
+- `docs/reports/` : rapports produits après chaque sprint.
+
+## Première utilisation
+
+1. Copier le dossier `docs/` à la racine du dépôt.
+2. Vérifier les noms et l’ouverture de tous les PDF.
+3. Mettre à jour `CURRENT_STATE.md` avec le chemin réel du dépôt, la branche et les outils installés.
+4. Ne pas lancer Codex avant validation du premier prompt de sprint.
