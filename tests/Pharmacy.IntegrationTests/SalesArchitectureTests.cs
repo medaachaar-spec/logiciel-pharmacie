@@ -78,12 +78,22 @@ public sealed class SalesArchitectureTests
     }
 
     [Fact]
-    public void Check61_DesktopIsNotConnectedToTheSalesCore()
+    public void Check61_DesktopSalesConnectionIsIsolatedInTheCoordinatorAndCompositionRoot()
     {
         var desktopSource = AllSource("src", "Pharmacy.Desktop");
+        var page = File.ReadAllText(
+            Path.Combine(
+                RepositoryRoot,
+                "src",
+                "Pharmacy.Desktop",
+                "Components",
+                "Pages",
+                "DemoPosPage.razor"));
 
-        Assert.DoesNotContain("Pharmacy.Domain.Sales", desktopSource, StringComparison.Ordinal);
-        Assert.DoesNotContain("Pharmacy.Application.Sales", desktopSource, StringComparison.Ordinal);
+        Assert.Contains("SalesPosCoordinator", desktopSource, StringComparison.Ordinal);
+        Assert.Contains("AddInMemorySalesAdapters", desktopSource, StringComparison.Ordinal);
+        Assert.Contains("@inject SalesPosCoordinator", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("InMemorySaleDraftStore", page, StringComparison.Ordinal);
     }
 
     [Fact]

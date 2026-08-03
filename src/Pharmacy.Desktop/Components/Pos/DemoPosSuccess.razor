@@ -7,7 +7,7 @@
     <dl class="pos-success__summary">
         <div>
             <dt>Total</dt>
-            <dd>@DemoMoney.Format(Result.Total)</dd>
+            <dd>@DemoMoney.Format(Result.Total.Amount)</dd>
         </div>
         <div>
             <dt>Mode de paiement</dt>
@@ -128,7 +128,7 @@
 #endif
 
     [Parameter, EditorRequired]
-    public DemoPosSession Session { get; set; } = default!;
+    public SalesPosCoordinator Session { get; set; } = default!;
 
     [Parameter]
     public EventCallback OnNewSale { get; set; }
@@ -136,7 +136,7 @@
     [Parameter]
     public EventCallback OnHome { get; set; }
 
-    private DemoCompletedSale Result => Session.Result
+    private SalesPosCompletedSale Result => Session.Result
         ?? throw new InvalidOperationException("Le résultat de vente de démonstration est requis.");
 
     private string PaymentLabel => Result.PaymentMethod switch

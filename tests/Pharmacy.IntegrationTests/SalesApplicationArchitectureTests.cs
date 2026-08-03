@@ -166,18 +166,22 @@ public sealed class SalesApplicationArchitectureTests
     }
 
     [Fact]
-    public void DesktopRemainsDisconnectedFromSalesApplication()
+    public void DesktopConnectsThroughCoordinatorWithoutConcreteAdaptersInRazor()
     {
-        var desktopSources = string.Join(
+        var razorSources = string.Join(
             Environment.NewLine,
             Directory
-                .EnumerateFiles(PathAt("src", "Pharmacy.Desktop"), "*", SearchOption.AllDirectories)
-                .Where(path => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
-                    || path.EndsWith(".razor", StringComparison.OrdinalIgnoreCase))
+                .EnumerateFiles(PathAt("src", "Pharmacy.Desktop"), "*.razor", SearchOption.AllDirectories)
                 .Select(File.ReadAllText));
+        var coordinator = File.ReadAllText(
+            PathAt("src", "Pharmacy.Desktop", "Components", "Pos", "SalesPosCoordinator.cs"));
+        var page = File.ReadAllText(
+            PathAt("src", "Pharmacy.Desktop", "Components", "Pages", "DemoPosPage.razor"));
 
-        Assert.DoesNotContain("Pharmacy.Application.Sales", desktopSources, StringComparison.Ordinal);
-        Assert.DoesNotContain("Pharmacy.Infrastructure.Sales", desktopSources, StringComparison.Ordinal);
+        Assert.Contains("Pharmacy.Application.Sales", coordinator, StringComparison.Ordinal);
+        Assert.Contains("@inject SalesPosCoordinator", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("Pharmacy.Infrastructure.Sales", razorSources, StringComparison.Ordinal);
+        Assert.DoesNotContain("new InMemory", razorSources, StringComparison.Ordinal);
     }
 
     private static string SalesSources()

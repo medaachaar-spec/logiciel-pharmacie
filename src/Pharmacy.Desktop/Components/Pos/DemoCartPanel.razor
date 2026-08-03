@@ -2,7 +2,7 @@
     <header class="pos-panel__header">
         <div>
             <p class="pos-kicker">Panier courant</p>
-            <h2 id="demo-cart-title">@Session.Lines.Count ligne(s)</h2>
+            <h2 id="demo-cart-title">@Lines.Count ligne(s)</h2>
         </div>
         <span class="pos-cart__quantity">@Session.TotalQuantity article(s)</span>
     </header>
@@ -14,13 +14,14 @@
                  Dismissible="true"
                  OnDismiss="OnDismissAvailability">
             <p>
-                Article : <strong>@AvailabilityIncident.ItemName</strong> — quantité maximale :
-                <strong>@AvailabilityIncident.MaximumQuantity</strong>. Le panier existant est conservé.
+                Article : <strong>@AvailabilityIncident.ProductName</strong> — quantité demandée :
+                <strong>@AvailabilityIncident.RequestedQuantity</strong> — quantité disponible :
+                <strong>@AvailabilityIncident.AvailableQuantity</strong>. Le panier existant est conservé.
             </p>
         </UiAlert>
     }
 
-    @if (Session.Lines.Count == 0)
+    @if (Lines.Count == 0)
     {
         <UiEmptyState Title="Le panier est vide"
                       Description="Recherchez un article ou saisissez un code de démonstration." />
@@ -28,50 +29,44 @@
     else
     {
         <ul class="pos-cart-list">
-            @foreach (var line in Session.Lines)
+            @foreach (var line in Lines)
             {
-                <li class="pos-cart-line" @key="line.Item.Id">
+                <li class="pos-cart-line" @key="line.ProductId.Value">
                     <div class="pos-cart-line__heading">
                         <span>
-                            <strong>@line.Item.Name</strong>
-                            <code>@line.Item.Code</code>
+                            <strong>@line.DisplayName</strong>
+                            <code>@line.Reference.Value</code>
                         </span>
-                        <strong>@DemoMoney.Format(line.Subtotal)</strong>
+                        <strong>@DemoMoney.Format(line.Subtotal.Amount)</strong>
                     </div>
-                    <p>Prix unitaire : @DemoMoney.Format(line.Item.UnitPrice)</p>
+                    <p>Prix unitaire : @DemoMoney.Format(line.UnitPrice.Amount)</p>
 
                     @if (ReadOnly)
                     {
-                        <span class="pos-cart-line__readonly">Quantité : @line.Quantity</span>
+                        <span class="pos-cart-line__readonly">Quantité : @line.Quantity.Value</span>
                     }
                     else
                     {
                         <div class="pos-cart-line__actions">
-                            <div class="pos-quantity-control" aria-label="Quantité de @line.Item.Name">
+                            <div class="pos-quantity-control" aria-label="Quantité de @line.DisplayName">
                                 <button type="button"
-                                        aria-label="Diminuer la quantité de @line.Item.Name"
-                                        disabled="@(line.Quantity <= 1)"
-                                        @onclick="() => OnDecrease.InvokeAsync(line.Item.Id)">−</button>
-                                <output aria-live="polite" aria-label="Quantité">@line.Quantity</output>
+                                        aria-label="Diminuer la quantité de @line.DisplayName"
+                                        disabled="@(line.Quantity.Value <= 1 || Session.IsCartMutationInProgress)"
+                                        @onclick="() => OnDecrease.InvokeAsync(line.ProductId)">−</button>
+                                <output aria-live="polite" aria-label="Quantité">@line.Quantity.Value</output>
                                 <button type="button"
-                                        aria-label="Augmenter la quantité de @line.Item.Name"
-                                        aria-describedby="@(line.Quantity >= line.Item.AvailableQuantity ? $"availability-{line.Item.Id}" : null)"
-                                        disabled="@(line.Quantity >= line.Item.AvailableQuantity)"
-                                        @onclick="() => OnIncrease.InvokeAsync(line.Item.Id)">+</button>
+                                        aria-label="Augmenter la quantité de @line.DisplayName"
+                                        disabled="@Session.IsCartMutationInProgress"
+                                        @onclick="() => OnIncrease.InvokeAsync(line.ProductId)">+</button>
                             </div>
                             <button type="button"
                                     class="pos-remove-button"
-                                    aria-label="Supprimer @line.Item.Name du panier"
-                                    @onclick="() => OnRemove.InvokeAsync(line.Item.Id)">
+                                    aria-label="Supprimer @line.DisplayName du panier"
+                                    disabled="@Session.IsCartMutationInProgress"
+                                    @onclick="() => OnRemove.InvokeAsync(line.ProductId)">
                                 Supprimer
                             </button>
                         </div>
-                        @if (line.Quantity >= line.Item.AvailableQuantity)
-                        {
-                            <p id="availability-@line.Item.Id" class="pos-limit-message">
-                                Disponibilité synthétique atteinte
-                            </p>
-                        }
                     }
                 </li>
             }
@@ -84,7 +79,7 @@
         @if (!ReadOnly)
         {
             <UiButton Size="UiButtonSize.Large"
-                      Disabled="@(Session.Lines.Count == 0)"
+                      Disabled="@(Lines.Count == 0 || Session.IsCartMutationInProgress)"
                       OnClick="CheckoutAsync">
                 Passer au paiement
             </UiButton>
@@ -94,28 +89,31 @@
 
 @code {
     [Parameter, EditorRequired]
-    public DemoPosSession Session { get; set; } = default!;
+    public SalesPosCoordinator Session { get; set; } = default!;
 
     [Parameter]
     public bool ReadOnly { get; set; }
 
     [Parameter]
-    public DemoAvailabilityIncident? AvailabilityIncident { get; set; }
+    public SalesPosAvailabilityIncident? AvailabilityIncident { get; set; }
 
     [Parameter]
     public EventCallback OnDismissAvailability { get; set; }
 
     [Parameter]
-    public EventCallback<int> OnIncrease { get; set; }
+    public EventCallback<ProductId> OnIncrease { get; set; }
 
     [Parameter]
-    public EventCallback<int> OnDecrease { get; set; }
+    public EventCallback<ProductId> OnDecrease { get; set; }
 
     [Parameter]
-    public EventCallback<int> OnRemove { get; set; }
+    public EventCallback<ProductId> OnRemove { get; set; }
 
     [Parameter]
     public EventCallback OnCheckout { get; set; }
+
+    private IReadOnlyList<SaleDraftLineView> Lines => Session.CurrentDraft?.Lines
+        ?? Array.Empty<SaleDraftLineView>();
 
     private Task CheckoutAsync(MouseEventArgs _)
     {

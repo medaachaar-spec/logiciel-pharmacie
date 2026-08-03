@@ -15,4 +15,9 @@
     <ProjectReference Include="..\..\src\Pharmacy.Application\Pharmacy.Application.csproj" />
     <ProjectReference Include="..\..\src\Pharmacy.Domain\Pharmacy.Domain.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\Pharmacy.Desktop\Components\Pos\SalesPosErrorMapper.cs"
+             Link="SalesPosErrorMapper.cs" />
+  </ItemGroup>
 </Project>

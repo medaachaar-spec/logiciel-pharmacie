@@ -28,7 +28,7 @@
                     <dl class="pos-hold__facts">
                         <div><dt>Lignes</dt><dd>@sale.LineCount</dd></div>
                         <div><dt>Quantité totale</dt><dd>@sale.TotalQuantity</dd></div>
-                        <div><dt>Total</dt><dd>@DemoMoney.Format(sale.Total)</dd></div>
+                        <div><dt>Total</dt><dd>@DemoMoney.Format(sale.Total.Amount)</dd></div>
                     </dl>
                     <div class="pos-hold__actions">
                         <UiButton Size="UiButtonSize.Small"
@@ -53,7 +53,7 @@
 
 @code {
     [Parameter]
-    public IReadOnlyList<DemoSuspendedSale> Sales { get; set; } = Array.Empty<DemoSuspendedSale>();
+    public IReadOnlyList<SalesPosSuspendedDraft> Sales { get; set; } = Array.Empty<SalesPosSuspendedDraft>();
 
     [Parameter]
     public EventCallback<string> OnResume { get; set; }

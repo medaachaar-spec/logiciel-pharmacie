@@ -24,5 +24,9 @@
              Link="DemoSuspendedSaleStore.cs" />
     <Compile Include="..\..\src\Pharmacy.Desktop\Components\Pos\DemoTicketPrintService.cs"
              Link="DemoTicketPrintService.cs" />
+    <Compile Include="..\..\src\Pharmacy.Desktop\Components\Pos\SalesPosErrorMapper.cs"
+             Link="SalesPosErrorMapper.cs" />
+    <Compile Include="..\..\src\Pharmacy.Desktop\Components\Pos\SalesPosCoordinator.cs"
+             Link="SalesPosCoordinator.cs" />
   </ItemGroup>
 </Project>

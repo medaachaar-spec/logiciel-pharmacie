@@ -8,7 +8,7 @@ Date de mise à jour : 2026-08-03
 - Phase 2 fonctionnelle : PASS.
 - Phase 3 modèle de données : PASS.
 - Phase 4 UX/UI : PASS.
-- Phase 5 code-first : fondation technique Sprint 1, `UI Foundations V0.1` Sprint 2, shell applicatif V0.1 Sprint 3, POS synthétique V0.1 Sprint 4 et continuité POS V0.2 Sprint 5 créés ; noyau Sales Sprint 6 puis cas d’utilisation Application et adaptateurs mémoire Sprint 7 créés, sans persistance ni connexion au frontend.
+- Phase 5 code-first : fondation technique Sprint 1, `UI Foundations V0.1` Sprint 2, shell applicatif V0.1 Sprint 3, POS synthétique V0.1 Sprint 4 et continuité POS V0.2 Sprint 5 créés ; noyau Sales Sprint 6, cas d’utilisation/adaptateurs mémoire Sprint 7 puis connexion progressive du POS à cette chaîne au Sprint 8, sans persistance.
 
 ## État du développement
 
@@ -16,10 +16,10 @@ Date de mise à jour : 2026-08-03
 - Dépôt réel : `C:\Users\HP\Desktop\Logiciel pharmacie`.
 - Branche active : `main`.
 - Sprint 0 : `IMPLEMENTED — FOUNDATION READY WITH WARNINGS` après correction de classification Sprint 0.1.
-- Git : dépôt local sur le commit `7ba1e83`, zéro remote ; changements Sprint 7 laissés non stagés pour revue.
+- Git : dépôt local sur le commit initial Sprint 8 `7ba1e83`, zéro remote ; changements Sprint 7 trouvés déjà stagés à l’entrée du Sprint 8 et préservés, changements Sprint 8 laissés visibles sans nouveau `git add`.
 - Solution .NET créée : OUI — `Pharmacy.slnx`, six projets .NET 10.
-- Code frontend : POS V0.2 — shell WPF/Blazor Hybrid, Ventes disponible avec parcours nominal, incidents, suspensions, TPE ambigu et impression simulée en mémoire ; sept pages provisoires, diagnostic et UI Lab Debug.
-- Code backend : SALES APPLICATION V0.1 — Domain reste inchangé ; Application orchestre brouillons, catalogue, disponibilité et préparation ; Infrastructure fournit cinq adaptateurs temporaires en mémoire, sans persistance.
+- Code frontend : POS Application Integration V0.1 — shell WPF/Blazor Hybrid, Ventes connecté aux handlers Sales pour catalogue/panier/version, suspensions Desktop restaurées par handlers, TPE ambigu et impression toujours simulés ; sept pages provisoires, diagnostic et UI Lab Debug.
+- Code backend : SALES APPLICATION V0.1 — Domain et Application restent inchangés au Sprint 8 ; Infrastructure fournit cinq adaptateurs temporaires en mémoire enregistrés une fois pour le processus Desktop, sans persistance.
 - Base SQL Server métier : NON CRÉÉE pour ce projet.
 - CI : NON DÉMARRÉE.
 
@@ -51,7 +51,7 @@ Date de mise à jour : 2026-08-03
 
 ## Prochaine étape autorisée
 
-Effectuer la revue manuelle de non-régression Sprint 7 : ouverture, shell, Ventes, parcours POS nominal, suspension/reprise, carte synthétique, impression simulée, Diagnostic et UI Lab. Les cas d’utilisation et adaptateurs mémoire ne doivent pas être connectés au frontend avant un prompt dédié. Ne pas démarrer la persistance sans autorisation explicite. Ne pas démarrer SQL avant disponibilité de SQL Server 2025 Express et traitement contrôlé du TLS. Ne pas certifier le poste pilote avant conformité Windows 11 Pro x64 et SQL Server 2025 Express.
+Effectuer la revue manuelle d’intégration Sprint 8 : ouverture, bandeau Application en mémoire, recherche/scan, panier et totaux Application, concurrence, suspension/reprise, carte synthétique, impression simulée, Diagnostic, UI Lab, clavier et responsive. Ne pas démarrer la persistance sans autorisation explicite. Ne pas démarrer SQL avant disponibilité de SQL Server 2025 Express et traitement contrôlé du TLS. Ne pas certifier le poste pilote avant conformité Windows 11 Pro x64 et SQL Server 2025 Express.
 
 ## Interdictions actuelles
 
@@ -170,3 +170,17 @@ Effectuer la revue manuelle de non-régression Sprint 7 : ouverture, shell, Vent
 - Lancement : processus et fenêtre WPF répondants, titre `Logiciel Pharmacie`, fermeture normale et aucun processus résiduel ; revue humaine encore requise.
 - Packages, projets et références : aucun ajout ou changement.
 - EF Core, SQL, fichier de données, réseau, lot, stock réel, paiement, caisse, audit, impression réelle, remote, commit et push : aucun ajout.
+
+## Mise à jour après le Sprint 8
+
+- Statut : `IMPLEMENTED — AUTOMATED CHECKS PASS — MANUAL POS INTEGRATION REVIEW REQUIRED`.
+- Composition root : les cinq adaptateurs Sales mémoire sont des singletons de processus ; les handlers sont transients et `SalesPosCoordinator` est scoped au frontend.
+- POS : `SaleDraftView` alimente désormais lignes, quantités, prix, sous-totaux et total ; le catalogue et le scan exact passent par les handlers Application.
+- Concurrence : chaque mutation utilise la version courante ; un conflit recharge la vue récente, affiche un message explicite et ne rejoue jamais l’action.
+- Continuité : les suspensions restent des snapshots immuables Desktop ; la reprise crée un nouveau brouillon et réajoute les lignes par handlers avant de supprimer le snapshot.
+- Paiement et impression : simulations Desktop conservées, alimentées par l’instantané Application ; aucun appel à `PrepareSaleFinalizationHandler` ou `ISaleFinalizer`.
+- Validation Debug et Release : builds réussis avec 0 avertissement et 0 erreur ; 271/271 tests réussis, aucun test ignoré.
+- Tests : 31 contrôles Sprint 8 ajoutés aux 240 tests de baseline — 5 unitaires et 26 intégration/architecture.
+- Lancement : fenêtre WPF répondante, titre `Logiciel Pharmacie`, fermeture normale, runner code 0, aucun stderr ni processus résiduel ; revue visuelle et interactive humaine requise.
+- Packages, projets et références : aucun package, projet ou `ProjectReference` ajouté ; trois liens de compilation de sources Desktop testables ajoutés dans les projets de tests.
+- Domain, Application existante et Infrastructure existante : aucun fichier modifié au Sprint 8 ; SQL, EF Core, fichier, réseau, stock réel, paiement réel, impression réelle, remote, commit et push : aucun ajout.

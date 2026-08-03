@@ -81,6 +81,12 @@
     padding: var(--space-4);
 }
 
+.pos-loading {
+    display: grid;
+    min-height: 8rem;
+    place-items: center;
+}
+
 .pos-panel__header,
 .pos-search__heading {
     display: flex;
@@ -272,8 +278,13 @@
     font-weight: var(--font-weight-bold);
 }
 
-.pos-remove-button:hover {
+.pos-remove-button:hover:not(:disabled) {
     background: var(--color-danger-surface);
+}
+
+.pos-remove-button:disabled {
+    color: var(--color-disabled-text);
+    cursor: not-allowed;
 }
 
 .pos-limit-message {

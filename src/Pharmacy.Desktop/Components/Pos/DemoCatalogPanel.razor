@@ -12,19 +12,22 @@
         <ul class="pos-catalog-list">
             @foreach (var item in Items)
             {
-                <li class="pos-catalog-item" @key="item.Id">
+                <li class="pos-catalog-item" @key="item.ProductId.Value">
                     <div class="pos-catalog-item__copy">
-                        <strong>@item.Name</strong>
-                        <span>@item.Presentation · @item.Category</span>
-                        <code>@item.Code</code>
+                        <strong>@item.DisplayName</strong>
+                        <span>@item.Presentation · Données synthétiques</span>
+                        <code>@item.Reference.Value</code>
                     </div>
                     <div class="pos-catalog-item__facts">
                         <span class="pos-price-label">Prix de vente de démonstration</span>
-                        <strong>@DemoMoney.Format(item.UnitPrice)</strong>
+                        <strong>@DemoMoney.Format(item.UnitSalePrice.Amount)</strong>
                         <small>Disponibilité synthétique : @item.AvailableQuantity</small>
                     </div>
                     <UiButton Size="UiButtonSize.Small"
-                              OnClick="args => AddAsync(item.Id, args)">
+                              Disabled="@(IsBusy || !item.IsAvailable)"
+                              IsLoading="@(IsBusy && BusyProductId == item.ProductId)"
+                              LoadingText="Ajout en cours"
+                              OnClick="args => AddAsync(item.ProductId, args)">
                         Ajouter
                     </UiButton>
                 </li>
@@ -35,13 +38,19 @@
 
 @code {
     [Parameter]
-    public IReadOnlyList<DemoCatalogItem> Items { get; set; } = Array.Empty<DemoCatalogItem>();
+    public IReadOnlyList<SellableProductView> Items { get; set; } = Array.Empty<SellableProductView>();
 
     [Parameter]
-    public EventCallback<int> OnAdd { get; set; }
+    public bool IsBusy { get; set; }
 
-    private Task AddAsync(int itemId, MouseEventArgs _)
+    [Parameter]
+    public ProductId? BusyProductId { get; set; }
+
+    [Parameter]
+    public EventCallback<ProductId> OnAdd { get; set; }
+
+    private Task AddAsync(ProductId productId, MouseEventArgs _)
     {
-        return OnAdd.InvokeAsync(itemId);
+        return OnAdd.InvokeAsync(productId);
     }
 }
