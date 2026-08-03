@@ -7,4 +7,5 @@ public sealed record SellableProductSnapshot(
     ProductReference Reference,
     string DisplayName,
     string? Presentation,
-    Money UnitSalePrice);
+    Money UnitSalePrice,
+    bool IsSellable);

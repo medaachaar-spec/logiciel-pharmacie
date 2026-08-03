@@ -54,19 +54,27 @@ public sealed class SalesArchitectureTests
     }
 
     [Fact]
-    public void Check60_InfrastructureHasNoSalesImplementation()
+    public void Check60_InfrastructureContainsOnlyApprovedInMemorySalesAdapters()
     {
         var contractTypes = new[]
         {
             typeof(IProductCatalogReader),
             typeof(IStockAvailabilityReader),
-            typeof(ISaleFinalizer)
+            typeof(ISaleDraftStore),
+            typeof(ISaleDraftIdGenerator),
+            typeof(ISaleFinalizationPreparationStore)
         };
         var infrastructureTypes = typeof(Pharmacy.Infrastructure.AssemblyMarker).Assembly.GetTypes();
+        var implementations = infrastructureTypes
+            .Where(type => !type.IsAbstract
+                && contractTypes.Any(contract => contract.IsAssignableFrom(type)))
+            .ToArray();
 
+        Assert.Equal(5, implementations.Length);
+        Assert.All(implementations, implementation =>
+            Assert.Equal("Pharmacy.Infrastructure.Sales.InMemory", implementation.Namespace));
         Assert.DoesNotContain(infrastructureTypes, type =>
-            !type.IsAbstract && contractTypes.Any(contract => contract.IsAssignableFrom(type)));
-        Assert.DoesNotContain("namespace Pharmacy.Infrastructure.Sales", AllSource("src", "Pharmacy.Infrastructure"), StringComparison.Ordinal);
+            !type.IsAbstract && typeof(ISaleFinalizer).IsAssignableFrom(type));
     }
 
     [Fact]

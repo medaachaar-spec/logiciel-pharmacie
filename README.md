@@ -49,9 +49,11 @@ Le POS V0.2 conserve le parcours nominal V0.1 et ajoute les incidents de code in
 
 Le Sprint 6 ajoute un noyau Sales V0.1 indépendant dans `Pharmacy.Domain` (`Money`, identifiants typés, quantité entière, snapshot produit, ligne immuable et agrégat `SaleDraft`) ainsi que trois contrats non implémentés dans `Pharmacy.Application`. Ce noyau n’est pas connecté au POS synthétique : il ne persiste rien, ne finalise aucune vente et ne traite ni stock, lot, paiement, caisse, audit ou impression. Sa conception est décrite dans `docs/domain/SALES_CORE_V0.1.md`.
 
+Le Sprint 7 ajoute les cas d’utilisation Sales Application V0.1 et cinq adaptateurs temporaires sous `Pharmacy.Infrastructure.Sales.InMemory`. Les brouillons sont versionnés, les mutations utilisent une concurrence optimiste et la préparation de finalisation est idempotente par `OperationId`. Tout reste strictement local au processus, synthétique et sans écriture disque. `Prepared` ne signifie ni finalisée, payée, réservée ou persistée. Le POS Desktop demeure déconnecté de cette nouvelle chaîne.
+
 En configuration Debug, le groupe `Développement` donne également accès à :
 
 - `Diagnostic technique` sur `/diagnostic` : smoke screen conservé du Sprint 1 ;
 - `UI Lab` sur `/ui-lab` : fondations visuelles code-first V0.1 et états des composants.
 
-Le sélecteur d’aperçu des accès est une prévisualisation locale et non persistante. Ses profils ne sont ni des rôles métier finaux ni un mécanisme de sécurité. Le POS, l’UI Lab et le shell V0.1 restent des prototypes soumis à revue visuelle humaine. La validation du noyau Sales Sprint 6 se trouve dans `docs/reports/sprint-06/sales-core-validation.md`.
+Le sélecteur d’aperçu des accès est une prévisualisation locale et non persistante. Ses profils ne sont ni des rôles métier finaux ni un mécanisme de sécurité. Le POS, l’UI Lab et le shell V0.1 restent des prototypes soumis à revue visuelle humaine. La validation Sales Application Sprint 7 se trouve dans `docs/reports/sprint-07/sales-application-validation.md`.
