@@ -1,0 +1,57 @@
+erDiagram
+    ProductCategories ||--o{ ProductLocalSettings : "classifies"
+    Products ||--|| ProductLocalSettings : "has local settings"
+    Products ||--o{ ProductBarcodes : "has"
+    Products ||--o{ ProductPriceHistories : "records"
+
+    ProductCategories {
+        bigint Id PK
+        nvarchar_64 Code UK
+        nvarchar_160 Name
+        bit IsActive
+        int SortOrder
+        rowversion RowVersion
+    }
+
+    Products {
+        bigint Id PK
+        nvarchar_256 Name
+        nvarchar_256 PackageDescription
+        datetime2 CreatedAtUtc
+        datetime2 UpdatedAtUtc
+        rowversion RowVersion
+    }
+
+    ProductLocalSettings {
+        bigint ProductId PK,FK
+        bigint CategoryId FK
+        nvarchar_128 InternalCode UK
+        bit IsActive
+        bit IsSellable
+        bit IsPurchasable
+        tinyint QuantityScale
+        decimal_19_4 CurrentSalePrice
+        nvarchar_3 CurrencyCode
+        rowversion RowVersion
+    }
+
+    ProductBarcodes {
+        bigint Id PK
+        bigint ProductId FK
+        nvarchar_128 Value
+        nvarchar_128 NormalizedValue UK
+        bit IsPrimary
+        bit IsActive
+        datetime2 CreatedAtUtc
+        rowversion RowVersion
+    }
+
+    ProductPriceHistories {
+        bigint Id PK
+        bigint ProductId FK
+        decimal_19_4 OldPrice
+        decimal_19_4 NewPrice
+        nvarchar_3 CurrencyCode
+        nvarchar_32 ChangeOrigin
+        datetime2 EffectiveAtUtc
+    }

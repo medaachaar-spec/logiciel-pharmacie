@@ -8,7 +8,7 @@ Date de mise à jour : 2026-08-03
 - Phase 2 fonctionnelle : PASS.
 - Phase 3 modèle de données : PASS.
 - Phase 4 UX/UI : PASS.
-- Phase 5 code-first : fondation technique Sprint 1, `UI Foundations V0.1` Sprint 2, shell applicatif V0.1 Sprint 3, POS synthétique V0.1 Sprint 4 et continuité POS V0.2 Sprint 5 créés ; noyau Sales Sprint 6, cas d’utilisation/adaptateurs mémoire Sprint 7 puis connexion progressive du POS à cette chaîne au Sprint 8, sans persistance.
+- Phase 5 code-first : fondation technique Sprint 1, `UI Foundations V0.1` Sprint 2, shell applicatif V0.1 Sprint 3, POS synthétique V0.1 Sprint 4 et continuité POS V0.2 Sprint 5 créés ; noyau Sales Sprint 6, cas d’utilisation/adaptateurs mémoire Sprint 7, connexion progressive du POS au Sprint 8, puis fondation SQL Server et schéma physique Catalogue Sprint 9 sans connexion du POS à SQL.
 
 ## État du développement
 
@@ -16,11 +16,11 @@ Date de mise à jour : 2026-08-03
 - Dépôt réel : `C:\Users\HP\Desktop\Logiciel pharmacie`.
 - Branche active : `main`.
 - Sprint 0 : `IMPLEMENTED — FOUNDATION READY WITH WARNINGS` après correction de classification Sprint 0.1.
-- Git : dépôt local sur le commit initial Sprint 8 `7ba1e83`, zéro remote ; changements Sprint 7 trouvés déjà stagés à l’entrée du Sprint 8 et préservés, changements Sprint 8 laissés visibles sans nouveau `git add`.
+- Git : dépôt local sur `49c2ff2`, zéro remote ; changements Sprint 9 laissés hors index pour revue, aucun commit ou push Sprint 9.
 - Solution .NET créée : OUI — `Pharmacy.slnx`, six projets .NET 10.
 - Code frontend : POS Application Integration V0.1 — shell WPF/Blazor Hybrid, Ventes connecté aux handlers Sales pour catalogue/panier/version, suspensions Desktop restaurées par handlers, TPE ambigu et impression toujours simulés ; sept pages provisoires, diagnostic et UI Lab Debug.
-- Code backend : SALES APPLICATION V0.1 — Domain et Application restent inchangés au Sprint 8 ; Infrastructure fournit cinq adaptateurs temporaires en mémoire enregistrés une fois pour le processus Desktop, sans persistance.
-- Base SQL Server métier : NON CRÉÉE pour ce projet.
+- Code backend : PERSISTENCE FOUNDATION V0.1 — Domain/Application inchangés ; Infrastructure conserve cinq adaptateurs Sales en mémoire et ajoute un DbContext Catalogue interne non branché au Desktop.
+- Base SQL Server métier : `Pharmacy_Development` créée sur SQL Server 2025 Developer avec cinq tables Catalogue vides, migration initiale appliquée et compatibilité 170 ; cible Express non encore validée.
 - CI : NON DÉMARRÉE.
 
 ## Prérequis détectés au Sprint 0
@@ -31,7 +31,7 @@ Date de mise à jour : 2026-08-03
 - Windows 11 Famille x64 : WARNING pour les fondations ; Windows 11 Pro x64 reste obligatoire avant certification du poste pilote.
 - Visual Studio / Build Tools : absent — WARNING non bloquant tant que `dotnet` CLI et MSBuild fonctionnent.
 - Workloads .NET Desktop/WPF et ASP.NET/web : absents — WARNING non bloquant confirmé par le smoke build Sprint 1 réussi via CLI/MSBuild.
-- SQL Server 2025 Express : absent ; édition Developer 17.0.1125.2 détectée — WARNING/différé pour les fondations, BLOCKING avant persistance SQL et production pilote.
+- SQL Server 2025 Express : absent ; édition Developer 17.0.1125.2 validée pour la fondation SQL Sprint 9 — gate Express toujours requis avant production pilote.
 - Espace libre : environ 32 Go lors de la réexécution 0.1 — PASS par rapport aux 25 Go recommandés ; la mesure manuelle antérieure était d’environ 16,15 Go.
 - Confiance TLS SQL locale : validation standard en échec — WARNING différé au sprint de persistance ; aucune exception permanente autorisée.
 
@@ -51,7 +51,7 @@ Date de mise à jour : 2026-08-03
 
 ## Prochaine étape autorisée
 
-Effectuer la revue manuelle d’intégration Sprint 8 : ouverture, bandeau Application en mémoire, recherche/scan, panier et totaux Application, concurrence, suspension/reprise, carte synthétique, impression simulée, Diagnostic, UI Lab, clavier et responsive. Ne pas démarrer la persistance sans autorisation explicite. Ne pas démarrer SQL avant disponibilité de SQL Server 2025 Express et traitement contrôlé du TLS. Ne pas certifier le poste pilote avant conformité Windows 11 Pro x64 et SQL Server 2025 Express.
+Effectuer la revue manuelle de la base Sprint 9 dans SSMS : instance, `Pharmacy_Development`, cinq tables `catalog`, colonnes/types, PK/FK/index/contraintes, quatre `rowversion` et historique EF. Conserver le POS sur les adaptateurs mémoire ; ne créer aucune persistance Sales ou migration automatique. Traiter la confiance TLS et valider SQL Server 2025 Express avant toute certification pilote.
 
 ## Interdictions actuelles
 
@@ -184,3 +184,21 @@ Effectuer la revue manuelle d’intégration Sprint 8 : ouverture, bandeau Appli
 - Lancement : fenêtre WPF répondante, titre `Logiciel Pharmacie`, fermeture normale, runner code 0, aucun stderr ni processus résiduel ; revue visuelle et interactive humaine requise.
 - Packages, projets et références : aucun package, projet ou `ProjectReference` ajouté ; trois liens de compilation de sources Desktop testables ajoutés dans les projets de tests.
 - Domain, Application existante et Infrastructure existante : aucun fichier modifié au Sprint 8 ; SQL, EF Core, fichier, réseau, stock réel, paiement réel, impression réelle, remote, commit et push : aucun ajout.
+
+## Mise à jour après le Sprint 9
+
+- Statut : `IMPLEMENTED — SQL SERVER DEVELOPER VALIDATION PASS — EXPRESS ENVIRONMENT GATE PENDING`.
+- SQL Server : instance par défaut `MED-AMINE`, version `17.0.1125.2`, édition Developer, moteur 17 ; connexion TLS standard refusée par chaîne non approuvée et exception de confiance limitée au développement local.
+- Outils : `Microsoft.EntityFrameworkCore.SqlServer` et `Design` 10.0.10 ; `dotnet-ef` local 10.0.10 ; aucun preview.
+- Persistence : `PharmacyDbContext`, factory design-time par variable d’environnement, options SQL Server niveau 170, retry et migrations explicites ; aucun logging sensible.
+- Catalogue : cinq tables vides dans le schéma `catalog` — catégories, produits, paramètres locaux, barcodes et historiques de prix.
+- Schéma : PK `bigint`, prix `decimal(19,4)`, seuils `decimal(18,3)`, instants `datetime2(7)`, textes bornés et quatre `rowversion`.
+- Intégrité : quatre FK `NO ACTION`, unicité catégorie/référence interne/barcode, un barcode principal actif, prix/seuils non négatifs et dates cohérentes.
+- Migration : `InitialCatalogPersistenceV01`, snapshot et script idempotent générés ; `Up`, `Down`, double application du script, rollback vers `0` et réapplication validés.
+- Base développement : `Pharmacy_Development` créée, migration unique appliquée, zéro donnée Catalogue et aucune migration en attente.
+- Tests SQL réels : bases `Pharmacy_Sprint09_Test_*` créées et supprimées dans `finally` ; zéro base temporaire résiduelle.
+- Validation Debug et Release : builds réussis avec 0 avertissement et 0 erreur ; 283/283 tests réussis, aucun test ignoré.
+- Non-régression Desktop : fenêtre répondante, titre `Logiciel Pharmacie`, fermeture propre, code runner 0, stderr vide et aucun processus résiduel sans variable SQL.
+- Architecture : Domain/Application/Desktop inchangés par la fondation ; POS toujours en mémoire ; aucune implémentation SQL Sales ou migration automatique.
+- Sécurité : aucun secret, mot de passe, compte SQL ou connexion réelle versionné ; scan spécialisé sans détection active.
+- Git : branche `main`, HEAD initial `49c2ff2`, index vide, zéro nouveau commit, remote ou push.

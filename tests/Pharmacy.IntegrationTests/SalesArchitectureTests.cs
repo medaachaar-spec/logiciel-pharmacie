@@ -108,6 +108,8 @@ public sealed class SalesArchitectureTests
         var allowedPackages = new[]
         {
             "Microsoft.AspNetCore.Components.WebView.Wpf",
+            "Microsoft.EntityFrameworkCore.Design",
+            "Microsoft.EntityFrameworkCore.SqlServer",
             "xunit.v3.mtp-v2"
         };
 
@@ -115,9 +117,23 @@ public sealed class SalesArchitectureTests
     }
 
     [Fact]
-    public void Check63_RepositoryContainsNoSqlFile()
+    public void Check63_RepositoryContainsOnlyApprovedSprint09SqlFiles()
     {
-        Assert.Empty(Directory.EnumerateFiles(RepositoryRoot, "*.sql", SearchOption.AllDirectories));
+        var sqlFiles = Directory
+            .EnumerateFiles(RepositoryRoot, "*.sql", SearchOption.AllDirectories)
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .Select(path => Path.GetRelativePath(RepositoryRoot, path).Replace('\\', '/'))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(
+            new[]
+            {
+                "database/scripts/001_initial_catalog_foundation_idempotent.sql",
+                "database/verification/verify_sprint09_schema.sql"
+            },
+            sqlFiles);
     }
 
     [Fact]

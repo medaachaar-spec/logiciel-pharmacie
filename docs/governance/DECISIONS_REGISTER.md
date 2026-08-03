@@ -89,3 +89,12 @@ xUnit v3, Microsoft Testing Platform, SQL Server réel pour les tests critiques,
 ## Amendement Phase 5
 
 Figma n’est pas obligatoire. Le prototype frontend sera construit directement dans le code avec WPF + Blazor Hybrid, données synthétiques, design tokens, UI Lab, captures et itérations pilotées par Codex.
+
+## Décisions techniques locales — Sprint 9
+
+- La première migration physique couvre uniquement le Catalogue et suit les relations validées en Phase 3 : `ProductLocalSettings` matérialise le 1–1 avec `Product`, tandis que les barcodes et historiques de prix référencent directement `Product`.
+- Les entités EF restent internes à `Pharmacy.Infrastructure`; le Desktop ne référence ni `DbContext` ni extension de persistance SQL.
+- Le projet Infrastructure sert de startup design-time pour `dotnet-ef`, afin que `Microsoft.EntityFrameworkCore.Design` reste privé à Infrastructure.
+- Les commandes design-time lisent uniquement `PHARMACY_SQLSERVER_CONNECTION`; les tests réels lisent uniquement `PHARMACY_TEST_SQLSERVER_CONNECTION`. Aucune valeur n’est versionnée ou journalisée.
+- Les longueurs physiques `nvarchar` sont des limites techniques de sûreté documentées, et non des obligations pharmacien, fiscales ou légales.
+- SQL Server 2025 Developer `17.0.1125.2` constitue l’environnement de validation Sprint 9. La cible pilote demeure SQL Server 2025 Express conformément à l’ADR-003 ; aucun changement d’édition cible n’est décidé.

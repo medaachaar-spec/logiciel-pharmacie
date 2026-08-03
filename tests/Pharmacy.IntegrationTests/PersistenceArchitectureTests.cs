@@ -1,0 +1,315 @@
+using System.Text.Json;
+using System.Xml.Linq;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Pharmacy.Application.Sales.Contracts;
+using Pharmacy.Infrastructure.Persistence;
+using Xunit;
+
+namespace Pharmacy.IntegrationTests;
+
+[Collection("Sprint 09 persistence serial")]
+public sealed class PersistenceArchitectureTests
+{
+    private static readonly object EnvironmentLock = new();
+    private static readonly string RepositoryRoot = FindRepositoryRoot();
+
+    [Fact]
+    public void EfCorePackagesAndLocalToolUseStableVersionTen()
+    {
+        var infrastructureProject = XDocument.Load(PathAt(
+            "src",
+            "Pharmacy.Infrastructure",
+            "Pharmacy.Infrastructure.csproj"));
+        var packages = infrastructureProject
+            .Descendants("PackageReference")
+            .ToDictionary(
+                package => package.Attribute("Include")!.Value,
+                package => package,
+                StringComparer.Ordinal);
+
+        Assert.Equal("10.0.10", packages["Microsoft.EntityFrameworkCore.SqlServer"].Attribute("Version")?.Value);
+        Assert.Equal("10.0.10", packages["Microsoft.EntityFrameworkCore.Design"].Attribute("Version")?.Value);
+        Assert.Equal("all", packages["Microsoft.EntityFrameworkCore.Design"].Element("PrivateAssets")?.Value);
+        Assert.Contains("buildtransitive", packages["Microsoft.EntityFrameworkCore.Design"].Element("IncludeAssets")?.Value);
+
+        using var manifest = JsonDocument.Parse(File.ReadAllText(PathAt(".config", "dotnet-tools.json")));
+        var tool = manifest.RootElement.GetProperty("tools").GetProperty("dotnet-ef");
+        Assert.Equal("10.0.10", tool.GetProperty("version").GetString());
+        Assert.Contains(tool.GetProperty("commands").EnumerateArray(), command => command.GetString() == "dotnet-ef");
+        Assert.DoesNotContain("preview", File.ReadAllText(PathAt(".config", "dotnet-tools.json")), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void DomainAndApplicationContainNoEfCorePackageReference()
+    {
+        foreach (var project in new[]
+                 {
+                     PathAt("src", "Pharmacy.Domain", "Pharmacy.Domain.csproj"),
+                     PathAt("src", "Pharmacy.Application", "Pharmacy.Application.csproj")
+                 })
+        {
+            var packages = XDocument.Load(project)
+                .Descendants("PackageReference")
+                .Select(package => package.Attribute("Include")?.Value)
+                .ToArray();
+
+            Assert.DoesNotContain(packages, package =>
+                package?.Contains("EntityFrameworkCore", StringComparison.OrdinalIgnoreCase) == true);
+        }
+    }
+
+    [Fact]
+    public void DesktopHasNoDbContextOrAutomaticMigration()
+    {
+        var source = AllText(PathAt("src", "Pharmacy.Desktop"), "*.cs", "*.razor", "*.csproj");
+        var prohibited = new[]
+        {
+            "DbContext",
+            "Database.Migrate",
+            "EnsureCreated",
+            "EnsureDeleted",
+            "AddPharmacySqlServerPersistence",
+            "PHARMACY_SQLSERVER_CONNECTION"
+        };
+
+        Assert.All(prohibited, token =>
+            Assert.DoesNotContain(token, source, StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("AddInMemorySalesAdapters", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProductionSourcesContainNoEnsureCreatedOrSensitiveLogging()
+    {
+        var source = AllText(PathAt("src"), "*.cs", "*.csproj", "*.razor");
+
+        Assert.DoesNotContain("EnsureCreated", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("EnsureDeleted", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("EnableSensitiveDataLogging", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Database.Migrate", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FactoryRefusesMissingConnectionWithoutRevealingAValue()
+    {
+        lock (EnvironmentLock)
+        {
+            var previous = Environment.GetEnvironmentVariable(
+                PharmacyDbContextFactory.ConnectionEnvironmentVariable);
+
+            try
+            {
+                Environment.SetEnvironmentVariable(
+                    PharmacyDbContextFactory.ConnectionEnvironmentVariable,
+                    null);
+                var exception = Assert.Throws<InvalidOperationException>(() =>
+                    new PharmacyDbContextFactory().CreateDbContext([]));
+
+                Assert.Contains(
+                    PharmacyDbContextFactory.ConnectionEnvironmentVariable,
+                    exception.Message,
+                    StringComparison.Ordinal);
+                Assert.DoesNotContain("Server=", exception.Message, StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain("Password=", exception.Message, StringComparison.OrdinalIgnoreCase);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(
+                    PharmacyDbContextFactory.ConnectionEnvironmentVariable,
+                    previous);
+            }
+        }
+    }
+
+    [Fact]
+    public void SqlServerOptionsDeclareCompatibilityRetryAndExplicitMigrationsAssembly()
+    {
+        var source = File.ReadAllText(PathAt(
+            "src",
+            "Pharmacy.Infrastructure",
+            "Persistence",
+            "PharmacySqlServerOptions.cs"));
+
+        Assert.Contains("UseSqlServer", source, StringComparison.Ordinal);
+        Assert.Contains("UseCompatibilityLevel(CompatibilityLevel)", source, StringComparison.Ordinal);
+        Assert.Contains("CompatibilityLevel = 170", source, StringComparison.Ordinal);
+        Assert.Contains("EnableRetryOnFailure()", source, StringComparison.Ordinal);
+        Assert.Contains("MigrationsAssembly", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("EnableSensitiveDataLogging", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ModelContainsOnlyTheFiveConfirmedCatalogTables()
+    {
+        using var context = CreateModelContext();
+        var tables = context.Model.GetEntityTypes()
+            .Select(entity => $"{entity.GetSchema()}.{entity.GetTableName()}")
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(
+            new[]
+            {
+                "catalog.ProductBarcodes",
+                "catalog.ProductCategories",
+                "catalog.ProductLocalSettings",
+                "catalog.ProductPriceHistories",
+                "catalog.Products"
+            },
+            tables);
+        Assert.All(context.Model.GetEntityTypes(), entity => Assert.False(entity.ClrType.IsPublic));
+    }
+
+    [Fact]
+    public void ModelUsesBigintKeysExplicitTextLengthsAndApprovedNumericTypes()
+    {
+        using var context = CreateModelContext();
+
+        Assert.All(context.Model.GetEntityTypes(), entity =>
+        {
+            var primaryKey = Assert.Single(entity.FindPrimaryKey()!.Properties);
+            Assert.Equal(typeof(long), primaryKey.ClrType);
+            Assert.Equal("bigint", primaryKey.GetColumnType());
+        });
+
+        var stringProperties = context.Model.GetEntityTypes()
+            .SelectMany(entity => entity.GetProperties())
+            .Where(property => property.ClrType == typeof(string))
+            .ToArray();
+        Assert.NotEmpty(stringProperties);
+        Assert.All(stringProperties, property =>
+        {
+            Assert.NotNull(property.GetMaxLength());
+            Assert.StartsWith("nvarchar(", property.GetColumnType(), StringComparison.Ordinal);
+        });
+
+        var storeTypes = context.Model.GetEntityTypes()
+            .SelectMany(entity => entity.GetProperties())
+            .Select(property => property.GetColumnType())
+            .Where(type => type is not null)
+            .ToArray();
+        Assert.Contains("decimal(19,4)", storeTypes);
+        Assert.Contains("decimal(18,3)", storeTypes);
+        Assert.Contains("datetime2(7)", storeTypes);
+        Assert.DoesNotContain(storeTypes, type =>
+            type is "float" or "real" or "money" or "smallmoney" or "datetime");
+    }
+
+    [Fact]
+    public void MutableTablesUseRowVersionAndRelationshipsNeverCascade()
+    {
+        using var context = CreateModelContext();
+        var rowVersions = context.Model.GetEntityTypes()
+            .SelectMany(entity => entity.GetProperties())
+            .Where(property => property.GetColumnType() == "rowversion")
+            .ToArray();
+
+        Assert.Equal(4, rowVersions.Length);
+        Assert.All(rowVersions, property =>
+        {
+            Assert.True(property.IsConcurrencyToken);
+            Assert.Equal(ValueGenerated.OnAddOrUpdate, property.ValueGenerated);
+        });
+
+        var foreignKeys = context.Model.GetEntityTypes()
+            .SelectMany(entity => entity.GetForeignKeys())
+            .ToArray();
+        Assert.Equal(4, foreignKeys.Length);
+        Assert.All(foreignKeys, foreignKey =>
+            Assert.Equal(DeleteBehavior.NoAction, foreignKey.DeleteBehavior));
+    }
+
+    [Fact]
+    public void MigrationAndIdempotentScriptContainNoSeedOrSecret()
+    {
+        using var context = CreateModelContext();
+        Assert.Single(context.Database.GetMigrations(), migration =>
+            migration.EndsWith("_InitialCatalogPersistenceV01", StringComparison.Ordinal));
+
+        var migrationSource = AllText(
+            PathAt("src", "Pharmacy.Infrastructure", "Persistence", "Migrations"),
+            "*.cs");
+        Assert.DoesNotContain("InsertData", migrationSource, StringComparison.Ordinal);
+        Assert.Contains("protected override void Down", migrationSource, StringComparison.Ordinal);
+
+        var script = File.ReadAllText(PathAt(
+            "database",
+            "scripts",
+            "001_initial_catalog_foundation_idempotent.sql"));
+        Assert.Contains("IF NOT EXISTS", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("__EFMigrationsHistory", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("Password=", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Pwd=", script, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void SalesContractsStillHaveOnlyInMemoryInfrastructureImplementations()
+    {
+        var contracts = new[]
+        {
+            typeof(IProductCatalogReader),
+            typeof(IStockAvailabilityReader),
+            typeof(ISaleDraftStore),
+            typeof(ISaleDraftIdGenerator),
+            typeof(ISaleFinalizationPreparationStore),
+            typeof(ISaleFinalizer)
+        };
+        var implementations = typeof(Pharmacy.Infrastructure.AssemblyMarker).Assembly
+            .GetTypes()
+            .Where(type => !type.IsAbstract && contracts.Any(contract => contract.IsAssignableFrom(type)))
+            .ToArray();
+
+        Assert.Equal(5, implementations.Length);
+        Assert.All(implementations, implementation =>
+            Assert.Equal("Pharmacy.Infrastructure.Sales.InMemory", implementation.Namespace));
+    }
+
+    private static PharmacyDbContext CreateModelContext()
+    {
+        var options = new DbContextOptionsBuilder<PharmacyDbContext>();
+        options.UsePharmacySqlServer(
+            "Server=not-used.invalid;Database=ModelOnly;Integrated Security=True;Encrypt=True");
+        return new PharmacyDbContext(options.Options);
+    }
+
+    private static string AllText(string root, params string[] patterns)
+    {
+        return string.Join(
+            Environment.NewLine,
+            patterns.SelectMany(pattern => Directory.EnumerateFiles(root, pattern, SearchOption.AllDirectories))
+                .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(File.ReadAllText));
+    }
+
+    private static string PathAt(params string[] segments)
+    {
+        return Path.Combine(new[] { RepositoryRoot }.Concat(segments).ToArray());
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        foreach (var startPath in new[] { AppContext.BaseDirectory, Directory.GetCurrentDirectory() })
+        {
+            var directory = new DirectoryInfo(startPath);
+
+            while (directory is not null)
+            {
+                if (File.Exists(Path.Combine(directory.FullName, "Pharmacy.slnx")))
+                {
+                    return directory.FullName;
+                }
+
+                directory = directory.Parent;
+            }
+        }
+
+        throw new DirectoryNotFoundException("Repository root not found.");
+    }
+}
+
+[CollectionDefinition("Sprint 09 persistence serial", DisableParallelization = true)]
+public sealed class Sprint09PersistenceCollection
+{
+}
