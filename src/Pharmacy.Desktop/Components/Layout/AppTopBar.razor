@@ -1,0 +1,42 @@
+<header class="app-topbar">
+    <div class="app-topbar__heading">
+        <p class="app-topbar__eyebrow">Espace de travail</p>
+        <h2>@PageTitle</h2>
+        <p>@PageDescription</p>
+    </div>
+
+    <div class="app-topbar__context">
+        <div class="app-topbar__badges" aria-label="Contexte d’exécution">
+            <span class="context-badge context-badge--local">
+                <span aria-hidden="true">●</span>
+                Mode local
+            </span>
+            <span class="context-badge">Session de démonstration</span>
+        </div>
+        <div class="app-topbar__account" aria-label="Compte courant">
+            <span class="app-topbar__avatar" aria-hidden="true">DL</span>
+            <span>
+                <strong>Compte local de démonstration</strong>
+                <small>Authentification non implémentée</small>
+            </span>
+        </div>
+    </div>
+
+    @if (ChildContent is not null)
+    {
+        <div class="app-topbar__development">
+            @ChildContent
+        </div>
+    }
+</header>
+
+@code {
+    [Parameter, EditorRequired]
+    public string PageTitle { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string PageDescription { get; set; } = string.Empty;
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

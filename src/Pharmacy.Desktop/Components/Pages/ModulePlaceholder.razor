@@ -1,0 +1,64 @@
+@page "/module/{ModuleId}"
+@using Pharmacy.Desktop.Components.Navigation
+
+<PageTitle>@PageTitleText</PageTitle>
+
+<div class="module-placeholder page-content">
+    @if (module is null)
+    {
+        <UiAlert Title="Module provisoire introuvable" Variant="UiAlertVariant.Warning">
+            <p>L’identifiant demandé ne correspond à aucun module déclaré dans le catalogue de navigation.</p>
+        </UiAlert>
+        <a class="shell-link-button shell-link-button--secondary" href="/home">Retour à l’accueil</a>
+    }
+    else
+    {
+        <header class="page-header" aria-labelledby="module-title">
+            <div>
+                <p class="eyebrow">Module du périmètre V1</p>
+                <h1 id="module-title" tabindex="-1">@module.Label</h1>
+                <p class="page-subtitle">@module.Description</p>
+            </div>
+            <UiBadge Text="Prévu — non implémenté" Variant="UiBadgeVariant.Warning" />
+        </header>
+
+        <UiAlert Title="Page provisoire" Variant="UiAlertVariant.Information">
+            <p>Cette page décrit uniquement le futur périmètre. Elle ne charge aucune donnée et n’exécute aucune règle métier.</p>
+        </UiAlert>
+
+        <section class="placeholder-panel" aria-labelledby="capabilities-title">
+            <div>
+                <p class="section-kicker">Orientation fonctionnelle validée</p>
+                <h2 id="capabilities-title">Capacités prévues</h2>
+                <p>Les éléments ci-dessous proviennent du périmètre documentaire et seront détaillés dans des sprints dédiés.</p>
+            </div>
+            <ul class="placeholder-capabilities">
+                @foreach (var capability in module.FutureCapabilities ?? Array.Empty<string>())
+                {
+                    <li><span aria-hidden="true">✓</span>@capability</li>
+                }
+            </ul>
+        </section>
+
+        <footer class="placeholder-actions">
+            <a class="shell-link-button shell-link-button--secondary" href="/home">Retour à l’accueil</a>
+            <UiButton Disabled="true">Action principale non disponible</UiButton>
+        </footer>
+    }
+</div>
+
+@code {
+    private AppNavigationItem? module;
+
+    [Parameter]
+    public string? ModuleId { get; set; }
+
+    private string PageTitleText => module is null
+        ? "Module introuvable — Logiciel Pharmacie"
+        : $"{module.Label} — Logiciel Pharmacie";
+
+    protected override void OnParametersSet()
+    {
+        module = AppNavigationCatalog.FindModule(ModuleId);
+    }
+}

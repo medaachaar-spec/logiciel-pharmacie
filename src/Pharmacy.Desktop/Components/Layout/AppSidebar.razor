@@ -1,0 +1,142 @@
+@using Pharmacy.Desktop.Components.Navigation
+
+<aside class="app-sidebar" aria-label="Navigation de l’application">
+    <div class="app-sidebar__brand">
+        <span class="app-sidebar__monogram" aria-hidden="true">LP</span>
+        <span class="app-sidebar__brand-copy">
+            <strong>Logiciel Pharmacie</strong>
+            <span>Prototype local</span>
+        </span>
+    </div>
+
+    <button type="button"
+            class="app-sidebar__toggle"
+            aria-controls="primary-navigation"
+            aria-expanded="@ExpandedValue"
+            aria-label="@ToggleLabel"
+            title="@ToggleLabel"
+            @onclick="ToggleCollapsedAsync">
+        <UiIcon Name="UiIconName.Menu" />
+        <span class="app-sidebar__toggle-text">@ToggleText</span>
+    </button>
+
+    <nav id="primary-navigation" class="app-navigation" aria-label="Navigation principale">
+        @foreach (var group in GroupedItems)
+        {
+            var groupLabelId = $"nav-group-{group.Key.ToString().ToLowerInvariant()}";
+            <section class="app-navigation__group" aria-labelledby="@groupLabelId">
+                <h2 id="@groupLabelId" class="app-navigation__group-label">
+                    @AppNavigationCatalog.GetGroupLabel(group.Key)
+                </h2>
+                <ul>
+                    @foreach (var item in group)
+                    {
+                        var state = DevelopmentAccessCatalog.ResolveState(item, AccessProfile);
+                        <li>
+                            @if (state == AppNavigationAccessState.Locked)
+                            {
+                                <button type="button"
+                                        class="app-navigation__link app-navigation__link--locked"
+                                        disabled
+                                        aria-label="@GetLockedLabel(item)"
+                                        title="@GetLockedLabel(item)">
+                                    <span class="app-navigation__icon"><UiIcon Name="@item.Icon" /></span>
+                                    <span class="app-navigation__label">@item.Label</span>
+                                    <span class="app-navigation__state app-navigation__state--lock">
+                                        <UiIcon Name="UiIconName.Lock" />
+                                        <span class="sr-only">Verrouillé</span>
+                                    </span>
+                                </button>
+                            }
+                            else
+                            {
+                                <a href="@item.Route"
+                                   class="@GetLinkClass(item)"
+                                   aria-current="@(IsCurrent(item) ? "page" : null)"
+                                   title="@GetAvailableLabel(item, state)">
+                                    <span class="app-navigation__icon"><UiIcon Name="@item.Icon" /></span>
+                                    <span class="app-navigation__label">@item.Label</span>
+                                    @if (state == AppNavigationAccessState.Soon)
+                                    {
+                                        <span class="app-navigation__state">Prévu</span>
+                                    }
+                                </a>
+                            }
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
+    </nav>
+
+    <div class="app-sidebar__scope">
+        <span class="app-sidebar__scope-dot" aria-hidden="true"></span>
+        <span class="app-sidebar__scope-copy">
+            <strong>Mode démonstration</strong>
+            <span>Aucune donnée réelle</span>
+        </span>
+    </div>
+</aside>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<AppNavigationItem> Items { get; set; } = Array.Empty<AppNavigationItem>();
+
+    [Parameter, EditorRequired]
+    public DevelopmentAccessProfile AccessProfile { get; set; } = DevelopmentAccessCatalog.Default;
+
+    [Parameter]
+    public string CurrentPath { get; set; } = "/";
+
+    [Parameter]
+    public bool IsCollapsed { get; set; }
+
+    [Parameter]
+    public EventCallback OnToggleCollapsed { get; set; }
+
+    private IEnumerable<IGrouping<AppNavigationGroup, AppNavigationItem>> GroupedItems => Items
+        .GroupBy(item => item.Group)
+        .OrderBy(group => AppNavigationCatalog.GetGroupOrder(group.Key));
+
+    private string ExpandedValue => (!IsCollapsed).ToString().ToLowerInvariant();
+
+    private string ToggleLabel => IsCollapsed ? "Déployer la barre latérale" : "Réduire la barre latérale";
+
+    private string ToggleText => IsCollapsed ? "Déployer" : "Réduire";
+
+    private Task ToggleCollapsedAsync()
+    {
+        return OnToggleCollapsed.InvokeAsync();
+    }
+
+    private bool IsCurrent(AppNavigationItem item)
+    {
+        if (item.Id == "home")
+        {
+            return CurrentPath is "/" or "/home";
+        }
+
+        return string.Equals(CurrentPath, item.Route, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string GetLinkClass(AppNavigationItem item)
+    {
+        return IsCurrent(item)
+            ? "app-navigation__link app-navigation__link--active"
+            : "app-navigation__link";
+    }
+
+    private static string GetLockedLabel(AppNavigationItem item)
+    {
+        return $"{item.Label} — accès verrouillé pour cette prévisualisation";
+    }
+
+    private static string GetAvailableLabel(
+        AppNavigationItem item,
+        AppNavigationAccessState state)
+    {
+        return state == AppNavigationAccessState.Soon
+            ? $"{item.Label} — module prévu, ouvrir la page provisoire"
+            : item.Label;
+    }
+}

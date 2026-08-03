@@ -59,4 +59,22 @@ public enum UiSpinnerSize
     Medium
 }
 
+public enum UiIconName
+{
+    Home,
+    Sales,
+    Catalog,
+    Inventory,
+    Purchasing,
+    Cash,
+    Customers,
+    Reporting,
+    Administration,
+    Diagnostic,
+    UiLab,
+    Chevron,
+    Menu,
+    Lock
+}
+
 public sealed record UiSelectOption(string Value, string Label);

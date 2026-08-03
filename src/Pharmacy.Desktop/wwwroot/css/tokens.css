@@ -72,6 +72,9 @@
     --content-max-width: 78rem;
     --content-gutter: clamp(1rem, 3vw, 2rem);
     --card-min-width: 15rem;
+    --shell-sidebar-width: 15.5rem;
+    --shell-sidebar-compact-width: 4.75rem;
+    --shell-content-max-width: 86rem;
 
     --transition-fast: 120ms;
     --transition-standard: 180ms;

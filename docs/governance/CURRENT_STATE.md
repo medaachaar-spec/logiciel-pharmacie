@@ -8,7 +8,7 @@ Date de mise à jour : 2026-08-03
 - Phase 2 fonctionnelle : PASS.
 - Phase 3 modèle de données : PASS.
 - Phase 4 UX/UI : PASS.
-- Phase 5 code-first : fondation technique Sprint 1 et `UI Foundations V0.1` Sprint 2 créées ; aucun module métier ni persistance démarré.
+- Phase 5 code-first : fondation technique Sprint 1, `UI Foundations V0.1` Sprint 2 et shell applicatif V0.1 Sprint 3 créés ; aucun module métier ni persistance démarré.
 
 ## État du développement
 
@@ -16,9 +16,9 @@ Date de mise à jour : 2026-08-03
 - Dépôt réel : `C:\Users\HP\Desktop\Logiciel pharmacie`.
 - Branche active : `main`.
 - Sprint 0 : `IMPLEMENTED — FOUNDATION READY WITH WARNINGS` après correction de classification Sprint 0.1.
-- Git : dépôt local sur le commit `ab5c51e`, zéro remote ; changements Sprint 2 laissés non stagés pour revue.
+- Git : dépôt local sur le commit `391dc3f`, zéro remote ; changements Sprint 3 laissés non stagés pour revue.
 - Solution .NET créée : OUI — `Pharmacy.slnx`, six projets .NET 10.
-- Code frontend : UI FOUNDATIONS V0.1 — diagnostic, navigation technique, tokens CSS, huit composants réutilisables et UI Lab local, sans fonctionnalité métier.
+- Code frontend : SHELL V0.1 — layout WPF/Blazor Hybrid, catalogue de navigation typé, sidebar compacte, topbar, statusbar, accueil synthétique, pages provisoires, diagnostic et UI Lab Debug, sans fonctionnalité métier.
 - Code backend : COUCHES VIDES — Domain, Application et Infrastructure contiennent uniquement leurs marqueurs techniques.
 - Base SQL Server métier : NON CRÉÉE pour ce projet.
 - CI : NON DÉMARRÉE.
@@ -51,7 +51,7 @@ Date de mise à jour : 2026-08-03
 
 ## Prochaine étape autorisée
 
-Effectuer la revue manuelle de l’UI Lab Sprint 2 à 1366 × 768 et 1920 × 1080, tester le clavier, les états loading/disabled et transmettre les captures demandées. Ne pas démarrer de module métier ou de persistance sans prompt de sprint dédié. Ne pas démarrer la persistance SQL avant disponibilité de SQL Server 2025 Express et traitement contrôlé du TLS. Ne pas certifier le poste pilote avant conformité Windows 11 Pro x64 et SQL Server 2025 Express.
+Effectuer la revue manuelle du shell Sprint 3 à 1366 × 768 et 1920 × 1080, tester la navigation clavier, le mode compact, les profils de prévisualisation et transmettre les captures demandées. Ne pas démarrer de module métier ou de persistance sans prompt de sprint dédié. Ne pas démarrer la persistance SQL avant disponibilité de SQL Server 2025 Express et traitement contrôlé du TLS. Ne pas certifier le poste pilote avant conformité Windows 11 Pro x64 et SQL Server 2025 Express.
 
 ## Interdictions actuelles
 
@@ -96,3 +96,18 @@ Effectuer la revue manuelle de l’UI Lab Sprint 2 à 1366 × 768 et 1920 × 108
 - Packages : aucun nouveau PackageReference ajouté.
 - Revue restante : contrôle humain complet des états, du clavier et du responsive à 1366 × 768 et 1920 × 1080.
 - Aucun écran ou type métier, base, SQL, API, serveur, ressource distante, remote, commit ou push ajouté.
+
+## Mise à jour après le Sprint 3
+
+- Statut : `IMPLEMENTED — AUTOMATED CHECKS PASS — MANUAL SHELL REVIEW REQUIRED`.
+- Shell : `AppShellLayout`, sidebar réductible, topbar contextuelle, statusbar locale et lien d’évitement.
+- Navigation : catalogue typé central de neuf entrées produit et deux outils techniques visibles uniquement dans le groupe Développement en Debug.
+- Routes : accueil sur `/` et `/home`, huit modules sur un placeholder paramétré, diagnostic sur `/diagnostic`, UI Lab sur `/ui-lab` et vue NotFound claire.
+- Accueil : quatre indicateurs, quatre accès rapides, trois références récentes génériques et quatre états système, tous explicitement synthétiques.
+- Aperçu des accès : trois profils locaux non persistants qui modifient uniquement la présentation ; aucune authentification, autorisation ou sécurité réelle.
+- Accessibilité : navigation sémantique, état actif, verrouillage non navigable, noms accessibles, focus visible, icônes décoratives et reduced motion.
+- Validation Debug et Release : build réussi avec 0 avertissement et 0 erreur ; 49/49 tests réussis dans chaque configuration.
+- Lancement : fenêtre WPF 1100 × 700, WebView2, accueil, mode compact et page provisoire vérifiés techniquement ; fermeture normale.
+- Packages : aucun nouveau PackageReference ajouté.
+- Revue restante : contrôle humain du rendu, du clavier et du responsive à 1366 × 768 et 1920 × 1080.
+- Aucun module métier, type métier, base, SQL, API, serveur, ressource distante, remote, commit ou push ajouté.

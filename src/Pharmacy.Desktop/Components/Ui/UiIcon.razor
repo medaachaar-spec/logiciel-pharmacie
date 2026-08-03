@@ -1,0 +1,78 @@
+<svg class="ui-icon"
+     viewBox="0 0 24 24"
+     fill="none"
+     stroke="currentColor"
+     stroke-width="1.8"
+     stroke-linecap="round"
+     stroke-linejoin="round"
+     aria-hidden="true"
+     focusable="false">
+    @switch (Name)
+    {
+        case UiIconName.Home:
+            <path d="M3 10.5 12 3l9 7.5" />
+            <path d="M5.5 9.5V21h13V9.5M9 21v-7h6v7" />
+            break;
+        case UiIconName.Sales:
+            <path d="M4 5h2l2 10h9l2-7H7" />
+            <circle cx="9.5" cy="19" r="1.25" />
+            <circle cx="17" cy="19" r="1.25" />
+            break;
+        case UiIconName.Catalog:
+            <path d="M5 4h13a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2V4Z" />
+            <path d="M8 8h8M8 12h8M8 16h5" />
+            break;
+        case UiIconName.Inventory:
+            <path d="m4 7 8-4 8 4-8 4-8-4Z" />
+            <path d="m4 7 8 4 8-4v10l-8 4-8-4V7Z" />
+            <path d="M12 11v10" />
+            break;
+        case UiIconName.Purchasing:
+            <path d="M3 7h11v10H3zM14 10h4l3 3v4h-7z" />
+            <circle cx="7" cy="19" r="2" />
+            <circle cx="17" cy="19" r="2" />
+            break;
+        case UiIconName.Cash:
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <path d="M7 9h5M7 13h3M16 9h1M16 13h1" />
+            break;
+        case UiIconName.Customers:
+            <circle cx="9" cy="8" r="3" />
+            <path d="M3.5 20c.5-4 2.2-6 5.5-6s5 2 5.5 6" />
+            <path d="M15 5.5a3 3 0 0 1 0 5M17 14c2.2.6 3.2 2.4 3.5 5" />
+            break;
+        case UiIconName.Reporting:
+            <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+            break;
+        case UiIconName.Administration:
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19 13.5v-3l-2-.7a7 7 0 0 0-.8-1.8l.9-1.9L15 4l-1.9.9a7 7 0 0 0-1.8-.8L10.5 2h-3l-.7 2.1a7 7 0 0 0-1.8.8L3.1 4 1 6.1 1.9 8a7 7 0 0 0-.8 1.8L-1 10.5v3l2.1.7a7 7 0 0 0 .8 1.8L1 17.9 3.1 20l1.9-.9a7 7 0 0 0 1.8.8l.7 2.1h3l.8-2.1a7 7 0 0 0 1.8-.8l1.9.9 2.1-2.1-.9-1.9a7 7 0 0 0 .8-1.8l2-.7Z" transform="translate(2) scale(.82)" />
+            break;
+        case UiIconName.Diagnostic:
+            <path d="M4 18h4l2-6 3 8 2-5h5" />
+            <path d="M4 5h16v14H4z" />
+            break;
+        case UiIconName.UiLab:
+            <path d="M9 3v6l-5 9a2 2 0 0 0 1.8 3h12.4A2 2 0 0 0 20 18l-5-9V3" />
+            <path d="M8 13h8M8 3h8" />
+            break;
+        case UiIconName.Chevron:
+            <path d="m9 5 7 7-7 7" />
+            break;
+        case UiIconName.Menu:
+            <path d="M4 6h16M4 12h16M4 18h16" />
+            break;
+        case UiIconName.Lock:
+            <rect x="5" y="10" width="14" height="11" rx="2" />
+            <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+            break;
+        default:
+            <circle cx="12" cy="12" r="8" />
+            break;
+    }
+</svg>
+
+@code {
+    [Parameter]
+    public UiIconName Name { get; set; }
+}

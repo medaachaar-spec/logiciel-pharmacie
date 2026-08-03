@@ -1,0 +1,35 @@
+@using Pharmacy.Desktop.Components.Navigation
+
+<section class="access-preview" aria-labelledby="access-preview-title">
+    <div class="access-preview__field">
+        <label id="access-preview-title" for="access-preview-profile">Aperçu des accès</label>
+        <select id="access-preview-profile" value="@SelectedProfile.Id" @onchange="ChangeProfileAsync">
+            @foreach (var profile in Profiles)
+            {
+                <option value="@profile.Id">@profile.Label</option>
+            }
+        </select>
+    </div>
+    <p><strong>Prévisualisation locale uniquement.</strong> @DevelopmentAccessCatalog.Warning.</p>
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<DevelopmentAccessProfile> Profiles { get; set; } = Array.Empty<DevelopmentAccessProfile>();
+
+    [Parameter, EditorRequired]
+    public DevelopmentAccessProfile SelectedProfile { get; set; } = DevelopmentAccessCatalog.Default;
+
+    [Parameter]
+    public EventCallback<DevelopmentAccessProfile> SelectedProfileChanged { get; set; }
+
+    private Task ChangeProfileAsync(ChangeEventArgs args)
+    {
+        var requestedId = args.Value?.ToString();
+        var profile = Profiles.FirstOrDefault(
+            item => string.Equals(item.Id, requestedId, StringComparison.Ordinal))
+            ?? DevelopmentAccessCatalog.Default;
+
+        return SelectedProfileChanged.InvokeAsync(profile);
+    }
+}

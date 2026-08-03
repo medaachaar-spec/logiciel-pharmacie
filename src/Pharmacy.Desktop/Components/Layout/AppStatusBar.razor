@@ -1,0 +1,12 @@
+<footer class="app-statusbar" aria-label="État de l’application">
+    <span><span class="app-statusbar__dot app-statusbar__dot--ok" aria-hidden="true"></span>Local</span>
+    <span><span class="app-statusbar__dot" aria-hidden="true"></span>Données de démonstration</span>
+    <span><span class="app-statusbar__dot app-statusbar__dot--muted" aria-hidden="true"></span>Base de données non connectée</span>
+    <span><strong>@BuildConfiguration</strong></span>
+    <span>Shell : prêt pour revue</span>
+</footer>
+
+@code {
+    [Parameter, EditorRequired]
+    public string BuildConfiguration { get; set; } = string.Empty;
+}

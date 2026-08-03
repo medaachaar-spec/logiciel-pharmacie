@@ -1,0 +1,109 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@using Microsoft.AspNetCore.Components.Routing
+@using Pharmacy.Desktop.Components.Navigation
+@inject NavigationManager NavigationManager
+
+<div class="app-shell @(isSidebarCollapsed ? "app-shell--collapsed" : null)">
+    <a class="skip-link" href="#main-content">Aller au contenu principal</a>
+
+    <AppSidebar Items="@AppNavigationCatalog.Items"
+                AccessProfile="@selectedProfile"
+                CurrentPath="@currentPath"
+                IsCollapsed="@isSidebarCollapsed"
+                OnToggleCollapsed="ToggleSidebar" />
+
+    <AppTopBar PageTitle="@CurrentPageTitle" PageDescription="@CurrentPageDescription">
+        @if (IsDevelopmentBuild)
+        {
+            <DevelopmentAccessPreview Profiles="@DevelopmentAccessCatalog.Profiles"
+                                      SelectedProfile="@selectedProfile"
+                                      SelectedProfileChanged="SelectProfile" />
+        }
+    </AppTopBar>
+
+    <main id="main-content" class="app-main" tabindex="-1">
+        @Body
+    </main>
+
+    <AppStatusBar BuildConfiguration="@BuildConfiguration" />
+</div>
+
+@code {
+    private bool isSidebarCollapsed;
+    private string currentPath = "/";
+    private AppNavigationItem? currentItem;
+    private DevelopmentAccessProfile selectedProfile = DevelopmentAccessCatalog.Default;
+
+    private string CurrentPageTitle => currentItem?.Label ?? "Page introuvable";
+
+    private string CurrentPageDescription => currentItem?.Description
+        ?? "Cette adresse ne correspond à aucun écran disponible.";
+
+    private static string BuildConfiguration
+    {
+        get
+        {
+#if DEBUG
+            return "Debug";
+#else
+            return "Release";
+#endif
+        }
+    }
+
+    private static bool IsDevelopmentBuild
+    {
+        get
+        {
+#if DEBUG
+            return true;
+#else
+            return false;
+#endif
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        NavigationManager.LocationChanged += HandleLocationChanged;
+        UpdateCurrentLocation();
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= HandleLocationChanged;
+        GC.SuppressFinalize(this);
+    }
+
+    private void ToggleSidebar()
+    {
+        isSidebarCollapsed = !isSidebarCollapsed;
+    }
+
+    private void SelectProfile(DevelopmentAccessProfile profile)
+    {
+        selectedProfile = profile;
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        UpdateCurrentLocation();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void UpdateCurrentLocation()
+    {
+        var relativePath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        currentPath = NormalizePath(relativePath);
+        currentItem = AppNavigationCatalog.FindByRoute(currentPath)
+            ?? AppNavigationCatalog.FindModule(currentPath.Split('/').LastOrDefault());
+    }
+
+    private static string NormalizePath(string path)
+    {
+        var routeOnly = path.Split('?', '#')[0];
+        var normalized = $"/{routeOnly.Trim('/')}";
+        return normalized.Length == 1 ? "/" : normalized;
+    }
+}
