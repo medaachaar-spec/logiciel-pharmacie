@@ -1,0 +1,47 @@
+<section class="pos-panel" aria-labelledby="demo-catalog-title">
+    <header class="pos-panel__header">
+        <div>
+            <p class="pos-kicker">Catalogue local</p>
+            <h2 id="demo-catalog-title">Articles de démonstration</h2>
+        </div>
+        <span class="pos-result-count">@Items.Count résultat(s)</span>
+    </header>
+
+    @if (Items.Count > 0)
+    {
+        <ul class="pos-catalog-list">
+            @foreach (var item in Items)
+            {
+                <li class="pos-catalog-item" @key="item.Id">
+                    <div class="pos-catalog-item__copy">
+                        <strong>@item.Name</strong>
+                        <span>@item.Presentation · @item.Category</span>
+                        <code>@item.Code</code>
+                    </div>
+                    <div class="pos-catalog-item__facts">
+                        <span class="pos-price-label">Prix de vente de démonstration</span>
+                        <strong>@DemoMoney.Format(item.UnitPrice)</strong>
+                        <small>Disponibilité synthétique : @item.AvailableQuantity</small>
+                    </div>
+                    <UiButton Size="UiButtonSize.Small"
+                              OnClick="args => AddAsync(item.Id, args)">
+                        Ajouter
+                    </UiButton>
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+@code {
+    [Parameter]
+    public IReadOnlyList<DemoCatalogItem> Items { get; set; } = Array.Empty<DemoCatalogItem>();
+
+    [Parameter]
+    public EventCallback<int> OnAdd { get; set; }
+
+    private Task AddAsync(int itemId, MouseEventArgs _)
+    {
+        return OnAdd.InvokeAsync(itemId);
+    }
+}

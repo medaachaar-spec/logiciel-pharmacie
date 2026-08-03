@@ -1,0 +1,105 @@
+<section class="pos-panel pos-cart" aria-labelledby="demo-cart-title">
+    <header class="pos-panel__header">
+        <div>
+            <p class="pos-kicker">Panier courant</p>
+            <h2 id="demo-cart-title">@Session.Lines.Count ligne(s)</h2>
+        </div>
+        <span class="pos-cart__quantity">@Session.TotalQuantity article(s)</span>
+    </header>
+
+    @if (Session.Lines.Count == 0)
+    {
+        <UiEmptyState Title="Le panier est vide"
+                      Description="Recherchez un article ou saisissez un code de démonstration." />
+    }
+    else
+    {
+        <ul class="pos-cart-list">
+            @foreach (var line in Session.Lines)
+            {
+                <li class="pos-cart-line" @key="line.Item.Id">
+                    <div class="pos-cart-line__heading">
+                        <span>
+                            <strong>@line.Item.Name</strong>
+                            <code>@line.Item.Code</code>
+                        </span>
+                        <strong>@DemoMoney.Format(line.Subtotal)</strong>
+                    </div>
+                    <p>Prix unitaire : @DemoMoney.Format(line.Item.UnitPrice)</p>
+
+                    @if (ReadOnly)
+                    {
+                        <span class="pos-cart-line__readonly">Quantité : @line.Quantity</span>
+                    }
+                    else
+                    {
+                        <div class="pos-cart-line__actions">
+                            <div class="pos-quantity-control" aria-label="Quantité de @line.Item.Name">
+                                <button type="button"
+                                        aria-label="Diminuer la quantité de @line.Item.Name"
+                                        disabled="@(line.Quantity <= 1)"
+                                        @onclick="() => OnDecrease.InvokeAsync(line.Item.Id)">−</button>
+                                <output aria-live="polite" aria-label="Quantité">@line.Quantity</output>
+                                <button type="button"
+                                        aria-label="Augmenter la quantité de @line.Item.Name"
+                                        aria-describedby="@(line.Quantity >= line.Item.AvailableQuantity ? $"availability-{line.Item.Id}" : null)"
+                                        disabled="@(line.Quantity >= line.Item.AvailableQuantity)"
+                                        @onclick="() => OnIncrease.InvokeAsync(line.Item.Id)">+</button>
+                            </div>
+                            <button type="button"
+                                    class="pos-remove-button"
+                                    aria-label="Supprimer @line.Item.Name du panier"
+                                    @onclick="() => OnRemove.InvokeAsync(line.Item.Id)">
+                                Supprimer
+                            </button>
+                        </div>
+                        @if (line.Quantity >= line.Item.AvailableQuantity)
+                        {
+                            <p id="availability-@line.Item.Id" class="pos-limit-message">
+                                Disponibilité synthétique atteinte
+                            </p>
+                        }
+                    }
+                </li>
+            }
+        </ul>
+    }
+
+    <footer class="pos-cart__footer">
+        <span>Total</span>
+        <strong>@DemoMoney.Format(Session.Total)</strong>
+        @if (!ReadOnly)
+        {
+            <UiButton Size="UiButtonSize.Large"
+                      Disabled="@(Session.Lines.Count == 0)"
+                      OnClick="CheckoutAsync">
+                Passer au paiement
+            </UiButton>
+        }
+    </footer>
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public DemoPosSession Session { get; set; } = default!;
+
+    [Parameter]
+    public bool ReadOnly { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnIncrease { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnDecrease { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnRemove { get; set; }
+
+    [Parameter]
+    public EventCallback OnCheckout { get; set; }
+
+    private Task CheckoutAsync(MouseEventArgs _)
+    {
+        return OnCheckout.InvokeAsync();
+    }
+}

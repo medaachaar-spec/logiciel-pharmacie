@@ -1,0 +1,364 @@
+@page "/module/sales"
+@inject DemoPosSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>Nouvelle vente — Logiciel Pharmacie</PageTitle>
+
+<div class="page-content pos-page">
+    <header class="page-header pos-page-header">
+        <div>
+            <p class="pos-kicker">Ventes</p>
+            <h1>Nouvelle vente</h1>
+            <p class="page-subtitle">Parcours nominal avec données exclusivement synthétiques.</p>
+        </div>
+        @if (Session.Step != DemoPosStep.Success)
+        {
+            <UiButton Variant="UiButtonVariant.Danger"
+                      Disabled="@(Session.Lines.Count == 0 || isCompleting)"
+                      OnClick="RequestClearCartAsync">
+                Vider le panier
+            </UiButton>
+        }
+    </header>
+
+    <UiAlert Title="Mode démonstration — aucune opération ne sera enregistrée"
+             Variant="UiAlertVariant.Warning">
+        Catalogue, panier et paiements restent uniquement en mémoire pendant cette session.
+    </UiAlert>
+
+    @if (Session.Step != DemoPosStep.Success)
+    {
+        <section class="pos-session-strip" aria-label="État de la vente de démonstration">
+            <UiBadge Text="Vente de démonstration" Variant="UiBadgeVariant.Information" />
+            <span><strong>Référence temporaire</strong> DEMO-BROUILLON</span>
+            <span><strong>Lignes</strong> @Session.Lines.Count</span>
+            <span><strong>Total</strong> @DemoMoney.Format(Session.Total)</span>
+        </section>
+    }
+
+    @if (showClearConfirmation)
+    {
+        <section class="pos-confirmation" role="alert" aria-labelledby="clear-cart-title">
+            <div>
+                <h2 id="clear-cart-title">Vider le panier de démonstration ?</h2>
+                <p>Les @Session.Lines.Count ligne(s) courantes seront retirées de cette session en mémoire.</p>
+            </div>
+            <div class="pos-confirmation__actions">
+                <UiButton Variant="UiButtonVariant.Secondary" OnClick="CancelClearCartAsync">Conserver le panier</UiButton>
+                <UiButton Variant="UiButtonVariant.Danger" OnClick="ConfirmClearCartAsync">Confirmer et vider</UiButton>
+            </div>
+        </section>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(noticeMessage))
+    {
+        <p class="pos-notice" role="status" aria-live="polite">@noticeMessage</p>
+    }
+
+    @if (Session.Step == DemoPosStep.Shopping)
+    {
+        <div class="pos-layout">
+            <div class="pos-main-column">
+                <section class="pos-search" aria-labelledby="demo-search-title">
+                    <div class="pos-search__heading">
+                        <div>
+                            <p class="pos-kicker">Recherche locale</p>
+                            <h2 id="demo-search-title">Rechercher ou scanner un code</h2>
+                        </div>
+                        <span>Entrée ajoute un code exact</span>
+                    </div>
+                    <label class="sr-only" for="demo-pos-search">Rechercher ou scanner un code</label>
+                    <div class="pos-search__control">
+                        <input id="demo-pos-search"
+                               @ref="searchInput"
+                               class="ui-field__control"
+                               type="search"
+                               autocomplete="off"
+                               spellcheck="false"
+                               placeholder="Nom fictif ou DEMO-000001"
+                               value="@searchTerm"
+                               aria-describedby="demo-search-help demo-search-message"
+                               @oninput="HandleSearchInput"
+                               @onkeydown="HandleSearchKeyDownAsync" />
+                        <UiButton Variant="UiButtonVariant.Secondary"
+                                  Disabled="@string.IsNullOrWhiteSpace(searchTerm)"
+                                  OnClick="ClearSearchAsync">
+                            Effacer la recherche
+                        </UiButton>
+                    </div>
+                    <p id="demo-search-help" class="ui-field__help">
+                        Recherche insensible à la casse, sans appel réseau ni création automatique.
+                    </p>
+                    <div id="demo-search-message" aria-live="polite">
+                        @if (!string.IsNullOrWhiteSpace(searchError)
+                            || !string.IsNullOrWhiteSpace(searchTerm) && FilteredItems.Count == 0)
+                        {
+                            <p class="ui-field__error" role="alert">
+                                Aucun article de démonstration trouvé. Aucun produit n’a été créé.
+                            </p>
+                        }
+                    </div>
+                </section>
+
+                <DemoCatalogPanel Items="FilteredItems" OnAdd="AddItemAsync" />
+            </div>
+
+            <aside class="pos-side-column" aria-label="Panier de démonstration">
+                <DemoCartPanel Session="Session"
+                               OnIncrease="IncreaseAsync"
+                               OnDecrease="DecreaseAsync"
+                               OnRemove="RemoveAsync"
+                               OnCheckout="BeginPaymentAsync" />
+            </aside>
+        </div>
+    }
+    else if (Session.Step == DemoPosStep.Payment)
+    {
+        <div class="pos-layout pos-layout--payment" @ref="paymentFocus" tabindex="-1">
+            <div class="pos-main-column">
+                <DemoPaymentPanel Session="Session"
+                                  IsCompleting="isCompleting"
+                                  OnBack="ReturnToCartAsync"
+                                  OnConfirm="CompleteSaleAsync" />
+            </div>
+            <aside class="pos-side-column" aria-label="Résumé du panier">
+                <DemoCartPanel Session="Session" ReadOnly="true" />
+            </aside>
+        </div>
+    }
+    else if (Session.Result is not null)
+    {
+        <div @ref="successFocus" tabindex="-1" class="pos-success-focus">
+            <DemoPosSuccess Result="Session.Result"
+                            OnNewSale="StartNewSaleAsync"
+                            OnHome="ReturnHomeAsync" />
+        </div>
+    }
+</div>
+
+@code {
+    private ElementReference searchInput;
+    private ElementReference paymentFocus;
+    private ElementReference successFocus;
+    private string searchTerm = string.Empty;
+    private string? searchError;
+    private string? noticeMessage;
+    private bool showClearConfirmation;
+    private bool isCompleting;
+    private FocusTarget requestedFocus = FocusTarget.Search;
+
+    private IReadOnlyList<DemoCatalogItem> FilteredItems => Session.Search(searchTerm);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender || requestedFocus != FocusTarget.None)
+        {
+            var target = firstRender ? FocusTarget.Search : requestedFocus;
+            requestedFocus = FocusTarget.None;
+
+            try
+            {
+                if (target == FocusTarget.Search && Session.Step == DemoPosStep.Shopping)
+                {
+                    await searchInput.FocusAsync();
+                }
+                else if (target == FocusTarget.Payment && Session.Step == DemoPosStep.Payment)
+                {
+                    await paymentFocus.FocusAsync();
+                }
+                else if (target == FocusTarget.Success && Session.Step == DemoPosStep.Success)
+                {
+                    await successFocus.FocusAsync();
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // The native view can be closing while a local focus request is pending.
+            }
+        }
+    }
+
+    private void HandleSearchInput(ChangeEventArgs args)
+    {
+        searchTerm = args.Value?.ToString() ?? string.Empty;
+        searchError = null;
+        noticeMessage = null;
+    }
+
+    private async Task HandleSearchKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (!string.Equals(args.Key, "Enter", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var result = Session.TryAddByExactCode(searchTerm);
+
+        if (result == DemoCartMutationResult.NotFound)
+        {
+            searchError = "unknown";
+            noticeMessage = null;
+            return;
+        }
+
+        ApplyMutationMessage(result);
+
+        if (result != DemoCartMutationResult.AvailabilityReached)
+        {
+            searchTerm = string.Empty;
+            searchError = null;
+        }
+
+        requestedFocus = FocusTarget.Search;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private Task AddItemAsync(int itemId)
+    {
+        ApplyMutationMessage(Session.AddItem(itemId));
+        requestedFocus = FocusTarget.Search;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task IncreaseAsync(int itemId)
+    {
+        ApplyMutationMessage(Session.Increase(itemId));
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task DecreaseAsync(int itemId)
+    {
+        ApplyMutationMessage(Session.Decrease(itemId));
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task RemoveAsync(int itemId)
+    {
+        ApplyMutationMessage(Session.Remove(itemId));
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task BeginPaymentAsync()
+    {
+        if (Session.BeginPayment())
+        {
+            showClearConfirmation = false;
+            noticeMessage = null;
+            requestedFocus = FocusTarget.Payment;
+        }
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task ReturnToCartAsync()
+    {
+        Session.ReturnToShopping();
+        requestedFocus = FocusTarget.Search;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CompleteSaleAsync()
+    {
+        if (!Session.TryBeginCompletion())
+        {
+            return;
+        }
+
+        isCompleting = true;
+
+        try
+        {
+            await Task.Delay(180);
+            Session.CompleteSale();
+            requestedFocus = FocusTarget.Success;
+        }
+        catch
+        {
+            Session.CancelCompletion();
+            throw;
+        }
+        finally
+        {
+            isCompleting = false;
+        }
+    }
+
+    private Task StartNewSaleAsync()
+    {
+        ResetPageState();
+        requestedFocus = FocusTarget.Search;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private void ReturnHomeAsync()
+    {
+        ResetPageState();
+        Navigation.NavigateTo("/home");
+    }
+
+    private Task RequestClearCartAsync(MouseEventArgs _)
+    {
+        showClearConfirmation = true;
+        noticeMessage = null;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task CancelClearCartAsync(MouseEventArgs _)
+    {
+        showClearConfirmation = false;
+        requestedFocus = FocusTarget.Search;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task ConfirmClearCartAsync(MouseEventArgs _)
+    {
+        Session.ClearCart();
+        showClearConfirmation = false;
+        noticeMessage = "Panier de démonstration vidé.";
+        requestedFocus = FocusTarget.Search;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task ClearSearchAsync(MouseEventArgs _)
+    {
+        searchTerm = string.Empty;
+        searchError = null;
+        noticeMessage = null;
+        requestedFocus = FocusTarget.Search;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private void ApplyMutationMessage(DemoCartMutationResult result)
+    {
+        searchError = null;
+        noticeMessage = result switch
+        {
+            DemoCartMutationResult.Added => "Article de démonstration ajouté au panier.",
+            DemoCartMutationResult.Merged => "Article déjà présent : quantité augmentée.",
+            DemoCartMutationResult.Increased => "Quantité augmentée.",
+            DemoCartMutationResult.Decreased => "Quantité diminuée.",
+            DemoCartMutationResult.Removed => "Ligne retirée du panier.",
+            DemoCartMutationResult.MinimumReached => "La quantité minimale est 1. Utilisez Supprimer pour retirer la ligne.",
+            DemoCartMutationResult.AvailabilityReached => "Disponibilité synthétique atteinte",
+            _ => "Aucune modification effectuée."
+        };
+    }
+
+    private void ResetPageState()
+    {
+        Session.ResetForNewSale();
+        searchTerm = string.Empty;
+        searchError = null;
+        noticeMessage = null;
+        showClearConfirmation = false;
+        isCompleting = false;
+    }
+
+    private enum FocusTarget
+    {
+        None,
+        Search,
+        Payment,
+        Success
+    }
+}

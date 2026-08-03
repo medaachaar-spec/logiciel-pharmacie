@@ -1,0 +1,182 @@
+@using System.Globalization
+
+<section class="pos-panel pos-payment" aria-labelledby="demo-payment-title">
+    <header class="pos-panel__header">
+        <div>
+            <p class="pos-kicker">Étape de règlement</p>
+            <h2 id="demo-payment-title">Paiement de démonstration</h2>
+        </div>
+        <strong class="pos-payment__total">@DemoMoney.Format(Session.Total)</strong>
+    </header>
+
+    <fieldset class="pos-payment-methods">
+        <legend>Choisir un mode de paiement</legend>
+        <label class="pos-payment-option">
+            <input type="radio"
+                   name="demo-payment-method"
+                   value="cash"
+                   checked="@(Session.PaymentMethod == DemoPaymentMethod.Cash)"
+                   @onchange="SelectCash" />
+            <span>
+                <strong>Espèces</strong>
+                <small>Calcul local de la monnaie</small>
+            </span>
+        </label>
+        <label class="pos-payment-option">
+            <input type="radio"
+                   name="demo-payment-method"
+                   value="card"
+                   checked="@(Session.PaymentMethod == DemoPaymentMethod.ExternalCard)"
+                   @onchange="SelectCard" />
+            <span>
+                <strong>Carte — TPE externe simulé</strong>
+                <small>Confirmation opérateur sans saisie bancaire</small>
+            </span>
+        </label>
+    </fieldset>
+
+    @if (Session.PaymentMethod == DemoPaymentMethod.Cash)
+    {
+        <div class="pos-payment-detail">
+            <label class="ui-field__label" for="demo-received-amount">Montant reçu</label>
+            <div class="pos-money-input">
+                <input id="demo-received-amount"
+                       class="ui-field__control"
+                       type="text"
+                       inputmode="decimal"
+                       autocomplete="off"
+                       value="@cashInput"
+                       aria-invalid="@HasCashError.ToString().ToLowerInvariant()"
+                       aria-describedby="demo-cash-help demo-cash-status"
+                       @oninput="HandleCashInput" />
+                <span>MAD</span>
+            </div>
+            <p id="demo-cash-help" class="ui-field__help">Saisissez un montant positif avec une virgule ou un point.</p>
+            <div id="demo-cash-status" class="pos-payment-status" aria-live="polite">
+                @if (!string.IsNullOrWhiteSpace(cashError))
+                {
+                    <p class="ui-field__error">Erreur : @cashError</p>
+                }
+                else if (Session.ReceivedAmount is not null && Session.ReceivedAmount.Value < Session.Total)
+                {
+                    <p class="ui-field__error">Montant insuffisant. Il manque @DemoMoney.Format(Session.Total - Session.ReceivedAmount.Value).</p>
+                }
+                else if (Session.ReceivedAmount is not null)
+                {
+                    <p class="pos-change">Monnaie à rendre : <strong>@DemoMoney.Format(Session.Change)</strong></p>
+                }
+            </div>
+        </div>
+    }
+    else if (Session.PaymentMethod == DemoPaymentMethod.ExternalCard)
+    {
+        <div class="pos-payment-detail">
+            <UiAlert Title="TPE externe — aucune donnée de carte n’est saisie dans le logiciel"
+                     Variant="UiAlertVariant.Information">
+                Le terminal est simulé et reste entièrement hors du logiciel.
+            </UiAlert>
+            <label class="pos-terminal-confirmation">
+                <input type="checkbox"
+                       checked="@Session.IsExternalTerminalConfirmed"
+                       @onchange="ConfirmTerminal" />
+                <span>Paiement confirmé sur le TPE de démonstration</span>
+            </label>
+        </div>
+    }
+    else
+    {
+        <p class="pos-payment-placeholder">Sélectionnez Espèces ou Carte — TPE externe simulé.</p>
+    }
+
+    <footer class="pos-payment__actions">
+        <UiButton Variant="UiButtonVariant.Secondary"
+                  Disabled="@IsCompleting"
+                  OnClick="BackAsync">
+            Retour au panier
+        </UiButton>
+        <UiButton Size="UiButtonSize.Large"
+                  Disabled="@(!Session.CanComplete || IsCompleting)"
+                  IsLoading="@IsCompleting"
+                  LoadingText="Validation locale en cours"
+                  OnClick="ConfirmAsync">
+            Confirmer la vente de démonstration
+        </UiButton>
+    </footer>
+</section>
+
+@code {
+    private string cashInput = string.Empty;
+    private string? cashError;
+
+    [Parameter, EditorRequired]
+    public DemoPosSession Session { get; set; } = default!;
+
+    [Parameter]
+    public bool IsCompleting { get; set; }
+
+    [Parameter]
+    public EventCallback OnBack { get; set; }
+
+    [Parameter]
+    public EventCallback OnConfirm { get; set; }
+
+    private bool HasCashError => !string.IsNullOrWhiteSpace(cashError)
+        || Session.ReceivedAmount is not null && Session.ReceivedAmount.Value < Session.Total;
+
+    private void SelectCash(ChangeEventArgs _)
+    {
+        Session.SelectPaymentMethod(DemoPaymentMethod.Cash);
+        cashInput = string.Empty;
+        cashError = null;
+    }
+
+    private void SelectCard(ChangeEventArgs _)
+    {
+        Session.SelectPaymentMethod(DemoPaymentMethod.ExternalCard);
+        cashInput = string.Empty;
+        cashError = null;
+    }
+
+    private void HandleCashInput(ChangeEventArgs args)
+    {
+        cashInput = args.Value?.ToString()?.Trim() ?? string.Empty;
+        cashError = null;
+
+        if (string.IsNullOrWhiteSpace(cashInput))
+        {
+            Session.SetReceivedAmount(null);
+            return;
+        }
+
+        var normalized = cashInput.Replace(',', '.');
+
+        if (!decimal.TryParse(
+                normalized,
+                NumberStyles.AllowDecimalPoint,
+                CultureInfo.InvariantCulture,
+                out var amount)
+            || amount < 0m)
+        {
+            Session.SetReceivedAmount(null);
+            cashError = "Saisissez un montant positif valide.";
+            return;
+        }
+
+        Session.SetReceivedAmount(amount);
+    }
+
+    private void ConfirmTerminal(ChangeEventArgs args)
+    {
+        Session.ConfirmExternalTerminal(args.Value is true);
+    }
+
+    private Task BackAsync(MouseEventArgs _)
+    {
+        return OnBack.InvokeAsync();
+    }
+
+    private Task ConfirmAsync(MouseEventArgs _)
+    {
+        return OnConfirm.InvokeAsync();
+    }
+}

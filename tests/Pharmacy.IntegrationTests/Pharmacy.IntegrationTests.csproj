@@ -16,4 +16,9 @@
     <ProjectReference Include="..\..\src\Pharmacy.Domain\Pharmacy.Domain.csproj" />
     <ProjectReference Include="..\..\src\Pharmacy.Infrastructure\Pharmacy.Infrastructure.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\Pharmacy.Desktop\Components\Pos\DemoPosModels.cs"
+             Link="DemoPosModels.cs" />
+  </ItemGroup>
 </Project>

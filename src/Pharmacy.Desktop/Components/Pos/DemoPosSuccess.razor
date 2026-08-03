@@ -1,0 +1,67 @@
+<section class="pos-success" aria-labelledby="demo-success-title">
+    <div class="pos-success__mark" aria-hidden="true">✓</div>
+    <p class="pos-kicker">Parcours local terminé</p>
+    <h2 id="demo-success-title">Vente de démonstration terminée</h2>
+    <p class="pos-success__reference">Référence en mémoire : <strong>@Result.Reference</strong></p>
+
+    <dl class="pos-success__summary">
+        <div>
+            <dt>Total</dt>
+            <dd>@DemoMoney.Format(Result.Total)</dd>
+        </div>
+        <div>
+            <dt>Mode de paiement</dt>
+            <dd>@PaymentLabel</dd>
+        </div>
+        @if (Result.PaymentMethod == DemoPaymentMethod.Cash)
+        {
+            <div>
+                <dt>Monnaie rendue</dt>
+                <dd>@DemoMoney.Format(Result.Change)</dd>
+            </div>
+        }
+        <div>
+            <dt>Articles</dt>
+            <dd>@Result.ItemCount article(s), @Result.LineCount ligne(s)</dd>
+        </div>
+    </dl>
+
+    <ul class="pos-success__reminders" aria-label="Limites de cette démonstration">
+        <li>Aucune donnée enregistrée</li>
+        <li>Aucun stock modifié</li>
+        <li>Aucun ticket imprimé</li>
+    </ul>
+
+    <div class="pos-success__actions">
+        <UiButton Size="UiButtonSize.Large" OnClick="NewSaleAsync">Nouvelle vente</UiButton>
+        <UiButton Variant="UiButtonVariant.Secondary" OnClick="HomeAsync">Retour à l’accueil</UiButton>
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public DemoCompletedSale Result { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback OnNewSale { get; set; }
+
+    [Parameter]
+    public EventCallback OnHome { get; set; }
+
+    private string PaymentLabel => Result.PaymentMethod switch
+    {
+        DemoPaymentMethod.Cash => "Espèces",
+        DemoPaymentMethod.ExternalCard => "Carte — TPE externe simulé",
+        _ => "Non défini"
+    };
+
+    private Task NewSaleAsync(MouseEventArgs _)
+    {
+        return OnNewSale.InvokeAsync();
+    }
+
+    private Task HomeAsync(MouseEventArgs _)
+    {
+        return OnHome.InvokeAsync();
+    }
+}

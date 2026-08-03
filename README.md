@@ -43,11 +43,13 @@ dotnet test .\Pharmacy.slnx -c Debug --no-build
 dotnet run --project .\src\Pharmacy.Desktop\Pharmacy.Desktop.csproj -c Debug
 ```
 
-Après le lancement, l’application ouvre l’accueil synthétique du shell V0.1. La barre latérale expose les domaines prévus de la V1 ; chaque entrée non implémentée ouvre une page provisoire descriptive, sans donnée réelle ni logique métier.
+Après le lancement, l’application ouvre l’accueil synthétique du shell V0.1. La barre latérale expose les domaines prévus de la V1. `Ventes` ouvre le POS V0.1, vertical slice de démonstration entièrement local et non persistant ; les sept autres domaines non implémentés ouvrent une page provisoire descriptive.
+
+Le POS V0.1 permet de rechercher les dix articles fictifs `DEMO-*`, d’ajouter et modifier un panier, puis de parcourir un paiement espèces ou une confirmation de TPE externe simulé. Tous les montants sont calculés avec `decimal`, aucune donnée n’est enregistrée, aucun stock n’est modifié et aucun ticket n’est produit. La spécification exécutable et ses limites sont documentées dans `docs/ux/POS_V0.1.md`.
 
 En configuration Debug, le groupe `Développement` donne également accès à :
 
 - `Diagnostic technique` sur `/diagnostic` : smoke screen conservé du Sprint 1 ;
 - `UI Lab` sur `/ui-lab` : fondations visuelles code-first V0.1 et états des composants.
 
-Le sélecteur d’aperçu des accès est une prévisualisation locale et non persistante. Ses profils ne sont ni des rôles métier finaux ni un mécanisme de sécurité. L’UI Lab et le shell V0.1 restent des outils/prototypes soumis à revue visuelle humaine.
+Le sélecteur d’aperçu des accès est une prévisualisation locale et non persistante. Ses profils ne sont ni des rôles métier finaux ni un mécanisme de sécurité. Le POS, l’UI Lab et le shell V0.1 restent des prototypes soumis à revue visuelle humaine.

@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using Pharmacy.Desktop.Components.Pos;
 
 namespace Pharmacy.Desktop;
 
@@ -16,6 +17,7 @@ public partial class App : System.Windows.Application
 
         var services = new ServiceCollection();
         services.AddWpfBlazorWebView();
+        services.AddScoped<DemoPosSession>();
 
 #if DEBUG
         services.AddBlazorWebViewDeveloperTools();
