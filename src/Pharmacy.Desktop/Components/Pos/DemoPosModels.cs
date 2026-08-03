@@ -16,9 +16,14 @@ public sealed record DemoCatalogItem(
 public sealed class DemoCartLine
 {
     public DemoCartLine(DemoCatalogItem item)
+        : this(item, 1)
+    {
+    }
+
+    internal DemoCartLine(DemoCatalogItem item, int quantity)
     {
         Item = item;
-        Quantity = 1;
+        Quantity = quantity;
     }
 
     public DemoCatalogItem Item { get; }
@@ -38,11 +43,27 @@ public sealed class DemoCartLine
     }
 }
 
+public sealed record DemoCartLineSnapshot(DemoCatalogItem Item, int Quantity)
+{
+    public decimal Subtotal => Item.UnitPrice * Quantity;
+}
+
+public sealed record DemoAvailabilityIncident(string ItemName, int MaximumQuantity);
+
 public enum DemoPaymentMethod
 {
     None,
     Cash,
     ExternalCard
+}
+
+public enum DemoCardPaymentStatus
+{
+    NotStarted,
+    AwaitingConfirmation,
+    Confirmed,
+    NotCompleted,
+    Ambiguous
 }
 
 public enum DemoPosStep
@@ -62,6 +83,14 @@ public enum DemoCartMutationResult
     MinimumReached,
     AvailabilityReached,
     NotFound
+}
+
+public enum DemoResumeResult
+{
+    Resumed,
+    CurrentCartNotEmpty,
+    NotFound,
+    Rejected
 }
 
 public sealed record DemoCompletedSale(
@@ -105,11 +134,24 @@ public sealed class DemoPosSession
 {
     private readonly List<DemoCartLine> lines = new();
     private readonly ReadOnlyCollection<DemoCartLine> readOnlyLines;
+    private readonly DemoSuspendedSaleStore suspendedSaleStore;
+    private readonly DemoTicketPrintService ticketPrintService;
+    private readonly object continuityLock = new();
     private int completedSaleCounter;
     private bool completionInProgress;
+    private bool continuityActionInProgress;
 
     public DemoPosSession()
+        : this(new DemoSuspendedSaleStore(), new DemoTicketPrintService())
     {
+    }
+
+    public DemoPosSession(
+        DemoSuspendedSaleStore suspendedSaleStore,
+        DemoTicketPrintService ticketPrintService)
+    {
+        this.suspendedSaleStore = suspendedSaleStore;
+        this.ticketPrintService = ticketPrintService;
         readOnlyLines = lines.AsReadOnly();
     }
 
@@ -117,15 +159,29 @@ public sealed class DemoPosSession
 
     public IReadOnlyList<DemoCartLine> Lines => readOnlyLines;
 
+    public IReadOnlyList<DemoSuspendedSale> SuspendedSales => suspendedSaleStore.Sales;
+
     public DemoPosStep Step { get; private set; } = DemoPosStep.Shopping;
 
     public DemoPaymentMethod PaymentMethod { get; private set; }
 
+    public DemoCardPaymentStatus CardPaymentStatus { get; private set; }
+
+    public int CardVerificationCount { get; private set; }
+
     public decimal? ReceivedAmount { get; private set; }
 
-    public bool IsExternalTerminalConfirmed { get; private set; }
+    public bool IsExternalTerminalConfirmed => CardPaymentStatus == DemoCardPaymentStatus.Confirmed;
 
     public DemoCompletedSale? Result { get; private set; }
+
+    public DemoPrintStatus PrintStatus => ticketPrintService.Status;
+
+    public int PrintAttemptCount => ticketPrintService.AttemptCount;
+
+    public DateTimeOffset? LastPrintAttemptAtLocal => ticketPrintService.LastAttemptAtLocal;
+
+    public bool ContinuedWithoutTicket => ticketPrintService.ContinuedWithoutTicket;
 
     public decimal Total => lines.Sum(line => line.Subtotal);
 
@@ -139,9 +195,22 @@ public sealed class DemoPosSession
 
     public bool IsCompletionInProgress => completionInProgress;
 
+    public bool IsContinuityActionInProgress => continuityActionInProgress;
+
+    public bool HasDraft => Step != DemoPosStep.Success && lines.Count > 0;
+
+    public bool CanSuspend => HasDraft
+        && !completionInProgress
+        && !continuityActionInProgress;
+
+    public bool CanAbandon => HasDraft
+        && !completionInProgress
+        && !continuityActionInProgress;
+
     public bool CanComplete => Step == DemoPosStep.Payment
         && lines.Count > 0
         && !completionInProgress
+        && !continuityActionInProgress
         && IsPaymentComplete();
 
     public IReadOnlyList<DemoCatalogItem> Search(string? query)
@@ -169,6 +238,11 @@ public sealed class DemoPosSession
                 && string.Equals(item.Code, code?.Trim(), StringComparison.OrdinalIgnoreCase));
     }
 
+    public DemoCartLine? FindLine(int itemId)
+    {
+        return lines.FirstOrDefault(line => line.Item.Id == itemId);
+    }
+
     public DemoCartMutationResult TryAddByExactCode(string? code)
     {
         var item = FindExactCode(code);
@@ -177,6 +251,11 @@ public sealed class DemoPosSession
 
     public DemoCartMutationResult AddItem(int itemId)
     {
+        if (Step != DemoPosStep.Shopping || continuityActionInProgress)
+        {
+            return DemoCartMutationResult.NotFound;
+        }
+
         var item = Catalog.FirstOrDefault(candidate => candidate.Id == itemId && candidate.IsActive);
 
         if (item is null)
@@ -184,7 +263,7 @@ public sealed class DemoPosSession
             return DemoCartMutationResult.NotFound;
         }
 
-        var line = lines.FirstOrDefault(candidate => candidate.Item.Id == itemId);
+        var line = FindLine(itemId);
 
         if (line is null)
         {
@@ -205,7 +284,7 @@ public sealed class DemoPosSession
     {
         var line = FindLine(itemId);
 
-        if (line is null)
+        if (line is null || Step != DemoPosStep.Shopping || continuityActionInProgress)
         {
             return DemoCartMutationResult.NotFound;
         }
@@ -223,7 +302,7 @@ public sealed class DemoPosSession
     {
         var line = FindLine(itemId);
 
-        if (line is null)
+        if (line is null || Step != DemoPosStep.Shopping || continuityActionInProgress)
         {
             return DemoCartMutationResult.NotFound;
         }
@@ -241,7 +320,7 @@ public sealed class DemoPosSession
     {
         var line = FindLine(itemId);
 
-        if (line is null)
+        if (line is null || Step != DemoPosStep.Shopping || continuityActionInProgress)
         {
             return DemoCartMutationResult.NotFound;
         }
@@ -253,32 +332,33 @@ public sealed class DemoPosSession
 
     public void ClearCart()
     {
+        if (Step == DemoPosStep.Success || continuityActionInProgress)
+        {
+            return;
+        }
+
         lines.Clear();
-        ResetPaymentIfCartChanged();
+        ResetDraftState();
     }
 
     public bool BeginPayment()
     {
-        if (lines.Count == 0)
+        if (lines.Count == 0 || continuityActionInProgress)
         {
             return false;
         }
 
         Step = DemoPosStep.Payment;
-        PaymentMethod = DemoPaymentMethod.None;
-        ReceivedAmount = null;
-        IsExternalTerminalConfirmed = false;
+        ResetPaymentState();
         return true;
     }
 
     public void ReturnToShopping()
     {
-        if (Step != DemoPosStep.Success)
+        if (Step != DemoPosStep.Success && !continuityActionInProgress)
         {
             Step = DemoPosStep.Shopping;
-            PaymentMethod = DemoPaymentMethod.None;
-            ReceivedAmount = null;
-            IsExternalTerminalConfirmed = false;
+            ResetPaymentState();
             completionInProgress = false;
         }
     }
@@ -286,14 +366,16 @@ public sealed class DemoPosSession
     public void SelectPaymentMethod(DemoPaymentMethod method)
     {
         if (Step != DemoPosStep.Payment
-            || method is DemoPaymentMethod.None)
+            || method is DemoPaymentMethod.None
+            || continuityActionInProgress)
         {
             return;
         }
 
         PaymentMethod = method;
         ReceivedAmount = null;
-        IsExternalTerminalConfirmed = false;
+        CardPaymentStatus = DemoCardPaymentStatus.NotStarted;
+        CardVerificationCount = 0;
     }
 
     public bool SetReceivedAmount(decimal? amount)
@@ -308,9 +390,227 @@ public sealed class DemoPosSession
         return true;
     }
 
+    public bool StartExternalCardVerification()
+    {
+        if (PaymentMethod != DemoPaymentMethod.ExternalCard
+            || CardPaymentStatus != DemoCardPaymentStatus.NotStarted)
+        {
+            return false;
+        }
+
+        CardPaymentStatus = DemoCardPaymentStatus.AwaitingConfirmation;
+        CardVerificationCount++;
+        return true;
+    }
+
+    public bool ReportExternalCardConfirmed()
+    {
+        return TransitionCardStatus(
+            DemoCardPaymentStatus.AwaitingConfirmation,
+            DemoCardPaymentStatus.Confirmed);
+    }
+
+    public bool ReportExternalCardNotCompleted()
+    {
+        return TransitionCardStatus(
+            DemoCardPaymentStatus.AwaitingConfirmation,
+            DemoCardPaymentStatus.NotCompleted);
+    }
+
+    public bool ReportExternalCardAmbiguous()
+    {
+        return TransitionCardStatus(
+            DemoCardPaymentStatus.AwaitingConfirmation,
+            DemoCardPaymentStatus.Ambiguous);
+    }
+
+    public bool ResolveAmbiguousCardAsConfirmed()
+    {
+        return TransitionCardStatus(
+            DemoCardPaymentStatus.Ambiguous,
+            DemoCardPaymentStatus.Confirmed);
+    }
+
+    public bool ResolveAmbiguousCardAsNotCompleted()
+    {
+        return TransitionCardStatus(
+            DemoCardPaymentStatus.Ambiguous,
+            DemoCardPaymentStatus.NotCompleted);
+    }
+
+    public bool ReturnToPaymentChoice()
+    {
+        if (Step != DemoPosStep.Payment || completionInProgress)
+        {
+            return false;
+        }
+
+        ResetPaymentState();
+        return true;
+    }
+
     public void ConfirmExternalTerminal(bool isConfirmed)
     {
-        IsExternalTerminalConfirmed = PaymentMethod == DemoPaymentMethod.ExternalCard && isConfirmed;
+        if (PaymentMethod != DemoPaymentMethod.ExternalCard)
+        {
+            return;
+        }
+
+        CardPaymentStatus = isConfirmed
+            ? DemoCardPaymentStatus.Confirmed
+            : DemoCardPaymentStatus.NotCompleted;
+    }
+
+    public DemoSuspendedSale? SuspendCurrent()
+    {
+        lock (continuityLock)
+        {
+            if (!CanSuspend)
+            {
+                return null;
+            }
+
+            continuityActionInProgress = true;
+
+            try
+            {
+                var suspended = suspendedSaleStore.Suspend(lines);
+                lines.Clear();
+                ResetDraftState();
+                return suspended;
+            }
+            finally
+            {
+                continuityActionInProgress = false;
+            }
+        }
+    }
+
+    public DemoResumeResult ResumeSuspended(string reference)
+    {
+        lock (continuityLock)
+        {
+            if (continuityActionInProgress || Step == DemoPosStep.Success)
+            {
+                return DemoResumeResult.Rejected;
+            }
+
+            if (lines.Count > 0)
+            {
+                return DemoResumeResult.CurrentCartNotEmpty;
+            }
+
+            continuityActionInProgress = true;
+
+            try
+            {
+                if (!suspendedSaleStore.TryTake(reference, out var suspended))
+                {
+                    return DemoResumeResult.NotFound;
+                }
+
+                Restore(suspended);
+                return DemoResumeResult.Resumed;
+            }
+            finally
+            {
+                continuityActionInProgress = false;
+            }
+        }
+    }
+
+    public DemoResumeResult SuspendCurrentThenResume(string reference)
+    {
+        lock (continuityLock)
+        {
+            if (!CanSuspend || !suspendedSaleStore.Contains(reference))
+            {
+                return DemoResumeResult.Rejected;
+            }
+
+            continuityActionInProgress = true;
+
+            try
+            {
+                suspendedSaleStore.Suspend(lines);
+                lines.Clear();
+
+                if (!suspendedSaleStore.TryTake(reference, out var suspended))
+                {
+                    ResetDraftState();
+                    return DemoResumeResult.NotFound;
+                }
+
+                Restore(suspended);
+                return DemoResumeResult.Resumed;
+            }
+            finally
+            {
+                continuityActionInProgress = false;
+            }
+        }
+    }
+
+    public DemoResumeResult AbandonCurrentThenResume(string reference)
+    {
+        lock (continuityLock)
+        {
+            if (continuityActionInProgress
+                || Step == DemoPosStep.Success
+                || !suspendedSaleStore.Contains(reference))
+            {
+                return DemoResumeResult.Rejected;
+            }
+
+            continuityActionInProgress = true;
+
+            try
+            {
+                lines.Clear();
+                ResetDraftState();
+
+                if (!suspendedSaleStore.TryTake(reference, out var suspended))
+                {
+                    return DemoResumeResult.NotFound;
+                }
+
+                Restore(suspended);
+                return DemoResumeResult.Resumed;
+            }
+            finally
+            {
+                continuityActionInProgress = false;
+            }
+        }
+    }
+
+    public bool DeleteSuspended(string reference)
+    {
+        return !continuityActionInProgress && suspendedSaleStore.TryDelete(reference);
+    }
+
+    public bool AbandonDraft()
+    {
+        lock (continuityLock)
+        {
+            if (!CanAbandon)
+            {
+                return false;
+            }
+
+            continuityActionInProgress = true;
+
+            try
+            {
+                lines.Clear();
+                ResetDraftState();
+                return true;
+            }
+            finally
+            {
+                continuityActionInProgress = false;
+            }
+        }
     }
 
     public bool TryBeginCompletion()
@@ -341,6 +641,7 @@ public sealed class DemoPosSession
             lines.Count);
         Step = DemoPosStep.Success;
         completionInProgress = false;
+        ticketPrintService.PrepareForSale(Result.Reference);
         return Result;
     }
 
@@ -349,20 +650,48 @@ public sealed class DemoPosSession
         completionInProgress = false;
     }
 
+    public bool TryBeginTicketPrint()
+    {
+        return Result is not null && ticketPrintService.TryBegin(Result.Reference);
+    }
+
+    public bool CompleteTicketPrint(DemoPrintSimulationOutcome outcome)
+    {
+        return Result is not null && ticketPrintService.Complete(Result.Reference, outcome);
+    }
+
+    public bool ContinueWithoutTicket()
+    {
+        return Result is not null && ticketPrintService.ContinueWithoutTicket(Result.Reference);
+    }
+
     public void ResetForNewSale()
     {
         lines.Clear();
-        Step = DemoPosStep.Shopping;
-        PaymentMethod = DemoPaymentMethod.None;
-        ReceivedAmount = null;
-        IsExternalTerminalConfirmed = false;
+        ResetDraftState();
         Result = null;
-        completionInProgress = false;
+        ticketPrintService.Reset();
     }
 
-    private DemoCartLine? FindLine(int itemId)
+    private bool TransitionCardStatus(DemoCardPaymentStatus from, DemoCardPaymentStatus to)
     {
-        return lines.FirstOrDefault(line => line.Item.Id == itemId);
+        if (PaymentMethod != DemoPaymentMethod.ExternalCard || CardPaymentStatus != from)
+        {
+            return false;
+        }
+
+        CardPaymentStatus = to;
+        return true;
+    }
+
+    private void Restore(DemoSuspendedSale suspended)
+    {
+        lines.Clear();
+        lines.AddRange(suspended.Lines.Select(line => new DemoCartLine(line.Item, line.Quantity)));
+        Result = null;
+        Step = DemoPosStep.Shopping;
+        ResetPaymentState();
+        completionInProgress = false;
     }
 
     private bool IsPaymentComplete()
@@ -370,7 +699,7 @@ public sealed class DemoPosSession
         return PaymentMethod switch
         {
             DemoPaymentMethod.Cash => ReceivedAmount is not null && ReceivedAmount.Value >= Total,
-            DemoPaymentMethod.ExternalCard => IsExternalTerminalConfirmed,
+            DemoPaymentMethod.ExternalCard => CardPaymentStatus == DemoCardPaymentStatus.Confirmed,
             _ => false
         };
     }
@@ -382,9 +711,22 @@ public sealed class DemoPosSession
             Step = DemoPosStep.Shopping;
         }
 
+        ResetPaymentState();
+        completionInProgress = false;
+    }
+
+    private void ResetDraftState()
+    {
+        Step = DemoPosStep.Shopping;
+        ResetPaymentState();
+        completionInProgress = false;
+    }
+
+    private void ResetPaymentState()
+    {
         PaymentMethod = DemoPaymentMethod.None;
         ReceivedAmount = null;
-        IsExternalTerminalConfirmed = false;
-        completionInProgress = false;
+        CardPaymentStatus = DemoCardPaymentStatus.NotStarted;
+        CardVerificationCount = 0;
     }
 }

@@ -20,5 +20,9 @@
   <ItemGroup>
     <Compile Include="..\..\src\Pharmacy.Desktop\Components\Pos\DemoPosModels.cs"
              Link="DemoPosModels.cs" />
+    <Compile Include="..\..\src\Pharmacy.Desktop\Components\Pos\DemoSuspendedSaleStore.cs"
+             Link="DemoSuspendedSaleStore.cs" />
+    <Compile Include="..\..\src\Pharmacy.Desktop\Components\Pos\DemoTicketPrintService.cs"
+             Link="DemoTicketPrintService.cs" />
   </ItemGroup>
 </Project>

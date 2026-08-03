@@ -17,6 +17,8 @@ public partial class App : System.Windows.Application
 
         var services = new ServiceCollection();
         services.AddWpfBlazorWebView();
+        services.AddScoped<DemoSuspendedSaleStore>();
+        services.AddScoped<DemoTicketPrintService>();
         services.AddScoped<DemoPosSession>();
 
 #if DEBUG

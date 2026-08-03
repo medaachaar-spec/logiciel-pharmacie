@@ -9,21 +9,13 @@
         <div>
             <p class="pos-kicker">Ventes</p>
             <h1>Nouvelle vente</h1>
-            <p class="page-subtitle">Parcours nominal avec données exclusivement synthétiques.</p>
+            <p class="page-subtitle">Continuité de vente avec données exclusivement synthétiques.</p>
         </div>
-        @if (Session.Step != DemoPosStep.Success)
-        {
-            <UiButton Variant="UiButtonVariant.Danger"
-                      Disabled="@(Session.Lines.Count == 0 || isCompleting)"
-                      OnClick="RequestClearCartAsync">
-                Vider le panier
-            </UiButton>
-        }
     </header>
 
     <UiAlert Title="Mode démonstration — aucune opération ne sera enregistrée"
              Variant="UiAlertVariant.Warning">
-        Catalogue, panier et paiements restent uniquement en mémoire pendant cette session.
+        Catalogue, paniers suspendus, paiements et impressions simulées restent uniquement en mémoire pendant cette session.
     </UiAlert>
 
     @if (Session.Step != DemoPosStep.Success)
@@ -34,18 +26,93 @@
             <span><strong>Lignes</strong> @Session.Lines.Count</span>
             <span><strong>Total</strong> @DemoMoney.Format(Session.Total)</span>
         </section>
+
+        <nav class="pos-continuity-actions" aria-label="Actions de continuité de la vente">
+            <UiButton Variant="UiButtonVariant.Secondary"
+                      Disabled="@(!Session.CanSuspend || isCompleting)"
+                      OnClick="RequestSuspendAsync">
+                Suspendre la vente
+            </UiButton>
+            <UiButton Variant="UiButtonVariant.Danger"
+                      Disabled="@(!Session.CanAbandon || isCompleting)"
+                      OnClick="RequestAbandonAsync">
+                Abandonner le brouillon
+            </UiButton>
+            <UiButton Variant="UiButtonVariant.Secondary"
+                      aria-expanded="@showSuspendedSales.ToString().ToLowerInvariant()"
+                      aria-controls="demo-suspended-sales"
+                      OnClick="ToggleSuspendedSalesAsync">
+                Ventes suspendues (@Session.SuspendedSales.Count)
+            </UiButton>
+        </nav>
     }
 
-    @if (showClearConfirmation)
+    @if (confirmationKind != ConfirmationKind.None)
     {
-        <section class="pos-confirmation" role="alert" aria-labelledby="clear-cart-title">
+        <section class="pos-confirmation"
+                 @ref="confirmationFocus"
+                 tabindex="-1"
+                 role="alertdialog"
+                 aria-modal="true"
+                 aria-labelledby="continuity-confirmation-title"
+                 @onkeydown="HandleConfirmationKeyDownAsync">
             <div>
-                <h2 id="clear-cart-title">Vider le panier de démonstration ?</h2>
-                <p>Les @Session.Lines.Count ligne(s) courantes seront retirées de cette session en mémoire.</p>
+                <h2 id="continuity-confirmation-title">@ConfirmationTitle</h2>
+                <p>@ConfirmationMessage</p>
             </div>
             <div class="pos-confirmation__actions">
-                <UiButton Variant="UiButtonVariant.Secondary" OnClick="CancelClearCartAsync">Conserver le panier</UiButton>
-                <UiButton Variant="UiButtonVariant.Danger" OnClick="ConfirmClearCartAsync">Confirmer et vider</UiButton>
+                @if (confirmationKind == ConfirmationKind.ResumeConflict)
+                {
+                    <UiButton Variant="UiButtonVariant.Secondary" OnClick="CancelConfirmationAsync">
+                        Revenir au panier courant
+                    </UiButton>
+                    <UiButton OnClick="ConfirmSuspendThenResumeAsync">
+                        Suspendre le panier courant puis reprendre
+                    </UiButton>
+                    <UiButton Variant="UiButtonVariant.Danger" OnClick="ConfirmAbandonThenResumeAsync">
+                        Abandonner le panier courant puis reprendre
+                    </UiButton>
+                }
+                else
+                {
+                    <UiButton Variant="UiButtonVariant.Secondary" OnClick="CancelConfirmationAsync">
+                        Annuler
+                    </UiButton>
+                    @if (confirmationKind == ConfirmationKind.Suspend)
+                    {
+                        <UiButton OnClick="ConfirmSuspendAsync">Confirmer la suspension</UiButton>
+                    }
+                    else if (confirmationKind == ConfirmationKind.Abandon)
+                    {
+                        <UiButton Variant="UiButtonVariant.Danger" OnClick="ConfirmAbandonAsync">
+                            Confirmer l’abandon
+                        </UiButton>
+                    }
+                    else if (confirmationKind == ConfirmationKind.DeleteSuspended)
+                    {
+                        <UiButton Variant="UiButtonVariant.Danger" OnClick="ConfirmDeleteSuspendedAsync">
+                            Confirmer la suppression
+                        </UiButton>
+                    }
+                    else if (confirmationKind == ConfirmationKind.ResolveCardConfirmed)
+                    {
+                        <UiButton OnClick="ConfirmResolveCardConfirmedAsync">
+                            Confirmer le paiement après vérification
+                        </UiButton>
+                    }
+                    else if (confirmationKind == ConfirmationKind.ResolveCardNotCompleted)
+                    {
+                        <UiButton Variant="UiButtonVariant.Danger" OnClick="ConfirmResolveCardNotCompletedAsync">
+                            Confirmer le paiement non réalisé
+                        </UiButton>
+                    }
+                    else if (confirmationKind == ConfirmationKind.ReturnCardToPaymentChoice)
+                    {
+                        <UiButton Variant="UiButtonVariant.Danger" OnClick="ConfirmReturnCardToPaymentChoiceAsync">
+                            Confirmer le retour au choix du paiement
+                        </UiButton>
+                    }
+                }
             </div>
         </section>
     }
@@ -53,6 +120,15 @@
     @if (!string.IsNullOrWhiteSpace(noticeMessage))
     {
         <p class="pos-notice" role="status" aria-live="polite">@noticeMessage</p>
+    }
+
+    @if (showSuspendedSales && Session.Step != DemoPosStep.Success)
+    {
+        <div id="demo-suspended-sales">
+            <DemoSuspendedSalesPanel Sales="Session.SuspendedSales"
+                                     OnResume="ResumeSuspendedAsync"
+                                     OnDelete="RequestDeleteSuspendedAsync" />
+        </div>
     }
 
     @if (Session.Step == DemoPosStep.Shopping)
@@ -90,11 +166,26 @@
                         Recherche insensible à la casse, sans appel réseau ni création automatique.
                     </p>
                     <div id="demo-search-message" aria-live="polite">
-                        @if (!string.IsNullOrWhiteSpace(searchError)
-                            || !string.IsNullOrWhiteSpace(searchTerm) && FilteredItems.Count == 0)
+                        @if (unknownCodeIncident)
                         {
-                            <p class="ui-field__error" role="alert">
-                                Aucun article de démonstration trouvé. Aucun produit n’a été créé.
+                            <UiAlert Title="Code inconnu" Variant="UiAlertVariant.Warning">
+                                <p>Aucun article de démonstration ne correspond à ce code. Aucun produit n’a été créé.</p>
+                                <div class="pos-incident-actions">
+                                    <UiButton Size="UiButtonSize.Small"
+                                              Variant="UiButtonVariant.Secondary"
+                                              OnClick="ClearSearchAsync">
+                                        Effacer la recherche
+                                    </UiButton>
+                                    <UiButton Size="UiButtonSize.Small" OnClick="ReturnToCatalogAsync">
+                                        Revenir au catalogue
+                                    </UiButton>
+                                </div>
+                            </UiAlert>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(searchTerm) && FilteredItems.Count == 0)
+                        {
+                            <p class="ui-field__error" role="status">
+                                Aucun résultat dans le catalogue de démonstration.
                             </p>
                         }
                     </div>
@@ -105,6 +196,8 @@
 
             <aside class="pos-side-column" aria-label="Panier de démonstration">
                 <DemoCartPanel Session="Session"
+                               AvailabilityIncident="availabilityIncident"
+                               OnDismissAvailability="DismissAvailabilityAsync"
                                OnIncrease="IncreaseAsync"
                                OnDecrease="DecreaseAsync"
                                OnRemove="RemoveAsync"
@@ -119,7 +212,10 @@
                 <DemoPaymentPanel Session="Session"
                                   IsCompleting="isCompleting"
                                   OnBack="ReturnToCartAsync"
-                                  OnConfirm="CompleteSaleAsync" />
+                                  OnConfirm="CompleteSaleAsync"
+                                  OnResolveCardConfirmed="RequestResolveCardConfirmedAsync"
+                                  OnResolveCardNotCompleted="RequestResolveCardNotCompletedAsync"
+                                  OnReturnAmbiguousToPaymentChoice="RequestReturnCardToPaymentChoiceAsync" />
             </div>
             <aside class="pos-side-column" aria-label="Résumé du panier">
                 <DemoCartPanel Session="Session" ReadOnly="true" />
@@ -129,7 +225,7 @@
     else if (Session.Result is not null)
     {
         <div @ref="successFocus" tabindex="-1" class="pos-success-focus">
-            <DemoPosSuccess Result="Session.Result"
+            <DemoPosSuccess Session="Session"
                             OnNewSale="StartNewSaleAsync"
                             OnHome="ReturnHomeAsync" />
         </div>
@@ -140,48 +236,89 @@
     private ElementReference searchInput;
     private ElementReference paymentFocus;
     private ElementReference successFocus;
+    private ElementReference confirmationFocus;
     private string searchTerm = string.Empty;
-    private string? searchError;
     private string? noticeMessage;
-    private bool showClearConfirmation;
+    private string? pendingSuspendedReference;
+    private DemoAvailabilityIncident? availabilityIncident;
+    private bool unknownCodeIncident;
+    private bool showSuspendedSales;
     private bool isCompleting;
+    private ConfirmationKind confirmationKind;
     private FocusTarget requestedFocus = FocusTarget.Search;
 
     private IReadOnlyList<DemoCatalogItem> FilteredItems => Session.Search(searchTerm);
 
+    private string ConfirmationTitle => confirmationKind switch
+    {
+        ConfirmationKind.Suspend => "Suspendre la vente courante ?",
+        ConfirmationKind.Abandon => "Abandonner le brouillon ?",
+        ConfirmationKind.DeleteSuspended => $"Supprimer {pendingSuspendedReference} ?",
+        ConfirmationKind.ResumeConflict => "Un panier est déjà en cours",
+        ConfirmationKind.ResolveCardConfirmed => "Confirmer le résultat du TPE ?",
+        ConfirmationKind.ResolveCardNotCompleted => "Déclarer le paiement non réalisé ?",
+        ConfirmationKind.ReturnCardToPaymentChoice => "Quitter le statut incertain ?",
+        _ => string.Empty
+    };
+
+    private string ConfirmationMessage => confirmationKind switch
+    {
+        ConfirmationKind.Suspend =>
+            "Les lignes et quantités seront conservées sous une référence temporaire. Le paiement courant ne sera pas conservé et la suspension disparaîtra à la fermeture de l’application.",
+        ConfirmationKind.Abandon =>
+            "Toutes les lignes et tout paiement incomplet du brouillon courant seront supprimés. Les ventes déjà suspendues resteront disponibles.",
+        ConfirmationKind.DeleteSuspended =>
+            "Cette vente suspendue en mémoire sera supprimée définitivement de la session de démonstration.",
+        ConfirmationKind.ResumeConflict =>
+            $"La reprise de {pendingSuspendedReference} ne doit pas écraser le panier courant. Choisissez explicitement de le conserver par suspension ou de l’abandonner.",
+        ConfirmationKind.ResolveCardConfirmed =>
+            "Confirmez uniquement après avoir vérifié le résultat affiché par le TPE externe simulé. Aucun nouveau paiement ne sera lancé.",
+        ConfirmationKind.ResolveCardNotCompleted =>
+            "Le paiement carte sera marqué non réalisé et la vente restera non validable jusqu’au choix explicite d’un paiement.",
+        ConfirmationKind.ReturnCardToPaymentChoice =>
+            "Le statut incertain sera effacé sans relancer de paiement. Vérifiez le TPE externe avant de choisir ensuite un nouveau mode de paiement.",
+        _ => string.Empty
+    };
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender || requestedFocus != FocusTarget.None)
+        if (!firstRender && requestedFocus == FocusTarget.None)
         {
-            var target = firstRender ? FocusTarget.Search : requestedFocus;
-            requestedFocus = FocusTarget.None;
+            return;
+        }
 
-            try
+        var target = firstRender ? FocusTarget.Search : requestedFocus;
+        requestedFocus = FocusTarget.None;
+
+        try
+        {
+            if (target == FocusTarget.Search && Session.Step == DemoPosStep.Shopping)
             {
-                if (target == FocusTarget.Search && Session.Step == DemoPosStep.Shopping)
-                {
-                    await searchInput.FocusAsync();
-                }
-                else if (target == FocusTarget.Payment && Session.Step == DemoPosStep.Payment)
-                {
-                    await paymentFocus.FocusAsync();
-                }
-                else if (target == FocusTarget.Success && Session.Step == DemoPosStep.Success)
-                {
-                    await successFocus.FocusAsync();
-                }
+                await searchInput.FocusAsync();
             }
-            catch (InvalidOperationException)
+            else if (target == FocusTarget.Payment && Session.Step == DemoPosStep.Payment)
             {
-                // The native view can be closing while a local focus request is pending.
+                await paymentFocus.FocusAsync();
             }
+            else if (target == FocusTarget.Success && Session.Step == DemoPosStep.Success)
+            {
+                await successFocus.FocusAsync();
+            }
+            else if (target == FocusTarget.Confirmation && confirmationKind != ConfirmationKind.None)
+            {
+                await confirmationFocus.FocusAsync();
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            // The native view can be closing while a local focus request is pending.
         }
     }
 
     private void HandleSearchInput(ChangeEventArgs args)
     {
         searchTerm = args.Value?.ToString() ?? string.Empty;
-        searchError = null;
+        unknownCodeIncident = false;
         noticeMessage = null;
     }
 
@@ -192,21 +329,24 @@
             return;
         }
 
-        var result = Session.TryAddByExactCode(searchTerm);
+        var item = Session.FindExactCode(searchTerm);
 
-        if (result == DemoCartMutationResult.NotFound)
+        if (item is null)
         {
-            searchError = "unknown";
+            unknownCodeIncident = true;
             noticeMessage = null;
+            requestedFocus = FocusTarget.Search;
+            await InvokeAsync(StateHasChanged);
             return;
         }
 
-        ApplyMutationMessage(result);
+        var result = Session.AddItem(item.Id);
+        ApplyMutationMessage(result, item.Id);
 
         if (result != DemoCartMutationResult.AvailabilityReached)
         {
             searchTerm = string.Empty;
-            searchError = null;
+            unknownCodeIncident = false;
         }
 
         requestedFocus = FocusTarget.Search;
@@ -215,26 +355,26 @@
 
     private Task AddItemAsync(int itemId)
     {
-        ApplyMutationMessage(Session.AddItem(itemId));
+        ApplyMutationMessage(Session.AddItem(itemId), itemId);
         requestedFocus = FocusTarget.Search;
         return InvokeAsync(StateHasChanged);
     }
 
     private Task IncreaseAsync(int itemId)
     {
-        ApplyMutationMessage(Session.Increase(itemId));
+        ApplyMutationMessage(Session.Increase(itemId), itemId);
         return InvokeAsync(StateHasChanged);
     }
 
     private Task DecreaseAsync(int itemId)
     {
-        ApplyMutationMessage(Session.Decrease(itemId));
+        ApplyMutationMessage(Session.Decrease(itemId), itemId);
         return InvokeAsync(StateHasChanged);
     }
 
     private Task RemoveAsync(int itemId)
     {
-        ApplyMutationMessage(Session.Remove(itemId));
+        ApplyMutationMessage(Session.Remove(itemId), itemId);
         return InvokeAsync(StateHasChanged);
     }
 
@@ -242,7 +382,8 @@
     {
         if (Session.BeginPayment())
         {
-            showClearConfirmation = false;
+            CloseConfirmation();
+            availabilityIncident = null;
             noticeMessage = null;
             requestedFocus = FocusTarget.Payment;
         }
@@ -265,6 +406,7 @@
         }
 
         isCompleting = true;
+        CloseConfirmation();
 
         try
         {
@@ -283,6 +425,202 @@
         }
     }
 
+    private Task RequestSuspendAsync(MouseEventArgs _)
+    {
+        return ShowConfirmationAsync(ConfirmationKind.Suspend);
+    }
+
+    private Task ConfirmSuspendAsync(MouseEventArgs _)
+    {
+        var suspended = Session.SuspendCurrent();
+        CloseConfirmation();
+
+        if (suspended is not null)
+        {
+            searchTerm = string.Empty;
+            unknownCodeIncident = false;
+            availabilityIncident = null;
+            showSuspendedSales = true;
+            noticeMessage = $"Vente suspendue sous {suspended.Reference}. Temporaire en mémoire : elle disparaîtra à la fermeture.";
+            requestedFocus = FocusTarget.Search;
+        }
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task RequestAbandonAsync(MouseEventArgs _)
+    {
+        return ShowConfirmationAsync(ConfirmationKind.Abandon);
+    }
+
+    private Task ConfirmAbandonAsync(MouseEventArgs _)
+    {
+        var abandoned = Session.AbandonDraft();
+        CloseConfirmation();
+
+        if (abandoned)
+        {
+            searchTerm = string.Empty;
+            unknownCodeIncident = false;
+            availabilityIncident = null;
+            noticeMessage = "Brouillon abandonné. Aucune vente ni aucun paiement n’a été créé.";
+            requestedFocus = FocusTarget.Search;
+        }
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task ToggleSuspendedSalesAsync(MouseEventArgs _)
+    {
+        showSuspendedSales = !showSuspendedSales;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task ResumeSuspendedAsync(string reference)
+    {
+        var result = Session.ResumeSuspended(reference);
+
+        if (result == DemoResumeResult.CurrentCartNotEmpty)
+        {
+            pendingSuspendedReference = reference;
+            return ShowConfirmationAsync(ConfirmationKind.ResumeConflict);
+        }
+
+        ApplyResumeResult(result, reference);
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task ConfirmSuspendThenResumeAsync(MouseEventArgs _)
+    {
+        var reference = pendingSuspendedReference;
+        var result = reference is null
+            ? DemoResumeResult.NotFound
+            : Session.SuspendCurrentThenResume(reference);
+        CloseConfirmation();
+        ApplyResumeResult(result, reference);
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task ConfirmAbandonThenResumeAsync(MouseEventArgs _)
+    {
+        var reference = pendingSuspendedReference;
+        var result = reference is null
+            ? DemoResumeResult.NotFound
+            : Session.AbandonCurrentThenResume(reference);
+        CloseConfirmation();
+        ApplyResumeResult(result, reference);
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task RequestDeleteSuspendedAsync(string reference)
+    {
+        pendingSuspendedReference = reference;
+        return ShowConfirmationAsync(ConfirmationKind.DeleteSuspended);
+    }
+
+    private Task ConfirmDeleteSuspendedAsync(MouseEventArgs _)
+    {
+        var reference = pendingSuspendedReference;
+        var deleted = reference is not null && Session.DeleteSuspended(reference);
+        CloseConfirmation();
+        noticeMessage = deleted
+            ? $"Vente suspendue {reference} supprimée de la mémoire de démonstration. Aucune vente réelle n’a été annulée."
+            : "La vente suspendue n’est plus disponible.";
+        requestedFocus = Session.Step == DemoPosStep.Shopping ? FocusTarget.Search : FocusTarget.Payment;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task RequestResolveCardConfirmedAsync()
+    {
+        return ShowConfirmationAsync(ConfirmationKind.ResolveCardConfirmed);
+    }
+
+    private Task RequestResolveCardNotCompletedAsync()
+    {
+        return ShowConfirmationAsync(ConfirmationKind.ResolveCardNotCompleted);
+    }
+
+    private Task RequestReturnCardToPaymentChoiceAsync()
+    {
+        return ShowConfirmationAsync(ConfirmationKind.ReturnCardToPaymentChoice);
+    }
+
+    private Task ConfirmResolveCardConfirmedAsync(MouseEventArgs _)
+    {
+        Session.ResolveAmbiguousCardAsConfirmed();
+        CloseConfirmation();
+        requestedFocus = FocusTarget.Payment;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task ConfirmResolveCardNotCompletedAsync(MouseEventArgs _)
+    {
+        Session.ResolveAmbiguousCardAsNotCompleted();
+        CloseConfirmation();
+        requestedFocus = FocusTarget.Payment;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task ConfirmReturnCardToPaymentChoiceAsync(MouseEventArgs _)
+    {
+        Session.ReturnToPaymentChoice();
+        CloseConfirmation();
+        requestedFocus = FocusTarget.Payment;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task ShowConfirmationAsync(ConfirmationKind kind)
+    {
+        confirmationKind = kind;
+        noticeMessage = null;
+        requestedFocus = FocusTarget.Confirmation;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task CancelConfirmationAsync(MouseEventArgs _)
+    {
+        CloseConfirmation();
+        requestedFocus = Session.Step switch
+        {
+            DemoPosStep.Payment => FocusTarget.Payment,
+            DemoPosStep.Success => FocusTarget.Success,
+            _ => FocusTarget.Search
+        };
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task HandleConfirmationKeyDownAsync(KeyboardEventArgs args)
+    {
+        return string.Equals(args.Key, "Escape", StringComparison.Ordinal)
+            ? CancelConfirmationAsync(new MouseEventArgs())
+            : Task.CompletedTask;
+    }
+
+    private Task ClearSearchAsync(MouseEventArgs _)
+    {
+        searchTerm = string.Empty;
+        unknownCodeIncident = false;
+        noticeMessage = null;
+        requestedFocus = FocusTarget.Search;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task ReturnToCatalogAsync(MouseEventArgs _)
+    {
+        searchTerm = string.Empty;
+        unknownCodeIncident = false;
+        noticeMessage = null;
+        requestedFocus = FocusTarget.Search;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task DismissAvailabilityAsync()
+    {
+        availabilityIncident = null;
+        requestedFocus = FocusTarget.Search;
+        return InvokeAsync(StateHasChanged);
+    }
+
     private Task StartNewSaleAsync()
     {
         ResetPageState();
@@ -296,41 +634,36 @@
         Navigation.NavigateTo("/home");
     }
 
-    private Task RequestClearCartAsync(MouseEventArgs _)
+    private void ApplyResumeResult(DemoResumeResult result, string? reference)
     {
-        showClearConfirmation = true;
-        noticeMessage = null;
-        return InvokeAsync(StateHasChanged);
+        if (result == DemoResumeResult.Resumed)
+        {
+            searchTerm = string.Empty;
+            unknownCodeIncident = false;
+            availabilityIncident = null;
+            noticeMessage = $"Vente suspendue {reference} reprise. Le paiement doit être choisi à nouveau.";
+            requestedFocus = FocusTarget.Search;
+        }
+        else if (result != DemoResumeResult.CurrentCartNotEmpty)
+        {
+            noticeMessage = "La vente suspendue n’est plus disponible.";
+        }
     }
 
-    private Task CancelClearCartAsync(MouseEventArgs _)
+    private void ApplyMutationMessage(DemoCartMutationResult result, int itemId)
     {
-        showClearConfirmation = false;
-        requestedFocus = FocusTarget.Search;
-        return InvokeAsync(StateHasChanged);
-    }
+        unknownCodeIncident = false;
 
-    private Task ConfirmClearCartAsync(MouseEventArgs _)
-    {
-        Session.ClearCart();
-        showClearConfirmation = false;
-        noticeMessage = "Panier de démonstration vidé.";
-        requestedFocus = FocusTarget.Search;
-        return InvokeAsync(StateHasChanged);
-    }
+        if (result == DemoCartMutationResult.AvailabilityReached)
+        {
+            var item = Session.FindLine(itemId)?.Item
+                ?? Session.Catalog.First(candidate => candidate.Id == itemId);
+            availabilityIncident = new DemoAvailabilityIncident(item.Name, item.AvailableQuantity);
+            noticeMessage = null;
+            return;
+        }
 
-    private Task ClearSearchAsync(MouseEventArgs _)
-    {
-        searchTerm = string.Empty;
-        searchError = null;
-        noticeMessage = null;
-        requestedFocus = FocusTarget.Search;
-        return InvokeAsync(StateHasChanged);
-    }
-
-    private void ApplyMutationMessage(DemoCartMutationResult result)
-    {
-        searchError = null;
+        availabilityIncident = null;
         noticeMessage = result switch
         {
             DemoCartMutationResult.Added => "Article de démonstration ajouté au panier.",
@@ -339,19 +672,38 @@
             DemoCartMutationResult.Decreased => "Quantité diminuée.",
             DemoCartMutationResult.Removed => "Ligne retirée du panier.",
             DemoCartMutationResult.MinimumReached => "La quantité minimale est 1. Utilisez Supprimer pour retirer la ligne.",
-            DemoCartMutationResult.AvailabilityReached => "Disponibilité synthétique atteinte",
             _ => "Aucune modification effectuée."
         };
+    }
+
+    private void CloseConfirmation()
+    {
+        confirmationKind = ConfirmationKind.None;
+        pendingSuspendedReference = null;
     }
 
     private void ResetPageState()
     {
         Session.ResetForNewSale();
         searchTerm = string.Empty;
-        searchError = null;
+        unknownCodeIncident = false;
+        availabilityIncident = null;
         noticeMessage = null;
-        showClearConfirmation = false;
+        showSuspendedSales = false;
         isCompleting = false;
+        CloseConfirmation();
+    }
+
+    private enum ConfirmationKind
+    {
+        None,
+        Suspend,
+        Abandon,
+        DeleteSuspended,
+        ResumeConflict,
+        ResolveCardConfirmed,
+        ResolveCardNotCompleted,
+        ReturnCardToPaymentChoice
     }
 
     private enum FocusTarget
@@ -359,6 +711,7 @@
         None,
         Search,
         Payment,
-        Success
+        Success,
+        Confirmation
     }
 }

@@ -7,6 +7,19 @@
         <span class="pos-cart__quantity">@Session.TotalQuantity article(s)</span>
     </header>
 
+    @if (AvailabilityIncident is not null)
+    {
+        <UiAlert Title="Quantité indisponible dans le catalogue de démonstration."
+                 Variant="UiAlertVariant.Warning"
+                 Dismissible="true"
+                 OnDismiss="OnDismissAvailability">
+            <p>
+                Article : <strong>@AvailabilityIncident.ItemName</strong> — quantité maximale :
+                <strong>@AvailabilityIncident.MaximumQuantity</strong>. Le panier existant est conservé.
+            </p>
+        </UiAlert>
+    }
+
     @if (Session.Lines.Count == 0)
     {
         <UiEmptyState Title="Le panier est vide"
@@ -85,6 +98,12 @@
 
     [Parameter]
     public bool ReadOnly { get; set; }
+
+    [Parameter]
+    public DemoAvailabilityIncident? AvailabilityIncident { get; set; }
+
+    [Parameter]
+    public EventCallback OnDismissAvailability { get; set; }
 
     [Parameter]
     public EventCallback<int> OnIncrease { get; set; }

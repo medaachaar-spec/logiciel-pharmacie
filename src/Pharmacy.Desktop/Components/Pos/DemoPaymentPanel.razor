@@ -9,7 +9,7 @@
         <strong class="pos-payment__total">@DemoMoney.Format(Session.Total)</strong>
     </header>
 
-    <fieldset class="pos-payment-methods">
+    <fieldset class="pos-payment-methods" disabled="@IsCompleting">
         <legend>Choisir un mode de paiement</legend>
         <label class="pos-payment-option">
             <input type="radio"
@@ -30,7 +30,7 @@
                    @onchange="SelectCard" />
             <span>
                 <strong>Carte — TPE externe simulé</strong>
-                <small>Confirmation opérateur sans saisie bancaire</small>
+                <small>Vérification opérateur sans saisie bancaire</small>
             </span>
         </label>
     </fieldset>
@@ -48,6 +48,7 @@
                        value="@cashInput"
                        aria-invalid="@HasCashError.ToString().ToLowerInvariant()"
                        aria-describedby="demo-cash-help demo-cash-status"
+                       disabled="@IsCompleting"
                        @oninput="HandleCashInput" />
                 <span>MAD</span>
             </div>
@@ -70,17 +71,73 @@
     }
     else if (Session.PaymentMethod == DemoPaymentMethod.ExternalCard)
     {
-        <div class="pos-payment-detail">
+        <div class="pos-payment-detail pos-terminal-state">
             <UiAlert Title="TPE externe — aucune donnée de carte n’est saisie dans le logiciel"
                      Variant="UiAlertVariant.Information">
-                Le terminal est simulé et reste entièrement hors du logiciel.
+                Le terminal est simulé et reste entièrement hors du logiciel. Aucun résultat n’est déduit automatiquement.
             </UiAlert>
-            <label class="pos-terminal-confirmation">
-                <input type="checkbox"
-                       checked="@Session.IsExternalTerminalConfirmed"
-                       @onchange="ConfirmTerminal" />
-                <span>Paiement confirmé sur le TPE de démonstration</span>
-            </label>
+
+            <div class="pos-terminal-state__header">
+                <strong>État du paiement carte</strong>
+                <UiBadge Text="@CardStatusLabel" Variant="@CardStatusVariant" />
+            </div>
+
+            @if (Session.CardPaymentStatus == DemoCardPaymentStatus.NotStarted)
+            {
+                <UiButton OnClick="StartCardVerificationAsync">
+                    Lancer la vérification TPE simulée
+                </UiButton>
+            }
+            else if (Session.CardPaymentStatus == DemoCardPaymentStatus.AwaitingConfirmation)
+            {
+                <p>Après lecture du TPE externe simulé, choisissez explicitement le résultat observé.</p>
+                <div class="pos-terminal-actions">
+                    <UiButton OnClick="ReportCardConfirmedAsync">Paiement confirmé</UiButton>
+                    <UiButton Variant="UiButtonVariant.Secondary" OnClick="ReportCardNotCompletedAsync">
+                        Paiement non réalisé
+                    </UiButton>
+                    <UiButton Variant="UiButtonVariant.Danger" OnClick="ReportCardAmbiguousAsync">
+                        Statut incertain
+                    </UiButton>
+                </div>
+            }
+            else if (Session.CardPaymentStatus == DemoCardPaymentStatus.Confirmed)
+            {
+                <UiAlert Title="Paiement confirmé après vérification du TPE"
+                         Variant="UiAlertVariant.Success">
+                    La vente peut maintenant être confirmée. Aucune donnée bancaire n’a été stockée.
+                </UiAlert>
+            }
+            else if (Session.CardPaymentStatus == DemoCardPaymentStatus.NotCompleted)
+            {
+                <UiAlert Title="Paiement non réalisé"
+                         Variant="UiAlertVariant.Warning">
+                    Aucun paiement carte n’est retenu et la validation de la vente reste bloquée.
+                </UiAlert>
+                <UiButton Variant="UiButtonVariant.Secondary" OnClick="ReturnToPaymentChoiceAsync">
+                    Retour au choix du paiement
+                </UiButton>
+            }
+            else if (Session.CardPaymentStatus == DemoCardPaymentStatus.Ambiguous)
+            {
+                <UiAlert Title="Statut du paiement incertain"
+                         Variant="UiAlertVariant.Danger">
+                    <p>Vérifiez le TPE externe avant de poursuivre. Ne relancez pas automatiquement un nouveau paiement.</p>
+                    <div class="pos-terminal-actions">
+                        <UiButton OnClick="ResolveConfirmedAsync">
+                            Confirmer après vérification du TPE
+                        </UiButton>
+                        <UiButton Variant="UiButtonVariant.Secondary" OnClick="ResolveNotCompletedAsync">
+                            Déclarer le paiement non réalisé
+                        </UiButton>
+                        <UiButton Variant="UiButtonVariant.Danger" OnClick="RequestReturnAmbiguousToPaymentChoiceAsync">
+                            Retour au choix du paiement
+                        </UiButton>
+                    </div>
+                </UiAlert>
+            }
+
+            <small>Vérifications TPE simulées lancées : @Session.CardVerificationCount</small>
         </div>
     }
     else
@@ -120,8 +177,34 @@
     [Parameter]
     public EventCallback OnConfirm { get; set; }
 
+    [Parameter]
+    public EventCallback OnResolveCardConfirmed { get; set; }
+
+    [Parameter]
+    public EventCallback OnResolveCardNotCompleted { get; set; }
+
+    [Parameter]
+    public EventCallback OnReturnAmbiguousToPaymentChoice { get; set; }
+
     private bool HasCashError => !string.IsNullOrWhiteSpace(cashError)
         || Session.ReceivedAmount is not null && Session.ReceivedAmount.Value < Session.Total;
+
+    private string CardStatusLabel => Session.CardPaymentStatus switch
+    {
+        DemoCardPaymentStatus.AwaitingConfirmation => "Vérification en attente",
+        DemoCardPaymentStatus.Confirmed => "Confirmé",
+        DemoCardPaymentStatus.NotCompleted => "Non réalisé",
+        DemoCardPaymentStatus.Ambiguous => "Incertain — action requise",
+        _ => "Non démarré"
+    };
+
+    private UiBadgeVariant CardStatusVariant => Session.CardPaymentStatus switch
+    {
+        DemoCardPaymentStatus.Confirmed => UiBadgeVariant.Success,
+        DemoCardPaymentStatus.Ambiguous => UiBadgeVariant.Danger,
+        DemoCardPaymentStatus.NotCompleted => UiBadgeVariant.Warning,
+        _ => UiBadgeVariant.Information
+    };
 
     private void SelectCash(ChangeEventArgs _)
     {
@@ -165,9 +248,49 @@
         Session.SetReceivedAmount(amount);
     }
 
-    private void ConfirmTerminal(ChangeEventArgs args)
+    private Task StartCardVerificationAsync(MouseEventArgs _)
     {
-        Session.ConfirmExternalTerminal(args.Value is true);
+        Session.StartExternalCardVerification();
+        return Task.CompletedTask;
+    }
+
+    private Task ReportCardConfirmedAsync(MouseEventArgs _)
+    {
+        Session.ReportExternalCardConfirmed();
+        return Task.CompletedTask;
+    }
+
+    private Task ReportCardNotCompletedAsync(MouseEventArgs _)
+    {
+        Session.ReportExternalCardNotCompleted();
+        return Task.CompletedTask;
+    }
+
+    private Task ReportCardAmbiguousAsync(MouseEventArgs _)
+    {
+        Session.ReportExternalCardAmbiguous();
+        return Task.CompletedTask;
+    }
+
+    private Task ResolveConfirmedAsync(MouseEventArgs _)
+    {
+        return OnResolveCardConfirmed.InvokeAsync();
+    }
+
+    private Task ResolveNotCompletedAsync(MouseEventArgs _)
+    {
+        return OnResolveCardNotCompleted.InvokeAsync();
+    }
+
+    private Task ReturnToPaymentChoiceAsync(MouseEventArgs _)
+    {
+        Session.ReturnToPaymentChoice();
+        return Task.CompletedTask;
+    }
+
+    private Task RequestReturnAmbiguousToPaymentChoiceAsync(MouseEventArgs _)
+    {
+        return OnReturnAmbiguousToPaymentChoice.InvokeAsync();
     }
 
     private Task BackAsync(MouseEventArgs _)

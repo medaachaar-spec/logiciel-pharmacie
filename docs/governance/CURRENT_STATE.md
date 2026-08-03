@@ -8,7 +8,7 @@ Date de mise à jour : 2026-08-03
 - Phase 2 fonctionnelle : PASS.
 - Phase 3 modèle de données : PASS.
 - Phase 4 UX/UI : PASS.
-- Phase 5 code-first : fondation technique Sprint 1, `UI Foundations V0.1` Sprint 2, shell applicatif V0.1 Sprint 3 et POS synthétique V0.1 Sprint 4 créés ; aucune persistance ni architecture métier définitive démarrée.
+- Phase 5 code-first : fondation technique Sprint 1, `UI Foundations V0.1` Sprint 2, shell applicatif V0.1 Sprint 3, POS synthétique V0.1 Sprint 4 et continuité POS V0.2 Sprint 5 créés ; aucune persistance ni architecture métier définitive démarrée.
 
 ## État du développement
 
@@ -16,9 +16,9 @@ Date de mise à jour : 2026-08-03
 - Dépôt réel : `C:\Users\HP\Desktop\Logiciel pharmacie`.
 - Branche active : `main`.
 - Sprint 0 : `IMPLEMENTED — FOUNDATION READY WITH WARNINGS` après correction de classification Sprint 0.1.
-- Git : dépôt local sur le commit `a160d0b`, zéro remote ; changements Sprint 4 laissés non stagés pour revue.
+- Git : dépôt local sur le commit `38dc3d0`, zéro remote ; changements Sprint 5 laissés non stagés pour revue.
 - Solution .NET créée : OUI — `Pharmacy.slnx`, six projets .NET 10.
-- Code frontend : POS V0.1 — shell WPF/Blazor Hybrid, Ventes disponible sur un parcours nominal synthétique en mémoire, sept pages provisoires, diagnostic et UI Lab Debug.
+- Code frontend : POS V0.2 — shell WPF/Blazor Hybrid, Ventes disponible avec parcours nominal, incidents, suspensions, TPE ambigu et impression simulée en mémoire ; sept pages provisoires, diagnostic et UI Lab Debug.
 - Code backend : COUCHES VIDES — Domain, Application et Infrastructure contiennent uniquement leurs marqueurs techniques.
 - Base SQL Server métier : NON CRÉÉE pour ce projet.
 - CI : NON DÉMARRÉE.
@@ -51,7 +51,7 @@ Date de mise à jour : 2026-08-03
 
 ## Prochaine étape autorisée
 
-Effectuer la revue manuelle du POS Sprint 4 à 1100 × 700, 1366 × 768 et 1920 × 1080, tester recherche/scan simulé, panier, paiements espèces/carte, clavier, focus et réinitialisation, puis transmettre les quatre captures et le résultat carte demandés. Ne pas démarrer le POS avancé, un autre module métier ou la persistance sans prompt dédié. Ne pas démarrer la persistance SQL avant disponibilité de SQL Server 2025 Express et traitement contrôlé du TLS. Ne pas certifier le poste pilote avant conformité Windows 11 Pro x64 et SQL Server 2025 Express.
+Effectuer la revue manuelle de continuité du POS Sprint 5 à 1100 × 700, 1366 × 768 et 1920 × 1080. Fournir les cinq captures demandées — code inconnu, disponibilité insuffisante, ventes suspendues, carte ambiguë et échec d’impression — ainsi que les confirmations de reprise, réimpression réussie et prévention du double clic. Ne pas démarrer un autre module métier ou la persistance sans prompt dédié. Ne pas démarrer la persistance SQL avant disponibilité de SQL Server 2025 Express et traitement contrôlé du TLS. Ne pas certifier le poste pilote avant conformité Windows 11 Pro x64 et SQL Server 2025 Express.
 
 ## Interdictions actuelles
 
@@ -127,3 +127,17 @@ Effectuer la revue manuelle du POS Sprint 4 à 1100 × 700, 1366 × 768 et 1920 
 - Lancement : fenêtre WPF 1100 × 700, WebView2, route Ventes et ajout clavier `DEMO-000001` vérifiés techniquement ; fermeture propre et runner final code 0.
 - Packages : aucun nouveau PackageReference ; graphe de six projets inchangé.
 - Architecture métier définitive, base, SQL, API, serveur, ressource distante, périphérique réel, remote, commit et push : aucun ajout.
+
+## Mise à jour après le Sprint 5
+
+- Statut : `IMPLEMENTED — AUTOMATED CHECKS PASS — MANUAL CONTINUITY REVIEW REQUIRED`.
+- Incidents : code inconnu sans création et refus explicite d’une quantité au-delà de la disponibilité synthétique, sans altérer le panier.
+- Continuité : suspensions `DEMO-HOLD-*` en mémoire, liste temporaire, reprise sans écrasement silencieux, suppression confirmée et abandon contrôlé du brouillon.
+- Carte : états `NotStarted`, `AwaitingConfirmation`, `Confirmed`, `NotCompleted` et `Ambiguous` ; validation bloquée tant que le statut est incertain et résolution manuelle confirmée.
+- Impression : vente terminée avant le ticket, états non demandé/en cours/imprimé/échec, nouvelle tentative avec compteur et protection contre les doubles clics ; aucun périphérique ou fichier utilisé.
+- Accessibilité : incidents adjacents, confirmations uniques, Escape non destructif, boutons natifs, focus replacé et textes indépendants de la couleur.
+- Responsive : disposition en colonne à 1100 px et grille à 1366/1920 px ; revue humaine encore requise aux trois résolutions.
+- Validation finale Debug et Release : builds réussis avec 0 avertissement et 0 erreur ; 115/115 tests réussis dans chaque configuration, aucun test ignoré.
+- Lancement : processus et fenêtre WPF répondants, POS/incident/suspensions/conflit de reprise rendus, fermeture propre ; TPE ambigu et impression restent à valider visuellement par l’utilisateur.
+- Packages : aucun nouveau PackageReference ; six projets et graphe de références inchangés.
+- Architecture métier définitive, base, SQL, fichier de ticket, réseau, donnée bancaire, périphérique réel, remote, commit et push : aucun ajout.

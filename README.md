@@ -43,13 +43,13 @@ dotnet test .\Pharmacy.slnx -c Debug --no-build
 dotnet run --project .\src\Pharmacy.Desktop\Pharmacy.Desktop.csproj -c Debug
 ```
 
-Après le lancement, l’application ouvre l’accueil synthétique du shell V0.1. La barre latérale expose les domaines prévus de la V1. `Ventes` ouvre le POS V0.1, vertical slice de démonstration entièrement local et non persistant ; les sept autres domaines non implémentés ouvrent une page provisoire descriptive.
+Après le lancement, l’application ouvre l’accueil synthétique du shell V0.1. La barre latérale expose les domaines prévus de la V1. `Ventes` ouvre le POS V0.2, vertical slice de démonstration entièrement local et non persistant ; les sept autres domaines non implémentés ouvrent une page provisoire descriptive.
 
-Le POS V0.1 permet de rechercher les dix articles fictifs `DEMO-*`, d’ajouter et modifier un panier, puis de parcourir un paiement espèces ou une confirmation de TPE externe simulé. Tous les montants sont calculés avec `decimal`, aucune donnée n’est enregistrée, aucun stock n’est modifié et aucun ticket n’est produit. La spécification exécutable et ses limites sont documentées dans `docs/ux/POS_V0.1.md`.
+Le POS V0.2 conserve le parcours nominal V0.1 et ajoute les incidents de code inconnu/disponibilité, la suspension et la reprise contrôlée de paniers, l’abandon du brouillon, la machine d’états du TPE ambigu et une impression post-vente entièrement simulée. Tous les montants sont calculés avec `decimal` ; aucune donnée bancaire ou réelle n’est collectée, aucune donnée n’est persistée, aucun stock n’est modifié et aucun ticket réel n’est produit. Les spécifications et limites sont documentées dans `docs/ux/POS_V0.1.md` et `docs/ux/POS_V0.2_CONTINUITY.md`.
 
 En configuration Debug, le groupe `Développement` donne également accès à :
 
 - `Diagnostic technique` sur `/diagnostic` : smoke screen conservé du Sprint 1 ;
 - `UI Lab` sur `/ui-lab` : fondations visuelles code-first V0.1 et états des composants.
 
-Le sélecteur d’aperçu des accès est une prévisualisation locale et non persistante. Ses profils ne sont ni des rôles métier finaux ni un mécanisme de sécurité. Le POS, l’UI Lab et le shell V0.1 restent des prototypes soumis à revue visuelle humaine.
+Le sélecteur d’aperçu des accès est une prévisualisation locale et non persistante. Ses profils ne sont ni des rôles métier finaux ni un mécanisme de sécurité. Le POS, l’UI Lab et le shell V0.1 restent des prototypes soumis à revue visuelle humaine. La checklist de continuité Sprint 5 se trouve dans `docs/reports/sprint-05/pos-continuity-validation.md`.

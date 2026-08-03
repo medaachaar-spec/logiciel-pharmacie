@@ -1,7 +1,7 @@
 <section class="pos-success" aria-labelledby="demo-success-title">
     <div class="pos-success__mark" aria-hidden="true">✓</div>
     <p class="pos-kicker">Parcours local terminé</p>
-    <h2 id="demo-success-title">Vente de démonstration terminée</h2>
+    <h2 id="demo-success-title">Vente terminée</h2>
     <p class="pos-success__reference">Référence en mémoire : <strong>@Result.Reference</strong></p>
 
     <dl class="pos-success__summary">
@@ -26,10 +26,89 @@
         </div>
     </dl>
 
+    <section class="pos-ticket" aria-labelledby="demo-ticket-title">
+        <div class="pos-ticket__heading">
+            <div>
+                <p class="pos-kicker">Opération post-vente indépendante</p>
+                <h3 id="demo-ticket-title">Ticket</h3>
+            </div>
+            <UiBadge Text="@PrintStatusLabel" Variant="@PrintStatusVariant" />
+        </div>
+
+        @if (IsDevelopmentBuild && Session.PrintStatus is DemoPrintStatus.NotRequested or DemoPrintStatus.Failed)
+        {
+            <label class="ui-field__label" for="demo-print-outcome">Simulateur technique — résultat de la prochaine impression</label>
+            <select id="demo-print-outcome"
+                    class="ui-field__control"
+                    value="@selectedOutcome"
+                    disabled="@isPrinting"
+                    @onchange="SelectOutcome">
+                <option value="success">Succès simulé</option>
+                <option value="failure">Échec simulé</option>
+            </select>
+        }
+
+        @if (Session.PrintStatus == DemoPrintStatus.NotRequested)
+        {
+            <p>La vente est déjà terminée. Cette action simule uniquement l’impression locale du ticket.</p>
+            <UiButton Disabled="@isPrinting"
+                      IsLoading="@isPrinting"
+                      LoadingText="Impression simulée en cours"
+                      OnClick="PrintAsync">
+                Imprimer le ticket de démonstration
+            </UiButton>
+        }
+        else if (Session.PrintStatus == DemoPrintStatus.InProgress)
+        {
+            <p role="status" aria-live="polite">Impression simulée en cours. La vente reste terminée.</p>
+        }
+        else if (Session.PrintStatus == DemoPrintStatus.Printed)
+        {
+            <UiAlert Title="Ticket imprimé dans le simulateur"
+                     Variant="UiAlertVariant.Success">
+                Aucun périphérique, fichier ou document réel n’a été utilisé.
+            </UiAlert>
+        }
+        else if (Session.PrintStatus == DemoPrintStatus.Failed && !Session.ContinuedWithoutTicket)
+        {
+            <UiAlert Title="Ticket non imprimé"
+                     Variant="UiAlertVariant.Warning">
+                <p>Vente terminée. La référence et le total sont conservés ; aucun paiement ni vente n’est recréé.</p>
+            </UiAlert>
+            <div class="pos-ticket__actions">
+                <UiButton Disabled="@isPrinting"
+                          IsLoading="@isPrinting"
+                          LoadingText="Nouvelle tentative en cours"
+                          OnClick="PrintAsync">
+                    Réessayer l’impression
+                </UiButton>
+                <UiButton Variant="UiButtonVariant.Secondary" OnClick="ContinueWithoutTicketAsync">
+                    Continuer sans ticket
+                </UiButton>
+                <UiButton Variant="UiButtonVariant.Secondary" OnClick="NewSaleAsync">
+                    Nouvelle vente
+                </UiButton>
+            </div>
+        }
+
+        @if (Session.ContinuedWithoutTicket)
+        {
+            <UiAlert Title="Suite choisie sans ticket"
+                     Variant="UiAlertVariant.Information">
+                La vente terminée reste inchangée. Vous pouvez démarrer une nouvelle vente.
+            </UiAlert>
+        }
+
+        <dl class="pos-ticket__facts">
+            <div><dt>Tentatives</dt><dd>@Session.PrintAttemptCount</dd></div>
+            <div><dt>Dernière tentative</dt><dd>@LastAttemptLabel</dd></div>
+        </dl>
+    </section>
+
     <ul class="pos-success__reminders" aria-label="Limites de cette démonstration">
         <li>Aucune donnée enregistrée</li>
         <li>Aucun stock modifié</li>
-        <li>Aucun ticket imprimé</li>
+        <li>Aucun ticket physique produit</li>
     </ul>
 
     <div class="pos-success__actions">
@@ -39,8 +118,17 @@
 </section>
 
 @code {
+    private bool isPrinting;
+    private string selectedOutcome = "success";
+
+#if DEBUG
+    private const bool IsDevelopmentBuild = true;
+#else
+    private const bool IsDevelopmentBuild = false;
+#endif
+
     [Parameter, EditorRequired]
-    public DemoCompletedSale Result { get; set; } = default!;
+    public DemoPosSession Session { get; set; } = default!;
 
     [Parameter]
     public EventCallback OnNewSale { get; set; }
@@ -48,12 +136,68 @@
     [Parameter]
     public EventCallback OnHome { get; set; }
 
+    private DemoCompletedSale Result => Session.Result
+        ?? throw new InvalidOperationException("Le résultat de vente de démonstration est requis.");
+
     private string PaymentLabel => Result.PaymentMethod switch
     {
         DemoPaymentMethod.Cash => "Espèces",
         DemoPaymentMethod.ExternalCard => "Carte — TPE externe simulé",
         _ => "Non défini"
     };
+
+    private string PrintStatusLabel => Session.PrintStatus switch
+    {
+        DemoPrintStatus.InProgress => "Impression en cours",
+        DemoPrintStatus.Printed => "Imprimé (simulation)",
+        DemoPrintStatus.Failed => Session.ContinuedWithoutTicket ? "Suite sans ticket" : "Échec d’impression",
+        _ => "Non demandé"
+    };
+
+    private UiBadgeVariant PrintStatusVariant => Session.PrintStatus switch
+    {
+        DemoPrintStatus.Printed => UiBadgeVariant.Success,
+        DemoPrintStatus.Failed => UiBadgeVariant.Warning,
+        _ => UiBadgeVariant.Information
+    };
+
+    private string LastAttemptLabel => Session.LastPrintAttemptAtLocal is null
+        ? "Aucune"
+        : Session.LastPrintAttemptAtLocal.Value.ToString("dd/MM/yyyy HH:mm:ss");
+
+    private void SelectOutcome(ChangeEventArgs args)
+    {
+        selectedOutcome = args.Value?.ToString() == "failure" ? "failure" : "success";
+    }
+
+    private async Task PrintAsync(MouseEventArgs _)
+    {
+        if (isPrinting || !Session.TryBeginTicketPrint())
+        {
+            return;
+        }
+
+        isPrinting = true;
+
+        try
+        {
+            await Task.Delay(180);
+            var outcome = selectedOutcome == "failure"
+                ? DemoPrintSimulationOutcome.Failure
+                : DemoPrintSimulationOutcome.Success;
+            Session.CompleteTicketPrint(outcome);
+        }
+        finally
+        {
+            isPrinting = false;
+        }
+    }
+
+    private Task ContinueWithoutTicketAsync(MouseEventArgs _)
+    {
+        Session.ContinueWithoutTicket();
+        return Task.CompletedTask;
+    }
 
     private Task NewSaleAsync(MouseEventArgs _)
     {

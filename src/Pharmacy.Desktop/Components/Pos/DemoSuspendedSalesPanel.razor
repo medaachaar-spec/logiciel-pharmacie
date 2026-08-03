@@ -1,0 +1,73 @@
+<section class="pos-panel pos-holds" aria-labelledby="demo-holds-title">
+    <header class="pos-panel__header">
+        <div>
+            <p class="pos-kicker">Continuité locale</p>
+            <h2 id="demo-holds-title">Ventes suspendues</h2>
+        </div>
+        <span class="pos-result-count">@Sales.Count vente(s)</span>
+    </header>
+
+    @if (Sales.Count == 0)
+    {
+        <UiEmptyState Title="Aucune vente suspendue"
+                      Description="Les paniers suspendus apparaîtront ici jusqu’à la fermeture de l’application." />
+    }
+    else
+    {
+        <ul class="pos-hold-list">
+            @foreach (var sale in Sales)
+            {
+                <li class="pos-hold" @key="sale.Reference">
+                    <div class="pos-hold__heading">
+                        <div>
+                            <strong>@sale.Reference</strong>
+                            <span>@sale.SuspendedAtLocal.ToString("dd/MM/yyyy HH:mm:ss")</span>
+                        </div>
+                        <UiBadge Text="Temporaire en mémoire" Variant="UiBadgeVariant.Warning" />
+                    </div>
+                    <dl class="pos-hold__facts">
+                        <div><dt>Lignes</dt><dd>@sale.LineCount</dd></div>
+                        <div><dt>Quantité totale</dt><dd>@sale.TotalQuantity</dd></div>
+                        <div><dt>Total</dt><dd>@DemoMoney.Format(sale.Total)</dd></div>
+                    </dl>
+                    <div class="pos-hold__actions">
+                        <UiButton Size="UiButtonSize.Small"
+                                  OnClick="args => ResumeAsync(sale.Reference, args)">
+                            Reprendre
+                        </UiButton>
+                        <UiButton Size="UiButtonSize.Small"
+                                  Variant="UiButtonVariant.Danger"
+                                  OnClick="args => DeleteAsync(sale.Reference, args)">
+                            Supprimer
+                        </UiButton>
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+
+    <p class="pos-holds__warning">
+        Stockage de démonstration uniquement en mémoire : toutes les suspensions disparaissent à la fermeture.
+    </p>
+</section>
+
+@code {
+    [Parameter]
+    public IReadOnlyList<DemoSuspendedSale> Sales { get; set; } = Array.Empty<DemoSuspendedSale>();
+
+    [Parameter]
+    public EventCallback<string> OnResume { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnDelete { get; set; }
+
+    private Task ResumeAsync(string reference, MouseEventArgs _)
+    {
+        return OnResume.InvokeAsync(reference);
+    }
+
+    private Task DeleteAsync(string reference, MouseEventArgs _)
+    {
+        return OnDelete.InvokeAsync(reference);
+    }
+}

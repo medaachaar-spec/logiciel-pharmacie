@@ -43,6 +43,13 @@
     color: var(--color-text-primary);
 }
 
+.pos-continuity-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
 .pos-layout {
     display: grid;
     grid-template-columns: minmax(0, 1.65fr) minmax(18.5rem, 1fr);
@@ -330,6 +337,11 @@
     font-size: var(--font-size-small);
 }
 
+.pos-confirmation > div:first-child {
+    flex: 1 1 20rem;
+    min-width: 16rem;
+}
+
 .pos-confirmation__actions,
 .pos-payment__actions,
 .pos-success__actions {
@@ -340,7 +352,13 @@
 }
 
 .pos-confirmation__actions {
-    flex: 0 0 auto;
+    flex: 1 1 34rem;
+    justify-content: flex-end;
+    min-width: 0;
+}
+
+.pos-confirmation__actions .ui-button {
+    max-width: 100%;
 }
 
 .pos-notice {
@@ -352,6 +370,92 @@
     background: var(--color-success-surface);
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
+}
+
+.pos-incident-actions,
+.pos-terminal-actions,
+.pos-ticket__actions,
+.pos-hold__actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.pos-incident-actions {
+    margin-top: var(--space-2);
+}
+
+.pos-hold-list {
+    display: grid;
+    margin: 0;
+    padding: var(--space-2) 0 0;
+    gap: var(--space-2);
+    list-style: none;
+}
+
+.pos-hold {
+    display: grid;
+    padding: var(--space-3);
+    gap: var(--space-3);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-small);
+    background: var(--color-surface-subtle);
+}
+
+.pos-hold__heading,
+.pos-ticket__heading,
+.pos-terminal-state__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    min-width: 0;
+    gap: var(--space-3);
+}
+
+.pos-hold__heading > div {
+    display: grid;
+    min-width: 0;
+    gap: var(--space-1);
+}
+
+.pos-hold__heading span,
+.pos-holds__warning,
+.pos-terminal-state > small {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-metadata);
+}
+
+.pos-hold__facts,
+.pos-ticket__facts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0;
+    gap: var(--space-2);
+}
+
+.pos-hold__facts > div,
+.pos-ticket__facts > div {
+    display: grid;
+    gap: var(--space-1);
+}
+
+.pos-hold__facts dt,
+.pos-ticket__facts dt {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-metadata);
+}
+
+.pos-hold__facts dd,
+.pos-ticket__facts dd {
+    margin: 0;
+    font-weight: var(--font-weight-bold);
+}
+
+.pos-holds__warning {
+    margin: var(--space-3) 0 0;
+    padding-top: var(--space-3);
+    border-top: var(--border-width) solid var(--color-border);
 }
 
 .pos-payment__total {
@@ -412,6 +516,14 @@
     border: var(--border-width) solid var(--color-accent-border);
     border-radius: var(--radius-medium);
     background: var(--color-accent-subtle);
+}
+
+.pos-terminal-state__header {
+    align-items: center;
+}
+
+.pos-terminal-state p {
+    margin-bottom: 0;
 }
 
 .pos-money-input {
@@ -552,7 +664,28 @@
     font-weight: var(--font-weight-bold);
 }
 
-@media (max-width: 64rem) {
+.pos-ticket {
+    display: grid;
+    width: 100%;
+    padding: var(--space-4);
+    gap: var(--space-3);
+    border: var(--border-width) solid var(--color-accent-border);
+    border-radius: var(--radius-medium);
+    background: var(--color-accent-subtle);
+    text-align: left;
+}
+
+.pos-ticket h3,
+.pos-ticket p,
+.pos-ticket .ui-alert p {
+    margin-bottom: 0;
+}
+
+.pos-ticket .ui-field__control {
+    max-width: 24rem;
+}
+
+@media (max-width: 72rem) {
     .pos-layout {
         grid-template-columns: 1fr;
     }
@@ -586,7 +719,10 @@
     }
 
     .pos-confirmation,
-    .pos-payment__actions {
+    .pos-payment__actions,
+    .pos-hold__heading,
+    .pos-ticket__heading,
+    .pos-terminal-state__header {
         align-items: stretch;
         flex-direction: column;
     }
@@ -595,6 +731,15 @@
     .pos-confirmation__actions .ui-button,
     .pos-payment__actions .ui-button {
         width: 100%;
+    }
+
+    .pos-confirmation > div:first-child {
+        min-width: 0;
+    }
+
+    .pos-hold__facts,
+    .pos-ticket__facts {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -639,7 +784,13 @@
     }
 
     .pos-success__actions,
-    .pos-success__actions .ui-button {
+    .pos-success__actions .ui-button,
+    .pos-continuity-actions,
+    .pos-continuity-actions .ui-button,
+    .pos-terminal-actions,
+    .pos-terminal-actions .ui-button,
+    .pos-ticket__actions,
+    .pos-ticket__actions .ui-button {
         width: 100%;
     }
 }
