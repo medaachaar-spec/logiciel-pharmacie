@@ -1,0 +1,23 @@
+<div class="development-shell">
+    <a class="skip-link" href="#main-content">Aller au contenu principal</a>
+    <header class="development-bar">
+        <div class="development-bar__inner">
+            <div class="development-brand">
+                <strong>Logiciel Pharmacie</strong>
+                <span>Navigation de développement</span>
+            </div>
+            <nav class="development-nav" aria-label="Outils de développement">
+                <NavLink href="" Match="NavLinkMatch.All">Diagnostic technique</NavLink>
+                <NavLink href="ui-lab">UI Lab</NavLink>
+            </nav>
+        </div>
+    </header>
+    <main id="main-content" class="development-main" tabindex="-1">
+        @ChildContent
+    </main>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public RenderFragment? ChildContent { get; set; }
+}

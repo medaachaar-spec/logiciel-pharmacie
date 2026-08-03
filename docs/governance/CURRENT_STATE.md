@@ -1,6 +1,6 @@
 # CURRENT_STATE - Logiciel Pharmacie
 
-Date de mise à jour : 2026-08-02
+Date de mise à jour : 2026-08-03
 
 ## État fonctionnel et architectural
 
@@ -8,7 +8,7 @@ Date de mise à jour : 2026-08-02
 - Phase 2 fonctionnelle : PASS.
 - Phase 3 modèle de données : PASS.
 - Phase 4 UX/UI : PASS.
-- Phase 5 code-first : fondation technique Sprint 1 créée ; aucun module métier ni persistance démarré.
+- Phase 5 code-first : fondation technique Sprint 1 et `UI Foundations V0.1` Sprint 2 créées ; aucun module métier ni persistance démarré.
 
 ## État du développement
 
@@ -16,9 +16,9 @@ Date de mise à jour : 2026-08-02
 - Dépôt réel : `C:\Users\HP\Desktop\Logiciel pharmacie`.
 - Branche active : `main`.
 - Sprint 0 : `IMPLEMENTED — FOUNDATION READY WITH WARNINGS` après correction de classification Sprint 0.1.
-- Git : dépôt local sur le commit initial `9b8da35`, zéro remote ; changements Sprint 1 laissés non stagés pour revue.
+- Git : dépôt local sur le commit `ab5c51e`, zéro remote ; changements Sprint 2 laissés non stagés pour revue.
 - Solution .NET créée : OUI — `Pharmacy.slnx`, six projets .NET 10.
-- Code frontend : SOCLE TECHNIQUE — hôte WPF/Blazor Hybrid et écran diagnostique local, sans fonctionnalité métier.
+- Code frontend : UI FOUNDATIONS V0.1 — diagnostic, navigation technique, tokens CSS, huit composants réutilisables et UI Lab local, sans fonctionnalité métier.
 - Code backend : COUCHES VIDES — Domain, Application et Infrastructure contiennent uniquement leurs marqueurs techniques.
 - Base SQL Server métier : NON CRÉÉE pour ce projet.
 - CI : NON DÉMARRÉE.
@@ -51,7 +51,7 @@ Date de mise à jour : 2026-08-02
 
 ## Prochaine étape autorisée
 
-Effectuer la revue manuelle de la fenêtre Sprint 1, du rendu à 1366 × 768 et du bouton d’interactivité, puis joindre une capture à la revue. Ne pas démarrer de module métier ou de persistance sans prompt de sprint dédié. Ne pas démarrer la persistance SQL avant disponibilité de SQL Server 2025 Express et traitement contrôlé du TLS. Ne pas certifier le poste pilote avant conformité Windows 11 Pro x64 et SQL Server 2025 Express.
+Effectuer la revue manuelle de l’UI Lab Sprint 2 à 1366 × 768 et 1920 × 1080, tester le clavier, les états loading/disabled et transmettre les captures demandées. Ne pas démarrer de module métier ou de persistance sans prompt de sprint dédié. Ne pas démarrer la persistance SQL avant disponibilité de SQL Server 2025 Express et traitement contrôlé du TLS. Ne pas certifier le poste pilote avant conformité Windows 11 Pro x64 et SQL Server 2025 Express.
 
 ## Interdictions actuelles
 
@@ -82,3 +82,17 @@ Effectuer la revue manuelle de la fenêtre Sprint 1, du rendu à 1366 × 768 et 
 - Validation Release : build réussi avec 0 avertissement et 0 erreur ; 12/12 tests réussis.
 - Démarrage : processus stable, fenêtre WPF et WebView2 détectés, fermeture normale ; revue visuelle humaine encore requise.
 - Aucun module métier, base de données, fichier SQL, secret, remote, commit ou push ajouté.
+
+## Mise à jour après le Sprint 2
+
+- Statut : `IMPLEMENTED — AUTOMATED CHECKS PASS — MANUAL VISUAL REVIEW REQUIRED`.
+- Design system : `UI Foundations V0.1`, provisoire et code-first, centralisé dans cinq fichiers CSS locaux.
+- Composants : `UiButton`, `UiBadge`, `UiCard`, `UiAlert`, `UiTextField`, `UiSelect`, `UiSpinner` et `UiEmptyState`.
+- Navigation : diagnostic Sprint 1 conservé sur `/` et UI Lab disponible sur `/ui-lab` via une barre de développement.
+- Accessibilité : HTML sémantique, labels, ARIA, focus visible, parcours Tab, états textuels et reduced motion prévus.
+- Validation Debug : build réussi avec 0 avertissement et 0 erreur ; 22/22 tests réussis.
+- Validation Release : build réussi avec 0 avertissement et 0 erreur ; 22/22 tests réussis.
+- Démarrage : fenêtre WPF, WebView2 et navigation UI Lab vérifiés techniquement ; fermeture normale.
+- Packages : aucun nouveau PackageReference ajouté.
+- Revue restante : contrôle humain complet des états, du clavier et du responsive à 1366 × 768 et 1920 × 1080.
+- Aucun écran ou type métier, base, SQL, API, serveur, ressource distante, remote, commit ou push ajouté.

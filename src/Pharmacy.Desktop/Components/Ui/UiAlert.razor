@@ -1,0 +1,64 @@
+@if (!isDismissed)
+{
+    <section class="ui-alert ui-alert--@VariantClass"
+             role="@AriaRole"
+             aria-live="@AriaLive">
+        <span class="ui-alert__indicator" aria-hidden="true">@Indicator</span>
+        <div class="ui-alert__content">
+            <h3 class="ui-alert__title">@Title</h3>
+            @ChildContent
+        </div>
+        @if (Dismissible)
+        {
+            <button type="button"
+                    class="ui-alert__dismiss"
+                    aria-label="Fermer le message"
+                    @onclick="DismissAsync">
+                ×
+            </button>
+        }
+    </section>
+}
+
+@code {
+    private bool isDismissed;
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public UiAlertVariant Variant { get; set; } = UiAlertVariant.Information;
+
+    [Parameter]
+    public bool Dismissible { get; set; }
+
+    [Parameter]
+    public EventCallback OnDismiss { get; set; }
+
+    private string VariantClass => Variant.ToString().ToLowerInvariant();
+
+    private string AriaRole => Variant is UiAlertVariant.Warning or UiAlertVariant.Danger
+        ? "alert"
+        : "status";
+
+    private string AriaLive => Variant is UiAlertVariant.Warning or UiAlertVariant.Danger
+        ? "assertive"
+        : "polite";
+
+    private string Indicator => Variant switch
+    {
+        UiAlertVariant.Success => "✓",
+        UiAlertVariant.Warning => "!",
+        UiAlertVariant.Danger => "×",
+        _ => "i"
+    };
+
+    private async Task DismissAsync()
+    {
+        isDismissed = true;
+        await OnDismiss.InvokeAsync();
+    }
+}

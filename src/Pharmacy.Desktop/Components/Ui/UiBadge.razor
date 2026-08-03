@@ -1,0 +1,23 @@
+<span class="ui-badge ui-badge--@VariantClass">
+    <span class="ui-badge__indicator" aria-hidden="true">@Indicator</span>
+    <span>@Text</span>
+</span>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Text { get; set; } = string.Empty;
+
+    [Parameter]
+    public UiBadgeVariant Variant { get; set; } = UiBadgeVariant.Neutral;
+
+    private string VariantClass => Variant.ToString().ToLowerInvariant();
+
+    private string Indicator => Variant switch
+    {
+        UiBadgeVariant.Information => "i",
+        UiBadgeVariant.Success => "✓",
+        UiBadgeVariant.Warning => "!",
+        UiBadgeVariant.Danger => "×",
+        _ => "•"
+    };
+}

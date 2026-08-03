@@ -1,0 +1,300 @@
+@page "/ui-lab"
+
+<PageTitle>UI Lab — Fondations visuelles V0.1</PageTitle>
+
+<div class="ui-lab">
+    <header class="lab-hero" aria-labelledby="ui-lab-title">
+        <div class="lab-hero__copy">
+            <p class="eyebrow">Outil interne de développement</p>
+            <h1 id="ui-lab-title" tabindex="-1">UI Lab — Fondations visuelles V0.1</h1>
+            <p class="lab-hero__description">
+                Référence exécutable des tokens, composants et états génériques. Cet écran ne représente aucun parcours métier.
+            </p>
+        </div>
+        <div class="u-cluster lab-hero__meta" aria-label="Caractéristiques de cette fondation">
+            <UiBadge Text="V0.1" Variant="UiBadgeVariant.Information" />
+            <UiBadge Text="Code-first" Variant="UiBadgeVariant.Neutral" />
+            <UiBadge Text="Ressources locales uniquement" Variant="UiBadgeVariant.Success" />
+            <UiBadge Text="Aucune donnée réelle" Variant="UiBadgeVariant.Warning" />
+        </div>
+    </header>
+
+    <section class="lab-section" aria-labelledby="palette-title">
+        <header class="lab-section__header">
+            <div>
+                <p class="lab-section__kicker">Tokens</p>
+                <h2 id="palette-title">Palette fonctionnelle</h2>
+            </div>
+            <p class="lab-section__description">La couleur renforce le sens ; les libellés et indicateurs restent explicites.</p>
+        </header>
+        <div class="token-grid">
+            @foreach (var token in PaletteTokens)
+            {
+                <div class="token-swatch token-swatch--@token.CssClass">
+                    <span class="token-swatch__color" aria-hidden="true"></span>
+                    <span class="token-swatch__label">@token.Label</span>
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="lab-section" aria-labelledby="typography-title">
+        <header class="lab-section__header">
+            <div>
+                <p class="lab-section__kicker">Hiérarchie</p>
+                <h2 id="typography-title">Typographie</h2>
+            </div>
+            <p class="lab-section__description">Pile système Windows, densité desktop et tailles lisibles.</p>
+        </header>
+        <div class="u-stack">
+            <div class="type-sample"><span class="type-metadata">Titre principal</span><span class="type-page-title">Interface de démonstration</span></div>
+            <div class="type-sample"><span class="type-metadata">Titre de section</span><span class="type-section-title">Fondations visuelles</span></div>
+            <div class="type-sample"><span class="type-metadata">Titre de carte</span><span class="type-card-title">Composant générique</span></div>
+            <div class="type-sample"><span class="type-metadata">Paragraphe</span><p>Exemple de texte courant conçu pour une lecture prolongée dans une application desktop.</p></div>
+            <div class="type-sample"><span class="type-metadata">Libellé</span><span class="type-label">Libellé de contrôle</span></div>
+            <div class="type-sample"><span class="type-metadata">Texte secondaire</span><span class="type-secondary">Information complémentaire non prioritaire.</span></div>
+            <div class="type-sample"><span class="type-metadata">Métadonnée</span><span class="type-metadata">Version technique · V0.1</span></div>
+        </div>
+    </section>
+
+    <section class="lab-section" aria-labelledby="buttons-title">
+        <header class="lab-section__header">
+            <div>
+                <p class="lab-section__kicker">Actions</p>
+                <h2 id="buttons-title">Boutons</h2>
+            </div>
+            <p class="lab-section__description">Les états hover et focus sont à vérifier à la souris et au clavier.</p>
+        </header>
+        <div class="component-row" aria-label="Variantes de boutons">
+            <UiButton Variant="UiButtonVariant.Primary">Primary</UiButton>
+            <UiButton Variant="UiButtonVariant.Secondary">Secondary</UiButton>
+            <UiButton Variant="UiButtonVariant.Tertiary">Tertiary</UiButton>
+            <UiButton Variant="UiButtonVariant.Danger">Danger</UiButton>
+        </div>
+        <div class="component-row" aria-label="Tailles et états de boutons">
+            <div class="component-state">
+                <span class="component-state__label">Small</span>
+                <UiButton Size="UiButtonSize.Small">Action compacte</UiButton>
+            </div>
+            <div class="component-state">
+                <span class="component-state__label">Medium</span>
+                <UiButton Size="UiButtonSize.Medium">Action standard</UiButton>
+            </div>
+            <div class="component-state">
+                <span class="component-state__label">Large</span>
+                <UiButton Size="UiButtonSize.Large">Action principale</UiButton>
+            </div>
+            <div class="component-state">
+                <span class="component-state__label">Disabled</span>
+                <UiButton Disabled="true">Action indisponible</UiButton>
+            </div>
+            <div class="component-state">
+                <span class="component-state__label">Loading</span>
+                <UiButton IsLoading="true" LoadingText="Traitement en cours">Action</UiButton>
+            </div>
+        </div>
+        <div class="interaction-proof">
+            <div class="u-cluster">
+                <UiButton OnClick="RecordClickAsync">Tester le clic</UiButton>
+                <UiButton Variant="UiButtonVariant.Secondary"
+                          IsLoading="@isSimulatingLoading"
+                          LoadingText="Simulation en cours"
+                          OnClick="SimulateLoadingAsync">
+                    Simuler le loading
+                </UiButton>
+            </div>
+            <output aria-live="polite">@interactionMessage</output>
+        </div>
+    </section>
+
+    <section class="lab-section" aria-labelledby="badges-title">
+        <header class="lab-section__header">
+            <div>
+                <p class="lab-section__kicker">Statuts courts</p>
+                <h2 id="badges-title">Badges</h2>
+            </div>
+        </header>
+        <div class="component-row">
+            <UiBadge Text="Neutre" Variant="UiBadgeVariant.Neutral" />
+            <UiBadge Text="Information" Variant="UiBadgeVariant.Information" />
+            <UiBadge Text="Succès" Variant="UiBadgeVariant.Success" />
+            <UiBadge Text="Avertissement" Variant="UiBadgeVariant.Warning" />
+            <UiBadge Text="Danger" Variant="UiBadgeVariant.Danger" />
+        </div>
+    </section>
+
+    <section class="lab-section" aria-labelledby="alerts-title">
+        <header class="lab-section__header">
+            <div>
+                <p class="lab-section__kicker">Messages</p>
+                <h2 id="alerts-title">Alertes</h2>
+            </div>
+        </header>
+        <div class="u-stack">
+            <UiAlert Title="Information" Variant="UiAlertVariant.Information"><p>Une information technique neutre est disponible.</p></UiAlert>
+            <UiAlert Title="Succès" Variant="UiAlertVariant.Success"><p>L’action de démonstration a été confirmée.</p></UiAlert>
+            <UiAlert Title="Avertissement" Variant="UiAlertVariant.Warning"><p>Vérifiez les éléments indiqués avant de continuer.</p></UiAlert>
+            <UiAlert Title="Erreur" Variant="UiAlertVariant.Danger"><p>La démonstration ne peut pas continuer dans cet état.</p></UiAlert>
+        </div>
+    </section>
+
+    <section class="lab-section" aria-labelledby="cards-title">
+        <header class="lab-section__header">
+            <div>
+                <p class="lab-section__kicker">Surfaces</p>
+                <h2 id="cards-title">Cartes</h2>
+            </div>
+        </header>
+        <div class="u-grid">
+            <UiCard><p>Carte simple avec un contenu synthétique et générique.</p></UiCard>
+            <UiCard Title="Carte avec titre" Subtitle="Description secondaire"><p>Le contenu principal reste concis et lisible.</p></UiCard>
+            <UiCard Title="Carte avec footer">
+                <ChildContent><p>Le footer sépare clairement les actions du contenu.</p></ChildContent>
+                <FooterContent><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary">Action locale</UiButton></FooterContent>
+            </UiCard>
+            <UiCard Title="Carte compacte" Density="UiCardDensity.Compact"><p>Une densité réduite pour les zones techniques.</p></UiCard>
+        </div>
+    </section>
+
+    <section class="lab-section" aria-labelledby="fields-title">
+        <header class="lab-section__header">
+            <div>
+                <p class="lab-section__kicker">Saisie</p>
+                <h2 id="fields-title">Champs</h2>
+            </div>
+            <p class="lab-section__description">Chaque contrôle possède un identifiant, un label explicite et un état annoncé.</p>
+        </header>
+        <div class="lab-form-grid">
+            <UiTextField Id="field-normal" Label="Champ normal" Placeholder="Exemple de texte" @bind-Value="normalText" />
+            <UiTextField Id="field-required" Label="Champ requis" Required="true" Placeholder="Exemple de texte" @bind-Value="requiredText" />
+            <UiTextField Id="field-help" Label="Champ avec aide" HelpText="Utilisez une valeur synthétique et neutre." @bind-Value="helpText" />
+            <UiTextField Id="field-readonly" Label="Champ readonly" ReadOnly="true" Value="Valeur de démonstration" />
+            <UiTextField Id="field-disabled" Label="Champ disabled" Disabled="true" Value="Valeur de démonstration" />
+            <UiTextField Id="field-error" Label="Champ en erreur" ErrorMessage="Une valeur de démonstration est attendue." @bind-Value="errorText" />
+            <UiTextField Id="field-search" Label="Recherche" Type="UiTextFieldType.Search" Placeholder="Recherche" @bind-Value="searchText" />
+        </div>
+    </section>
+
+    <section class="lab-section" aria-labelledby="selects-title">
+        <header class="lab-section__header">
+            <div>
+                <p class="lab-section__kicker">Choix</p>
+                <h2 id="selects-title">Sélecteurs</h2>
+            </div>
+        </header>
+        <div class="lab-form-grid">
+            <UiSelect Id="select-normal" Label="Sélecteur normal" Options="@NeutralOptions" @bind-Value="normalSelection" />
+            <UiSelect Id="select-required" Label="Sélecteur requis" Required="true" Options="@NeutralOptions" @bind-Value="requiredSelection" />
+            <UiSelect Id="select-disabled" Label="Sélecteur disabled" Disabled="true" Options="@NeutralOptions" Value="b" />
+            <UiSelect Id="select-error" Label="Sélecteur en erreur" ErrorMessage="Sélectionnez une option neutre." Options="@NeutralOptions" @bind-Value="errorSelection" />
+        </div>
+    </section>
+
+    <section class="lab-section" aria-labelledby="loading-title">
+        <header class="lab-section__header">
+            <div>
+                <p class="lab-section__kicker">Progression</p>
+                <h2 id="loading-title">Chargement</h2>
+            </div>
+        </header>
+        <div class="component-row">
+            <UiSpinner Size="UiSpinnerSize.Small" Label="Petit chargement en cours" ShowLabel="true" />
+            <UiSpinner Size="UiSpinnerSize.Medium" Label="Chargement standard en cours" ShowLabel="true" />
+            <UiButton IsLoading="true" LoadingText="Traitement en cours">Action</UiButton>
+        </div>
+    </section>
+
+    <section class="lab-section" aria-labelledby="empty-state-title">
+        <header class="lab-section__header">
+            <div>
+                <p class="lab-section__kicker">Absence de contenu</p>
+                <h2 id="empty-state-title">État vide</h2>
+            </div>
+        </header>
+        <UiEmptyState Title="Aucun élément de démonstration"
+                      Description="Cette zone générique montre un état vide sans dépendre d’un module métier.">
+            <ActionContent>
+                <UiButton Variant="UiButtonVariant.Secondary">Action facultative</UiButton>
+            </ActionContent>
+        </UiEmptyState>
+    </section>
+
+    <section class="lab-section" aria-labelledby="responsive-title">
+        <header class="lab-section__header">
+            <div>
+                <p class="lab-section__kicker">Mise en page</p>
+                <h2 id="responsive-title">Responsive et densité</h2>
+            </div>
+            <p class="lab-section__description">La grille passe automatiquement de trois à deux puis une colonne selon l’espace disponible.</p>
+        </header>
+        <div class="responsive-demo">
+            <div class="responsive-demo__cell"><strong>Zone 1</strong><br /><span class="u-muted">Contenu compact et flexible.</span></div>
+            <div class="responsive-demo__cell"><strong>Zone 2</strong><br /><span class="u-muted">Texte long avec retour à la ligne correct sans largeur fixe.</span></div>
+            <div class="responsive-demo__cell"><strong>Zone 3</strong><br /><span class="u-muted">Aucun débordement horizontal attendu.</span></div>
+        </div>
+    </section>
+</div>
+
+@code {
+    private static readonly IReadOnlyList<(string CssClass, string Label)> PaletteTokens =
+        new[]
+        {
+            ("accent", "Accent principal"),
+            ("surface", "Surface"),
+            ("background", "Fond application"),
+            ("text", "Texte principal"),
+            ("success", "Succès"),
+            ("information", "Information"),
+            ("warning", "Avertissement"),
+            ("danger", "Danger")
+        };
+
+    private static readonly IReadOnlyList<UiSelectOption> NeutralOptions =
+        new[]
+        {
+            new UiSelectOption("a", "Option A"),
+            new UiSelectOption("b", "Option B"),
+            new UiSelectOption("c", "Option C")
+        };
+
+    private string? normalText;
+    private string? requiredText;
+    private string? helpText = "Exemple de texte";
+    private string? errorText;
+    private string? searchText;
+    private string? normalSelection;
+    private string? requiredSelection;
+    private string? errorSelection;
+    private bool isSimulatingLoading;
+    private int interactionCount;
+    private string interactionMessage = "Aucune interaction exécutée.";
+
+    private Task RecordClickAsync(MouseEventArgs args)
+    {
+        interactionCount++;
+        interactionMessage = $"Clic local confirmé — interaction n° {interactionCount}.";
+        return Task.CompletedTask;
+    }
+
+    private async Task SimulateLoadingAsync(MouseEventArgs args)
+    {
+        if (isSimulatingLoading)
+        {
+            return;
+        }
+
+        isSimulatingLoading = true;
+        interactionMessage = "Simulation en cours — les doubles activations sont bloquées.";
+
+        try
+        {
+            await Task.Delay(700);
+            interactionCount++;
+            interactionMessage = $"Loading terminé — interaction n° {interactionCount}.";
+        }
+        finally
+        {
+            isSimulatingLoading = false;
+        }
+    }
+}

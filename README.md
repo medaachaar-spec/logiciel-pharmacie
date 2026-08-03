@@ -42,3 +42,10 @@ dotnet build .\Pharmacy.slnx -c Debug --no-restore
 dotnet test .\Pharmacy.slnx -c Debug --no-build
 dotnet run --project .\src\Pharmacy.Desktop\Pharmacy.Desktop.csproj -c Debug
 ```
+
+Après le lancement, la barre de développement permet d’ouvrir :
+
+- `Diagnostic technique` : smoke screen conservé du Sprint 1 ;
+- `UI Lab` : fondations visuelles code-first V0.1 et états des composants.
+
+L’UI Lab est un outil interne de développement. Il ne constitue pas un écran métier ni une identité graphique commerciale définitive.

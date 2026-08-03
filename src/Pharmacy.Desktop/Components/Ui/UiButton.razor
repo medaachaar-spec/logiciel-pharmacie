@@ -1,0 +1,76 @@
+<button type="@HtmlButtonType"
+        class="ui-button ui-button--@VariantClass ui-button--@SizeClass"
+        disabled="@IsUnavailable"
+        aria-busy="@IsLoading.ToString().ToLowerInvariant()"
+        @onclick="HandleClickAsync"
+        @attributes="AdditionalAttributes">
+    <span class="ui-button__content">
+        @if (IsLoading)
+        {
+            <span class="ui-button__loading-indicator" aria-hidden="true"></span>
+            <span>@LoadingText</span>
+        }
+        else
+        {
+            @ChildContent
+        }
+    </span>
+</button>
+
+@code {
+    private bool clickInProgress;
+
+    [Parameter, EditorRequired]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public UiButtonVariant Variant { get; set; } = UiButtonVariant.Primary;
+
+    [Parameter]
+    public UiButtonSize Size { get; set; } = UiButtonSize.Medium;
+
+    [Parameter]
+    public UiButtonType ButtonType { get; set; } = UiButtonType.Button;
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public bool IsLoading { get; set; }
+
+    [Parameter]
+    public string LoadingText { get; set; } = "Chargement en cours";
+
+    [Parameter]
+    public EventCallback<MouseEventArgs> OnClick { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    private bool IsUnavailable => Disabled || IsLoading || clickInProgress;
+
+    private string VariantClass => Variant.ToString().ToLowerInvariant();
+
+    private string SizeClass => Size.ToString().ToLowerInvariant();
+
+    private string HtmlButtonType => ButtonType.ToString().ToLowerInvariant();
+
+    private async Task HandleClickAsync(MouseEventArgs args)
+    {
+        if (IsUnavailable)
+        {
+            return;
+        }
+
+        clickInProgress = true;
+
+        try
+        {
+            await OnClick.InvokeAsync(args);
+        }
+        finally
+        {
+            clickInProgress = false;
+        }
+    }
+}

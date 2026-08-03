@@ -1,1 +1,15 @@
-<DiagnosticScreen />
+<Router AppAssembly="@typeof(RootComponent).Assembly">
+    <Found Context="routeData">
+        <DevelopmentShell>
+            <RouteView RouteData="@routeData" />
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </DevelopmentShell>
+    </Found>
+    <NotFound>
+        <DevelopmentShell>
+            <UiAlert Title="Page technique introuvable" Variant="UiAlertVariant.Warning">
+                <p>Utilisez la navigation de développement pour revenir à un écran disponible.</p>
+            </UiAlert>
+        </DevelopmentShell>
+    </NotFound>
+</Router>

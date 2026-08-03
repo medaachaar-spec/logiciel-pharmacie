@@ -1,0 +1,91 @@
+<div class="ui-field">
+    <label class="ui-field__label" for="@Id">
+        @Label
+        @if (Required)
+        {
+            <span class="ui-field__required" aria-hidden="true">*</span>
+            <span class="sr-only"> (obligatoire)</span>
+        }
+    </label>
+    <select id="@Id"
+            class="ui-field__control"
+            value="@Value"
+            required="@Required"
+            disabled="@Disabled"
+            aria-invalid="@HasError.ToString().ToLowerInvariant()"
+            aria-describedby="@DescribedBy"
+            @onchange="HandleChangeAsync">
+        <option value="">@Placeholder</option>
+        @foreach (var option in Options)
+        {
+            <option value="@option.Value">@option.Label</option>
+        }
+    </select>
+    @if (!string.IsNullOrWhiteSpace(HelpText))
+    {
+        <p id="@HelpId" class="ui-field__help">@HelpText</p>
+    }
+    @if (HasError)
+    {
+        <p id="@ErrorId" class="ui-field__error" role="alert">Erreur : @ErrorMessage</p>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Id { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    [Parameter]
+    public IReadOnlyList<UiSelectOption> Options { get; set; } = Array.Empty<UiSelectOption>();
+
+    [Parameter]
+    public string? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> ValueChanged { get; set; }
+
+    [Parameter]
+    public string Placeholder { get; set; } = "Sélectionner une option";
+
+    [Parameter]
+    public string? HelpText { get; set; }
+
+    [Parameter]
+    public string? ErrorMessage { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public bool Required { get; set; }
+
+    private bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
+
+    private string HelpId => $"{Id}-help";
+
+    private string ErrorId => $"{Id}-error";
+
+    private string? DescribedBy => string.Join(
+        " ",
+        new[]
+        {
+            string.IsNullOrWhiteSpace(HelpText) ? null : HelpId,
+            HasError ? ErrorId : null
+        }.Where(value => value is not null));
+
+    protected override void OnParametersSet()
+    {
+        if (string.IsNullOrWhiteSpace(Id))
+        {
+            throw new ArgumentException("A non-empty select identifier is required.", nameof(Id));
+        }
+    }
+
+    private Task HandleChangeAsync(ChangeEventArgs args)
+    {
+        return ValueChanged.InvokeAsync(args.Value?.ToString());
+    }
+}

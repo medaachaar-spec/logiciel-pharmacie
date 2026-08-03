@@ -1,0 +1,47 @@
+<article class="ui-card ui-card--@DensityClass" aria-labelledby="@LabelledBy">
+    @if (!string.IsNullOrWhiteSpace(Title) || !string.IsNullOrWhiteSpace(Subtitle))
+    {
+        <header class="ui-card__header">
+            @if (!string.IsNullOrWhiteSpace(Title))
+            {
+                <h3 id="@titleId" class="ui-card__title">@Title</h3>
+            }
+            @if (!string.IsNullOrWhiteSpace(Subtitle))
+            {
+                <p class="ui-card__subtitle">@Subtitle</p>
+            }
+        </header>
+    }
+    <div class="ui-card__body">
+        @ChildContent
+    </div>
+    @if (FooterContent is not null)
+    {
+        <footer class="ui-card__footer">
+            @FooterContent
+        </footer>
+    }
+</article>
+
+@code {
+    private readonly string titleId = $"ui-card-{Guid.NewGuid():N}";
+
+    [Parameter]
+    public string? Title { get; set; }
+
+    [Parameter]
+    public string? Subtitle { get; set; }
+
+    [Parameter, EditorRequired]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public RenderFragment? FooterContent { get; set; }
+
+    [Parameter]
+    public UiCardDensity Density { get; set; } = UiCardDensity.Comfortable;
+
+    private string DensityClass => Density.ToString().ToLowerInvariant();
+
+    private string? LabelledBy => string.IsNullOrWhiteSpace(Title) ? null : titleId;
+}

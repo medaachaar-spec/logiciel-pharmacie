@@ -1,0 +1,82 @@
+:root {
+    color-scheme: light;
+
+    --font-family-sans: "Segoe UI", Inter, Arial, sans-serif;
+    --font-size-metadata: 0.75rem;
+    --font-size-small: 0.875rem;
+    --font-size-body: 1rem;
+    --font-size-card-title: 1.0625rem;
+    --font-size-section-title: 1.375rem;
+    --font-size-page-title: clamp(2rem, 4vw, 2.75rem);
+    --font-weight-regular: 400;
+    --font-weight-medium: 600;
+    --font-weight-bold: 700;
+    --line-height-tight: 1.2;
+    --line-height-body: 1.55;
+
+    --color-accent: #0f5f5a;
+    --color-accent-hover: #0a4c48;
+    --color-accent-active: #083e3b;
+    --color-accent-subtle: #e5f4f1;
+    --color-accent-border: #8fc6bd;
+    --color-text-primary: #10242e;
+    --color-text-secondary: #52636c;
+    --color-text-inverse: #f7fbfa;
+    --color-app-background: #eef3f5;
+    --color-surface: #ffffff;
+    --color-surface-subtle: #f7fafb;
+    --color-surface-emphasis: #e7edef;
+    --color-border: #cbd7db;
+    --color-border-strong: #9fb1b8;
+    --color-success: #176c47;
+    --color-success-surface: #eaf7ef;
+    --color-success-border: #9bcdb0;
+    --color-warning: #7a4b00;
+    --color-warning-surface: #fff4da;
+    --color-warning-border: #e4c479;
+    --color-danger: #a8212d;
+    --color-danger-hover: #891923;
+    --color-danger-surface: #fff0f1;
+    --color-danger-border: #e2a0a7;
+    --color-information: #155d96;
+    --color-information-surface: #edf6ff;
+    --color-information-border: #a9c9e8;
+    --color-disabled-background: #e6ecee;
+    --color-disabled-text: #65777f;
+    --color-focus: #bd7200;
+    --color-development-bar: #14373c;
+    --color-development-bar-border: #28545a;
+    --color-development-muted: #c1d6d4;
+    --color-overlay: rgba(16, 36, 46, 0.08);
+
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+    --space-12: 3rem;
+
+    --radius-small: 0.375rem;
+    --radius-medium: 0.625rem;
+    --radius-large: 0.875rem;
+    --radius-pill: 999rem;
+    --border-width: 1px;
+    --shadow-small: 0 0.25rem 0.9rem var(--color-overlay);
+    --shadow-focus: 0 0 0 0.2rem color-mix(in srgb, var(--color-focus) 32%, transparent);
+
+    --control-height-small: 2.25rem;
+    --control-height-medium: 2.625rem;
+    --control-height-large: 3rem;
+    --control-padding-inline: 0.875rem;
+    --content-max-width: 78rem;
+    --content-gutter: clamp(1rem, 3vw, 2rem);
+    --card-min-width: 15rem;
+
+    --transition-fast: 120ms;
+    --transition-standard: 180ms;
+    --z-index-navigation: 20;
+    --z-index-notification: 40;
+    --focus-ring-width: 0.1875rem;
+    --focus-ring-offset: 0.1875rem;
+}

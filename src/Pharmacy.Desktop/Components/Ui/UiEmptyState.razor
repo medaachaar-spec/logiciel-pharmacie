@@ -1,0 +1,24 @@
+<section class="ui-empty-state" aria-labelledby="@titleId">
+    <div class="ui-empty-state__illustration" aria-hidden="true"></div>
+    <h3 id="@titleId" class="ui-empty-state__title">@Title</h3>
+    <p class="ui-empty-state__description">@Description</p>
+    @if (ActionContent is not null)
+    {
+        <div class="ui-empty-state__action">
+            @ActionContent
+        </div>
+    }
+</section>
+
+@code {
+    private readonly string titleId = $"ui-empty-state-{Guid.NewGuid():N}";
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Description { get; set; } = string.Empty;
+
+    [Parameter]
+    public RenderFragment? ActionContent { get; set; }
+}
