@@ -47,9 +47,11 @@ Après le lancement, l’application ouvre l’accueil synthétique du shell V0.
 
 Le POS V0.2 conserve le parcours nominal V0.1 et ajoute les incidents de code inconnu/disponibilité, la suspension et la reprise contrôlée de paniers, l’abandon du brouillon, la machine d’états du TPE ambigu et une impression post-vente entièrement simulée. Tous les montants sont calculés avec `decimal` ; aucune donnée bancaire ou réelle n’est collectée, aucune donnée n’est persistée, aucun stock n’est modifié et aucun ticket réel n’est produit. Les spécifications et limites sont documentées dans `docs/ux/POS_V0.1.md` et `docs/ux/POS_V0.2_CONTINUITY.md`.
 
+Le Sprint 6 ajoute un noyau Sales V0.1 indépendant dans `Pharmacy.Domain` (`Money`, identifiants typés, quantité entière, snapshot produit, ligne immuable et agrégat `SaleDraft`) ainsi que trois contrats non implémentés dans `Pharmacy.Application`. Ce noyau n’est pas connecté au POS synthétique : il ne persiste rien, ne finalise aucune vente et ne traite ni stock, lot, paiement, caisse, audit ou impression. Sa conception est décrite dans `docs/domain/SALES_CORE_V0.1.md`.
+
 En configuration Debug, le groupe `Développement` donne également accès à :
 
 - `Diagnostic technique` sur `/diagnostic` : smoke screen conservé du Sprint 1 ;
 - `UI Lab` sur `/ui-lab` : fondations visuelles code-first V0.1 et états des composants.
 
-Le sélecteur d’aperçu des accès est une prévisualisation locale et non persistante. Ses profils ne sont ni des rôles métier finaux ni un mécanisme de sécurité. Le POS, l’UI Lab et le shell V0.1 restent des prototypes soumis à revue visuelle humaine. La checklist de continuité Sprint 5 se trouve dans `docs/reports/sprint-05/pos-continuity-validation.md`.
+Le sélecteur d’aperçu des accès est une prévisualisation locale et non persistante. Ses profils ne sont ni des rôles métier finaux ni un mécanisme de sécurité. Le POS, l’UI Lab et le shell V0.1 restent des prototypes soumis à revue visuelle humaine. La validation du noyau Sales Sprint 6 se trouve dans `docs/reports/sprint-06/sales-core-validation.md`.

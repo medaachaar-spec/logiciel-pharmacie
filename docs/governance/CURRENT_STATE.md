@@ -8,7 +8,7 @@ Date de mise à jour : 2026-08-03
 - Phase 2 fonctionnelle : PASS.
 - Phase 3 modèle de données : PASS.
 - Phase 4 UX/UI : PASS.
-- Phase 5 code-first : fondation technique Sprint 1, `UI Foundations V0.1` Sprint 2, shell applicatif V0.1 Sprint 3, POS synthétique V0.1 Sprint 4 et continuité POS V0.2 Sprint 5 créés ; aucune persistance ni architecture métier définitive démarrée.
+- Phase 5 code-first : fondation technique Sprint 1, `UI Foundations V0.1` Sprint 2, shell applicatif V0.1 Sprint 3, POS synthétique V0.1 Sprint 4 et continuité POS V0.2 Sprint 5 créés ; noyau Sales V0.1 et contrats Application Sprint 6 créés, sans persistance ni connexion au frontend.
 
 ## État du développement
 
@@ -16,10 +16,10 @@ Date de mise à jour : 2026-08-03
 - Dépôt réel : `C:\Users\HP\Desktop\Logiciel pharmacie`.
 - Branche active : `main`.
 - Sprint 0 : `IMPLEMENTED — FOUNDATION READY WITH WARNINGS` après correction de classification Sprint 0.1.
-- Git : dépôt local sur le commit `38dc3d0`, zéro remote ; changements Sprint 5 laissés non stagés pour revue.
+- Git : dépôt local sur le commit `21dd4a0`, zéro remote ; changements Sprint 6 laissés non stagés pour revue.
 - Solution .NET créée : OUI — `Pharmacy.slnx`, six projets .NET 10.
 - Code frontend : POS V0.2 — shell WPF/Blazor Hybrid, Ventes disponible avec parcours nominal, incidents, suspensions, TPE ambigu et impression simulée en mémoire ; sept pages provisoires, diagnostic et UI Lab Debug.
-- Code backend : COUCHES VIDES — Domain, Application et Infrastructure contiennent uniquement leurs marqueurs techniques.
+- Code backend : NOYAU SALES V0.1 — Domain contient les primitives, lignes et brouillon de vente ; Application contient trois contrats sans implémentation ; Infrastructure reste vide de Sales et sans persistance.
 - Base SQL Server métier : NON CRÉÉE pour ce projet.
 - CI : NON DÉMARRÉE.
 
@@ -51,7 +51,7 @@ Date de mise à jour : 2026-08-03
 
 ## Prochaine étape autorisée
 
-Effectuer la revue manuelle de continuité du POS Sprint 5 à 1100 × 700, 1366 × 768 et 1920 × 1080. Fournir les cinq captures demandées — code inconnu, disponibilité insuffisante, ventes suspendues, carte ambiguë et échec d’impression — ainsi que les confirmations de reprise, réimpression réussie et prévention du double clic. Ne pas démarrer un autre module métier ou la persistance sans prompt dédié. Ne pas démarrer la persistance SQL avant disponibilité de SQL Server 2025 Express et traitement contrôlé du TLS. Ne pas certifier le poste pilote avant conformité Windows 11 Pro x64 et SQL Server 2025 Express.
+Effectuer la revue manuelle de non-régression Sprint 6 : ouverture, shell, Ventes, parcours POS nominal, suspension/reprise, carte synthétique, impression simulée, Diagnostic et UI Lab. Le noyau Sales ne doit pas être connecté au frontend avant un prompt dédié. Ne pas démarrer un autre module métier ou la persistance sans autorisation explicite. Ne pas démarrer la persistance SQL avant disponibilité de SQL Server 2025 Express et traitement contrôlé du TLS. Ne pas certifier le poste pilote avant conformité Windows 11 Pro x64 et SQL Server 2025 Express.
 
 ## Interdictions actuelles
 
@@ -141,3 +141,16 @@ Effectuer la revue manuelle de continuité du POS Sprint 5 à 1100 × 700, 1366 
 - Lancement : processus et fenêtre WPF répondants, POS/incident/suspensions/conflit de reprise rendus, fermeture propre ; TPE ambigu et impression restent à valider visuellement par l’utilisateur.
 - Packages : aucun nouveau PackageReference ; six projets et graphe de références inchangés.
 - Architecture métier définitive, base, SQL, fichier de ticket, réseau, donnée bancaire, périphérique réel, remote, commit et push : aucun ajout.
+
+## Mise à jour après le Sprint 6
+
+- Statut : `IMPLEMENTED — AUTOMATED CHECKS PASS — MANUAL REGRESSION REVIEW REQUIRED`.
+- Domain : `Error`, `Result`, `Result<T>`, `Money` MAD en `decimal`, identifiants typés, référence produit, quantité entière, snapshot immuable, `SaleLine` immuable et agrégat `SaleDraft` encapsulé.
+- Brouillon : ajout, fusion par `ProductId`, changement de quantité, suppression, vidage, sous-totaux et total exacts ; échecs explicites sans mutation partielle.
+- Application : contrats `IProductCatalogReader`, `IStockAvailabilityReader` et `ISaleFinalizer`, avec modèles minimaux et `OperationId` idempotent ; aucune implémentation.
+- Architecture : Domain reste indépendant ; Application ne dépend que de Domain ; Infrastructure reste sans Sales ; Desktop reste déconnecté du nouveau noyau.
+- Validation Debug et Release : builds réussis avec 0 avertissement et 0 erreur ; 183/183 tests réussis dans chaque configuration, aucun test ignoré.
+- Tests : 68 contrôles Sprint 6 numérotés ajoutés aux 115 tests existants.
+- Lancement : processus et fenêtre WPF répondants, titre `Logiciel Pharmacie`, fermeture normale et aucun processus résiduel ; revue visuelle et fonctionnelle humaine encore requise.
+- Packages : aucun `PackageReference` ajouté, supprimé ou modifié ; six projets inchangés.
+- Persistance, EF Core, SQL, lots, paiements, stock réel, caisse, audit, impression réelle, réseau, remote, commit et push : aucun ajout.
