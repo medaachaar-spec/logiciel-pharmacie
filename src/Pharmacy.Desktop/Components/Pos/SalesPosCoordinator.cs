@@ -233,7 +233,7 @@ public sealed class SalesPosCoordinator
             }
 
             initialized = true;
-            Trace.TraceInformation("Sales POS initialized with an in-memory Application draft.");
+            Trace.TraceInformation("Sales POS initialized with SQL catalog and an in-memory Application draft.");
             return true;
         }
         catch (OperationCanceledException)

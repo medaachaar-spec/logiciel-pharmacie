@@ -44,6 +44,8 @@ public static class SalesPosErrorMapper
             "sales.product.not_found" => "Code ou produit inconnu. Aucun produit n’a été créé.",
             "sales.product.not_sellable" => "Ce produit n’est pas vendable et n’a pas été ajouté.",
             "sales.product_code.invalid" => "Saisissez un code produit exact avant de valider.",
+            "catalog.database.unavailable" =>
+                "Le Catalogue SQL est indisponible. Aucun catalogue mémoire de secours n’a été utilisé.",
             "sales.quantity.invalid" => "La quantité doit être un entier strictement positif. Utilisez Supprimer pour retirer la ligne.",
             "sales.line.not_found" => "La ligne demandée n’existe plus dans le brouillon.",
             _ => "L’opération Sales n’a pas pu être réalisée. Le panier existant est conservé."

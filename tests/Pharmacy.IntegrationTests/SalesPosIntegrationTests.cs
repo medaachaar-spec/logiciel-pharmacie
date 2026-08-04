@@ -406,13 +406,15 @@ public sealed class SalesPosIntegrationTests
     }
 
     [Fact]
-    public void CompositionRootRegistersFiveSharedAdaptersAndAllHandlers()
+    public void CompositionRootRegistersSqlCatalogMemoryDraftsAndAllHandlers()
     {
         var source = DesktopText("SalesServiceCollectionExtensions.cs");
 
-        Assert.Equal(5, CountOccurrences(source, "services.AddSingleton<I"));
+        Assert.Contains("AddSqlCatalogAdaptersFromEnvironment", source, StringComparison.Ordinal);
         Assert.Contains("ISaleDraftStore, InMemorySaleDraftStore", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("InMemoryProductCatalogReader", source, StringComparison.Ordinal);
         Assert.Contains("AddTransient<SearchSellableProductsHandler>", source, StringComparison.Ordinal);
+        Assert.Contains("AddTransient<SearchCatalogProductsHandler>", source, StringComparison.Ordinal);
         Assert.Contains("AddTransient<PrepareSaleFinalizationHandler>", source, StringComparison.Ordinal);
         Assert.Contains("AddScoped<SalesPosCoordinator>", source, StringComparison.Ordinal);
         Assert.DoesNotContain("AddSingleton<ISaleFinalizer", source, StringComparison.Ordinal);
@@ -428,7 +430,7 @@ public sealed class SalesPosIntegrationTests
         var page = DesktopText("Components", "Pages", "DemoPosPage.razor");
 
         Assert.Contains("@inject SalesPosCoordinator", page, StringComparison.Ordinal);
-        Assert.Contains("Mode démonstration — moteur Sales Application en mémoire — aucune opération persistée", page, StringComparison.Ordinal);
+        Assert.Contains("Mode démonstration — Catalogue SQL et brouillon Sales en mémoire", page, StringComparison.Ordinal);
         Assert.All(razorSources, source =>
         {
             Assert.DoesNotContain("new InMemory", source, StringComparison.Ordinal);

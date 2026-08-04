@@ -171,6 +171,11 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -191,6 +196,9 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("PK_catalog_Products");
+
+                    b.HasIndex("IsActive")
+                        .HasDatabaseName("IX_catalog_Products_IsActive");
 
                     b.HasIndex("Name")
                         .HasDatabaseName("IX_catalog_Products_Name");

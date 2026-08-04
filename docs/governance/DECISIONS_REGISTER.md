@@ -98,3 +98,13 @@ Figma n’est pas obligatoire. Le prototype frontend sera construit directement 
 - Les commandes design-time lisent uniquement `PHARMACY_SQLSERVER_CONNECTION`; les tests réels lisent uniquement `PHARMACY_TEST_SQLSERVER_CONNECTION`. Aucune valeur n’est versionnée ou journalisée.
 - Les longueurs physiques `nvarchar` sont des limites techniques de sûreté documentées, et non des obligations pharmacien, fiscales ou légales.
 - SQL Server 2025 Developer `17.0.1125.2` constitue l’environnement de validation Sprint 9. La cible pilote demeure SQL Server 2025 Express conformément à l’ADR-003 ; aucun changement d’édition cible n’est décidé.
+
+## Décisions techniques locales — Sprint 10
+
+- Le manque de `Products.IsActive` empêchait l’activation globale exigée par le Catalogue. `CatalogPersistenceEnhancementsV01` ajoute uniquement ce booléen, valeur par défaut active, et un index ; la migration Sprint 9 n’est pas modifiée.
+- `ProductLocalSettings.InternalCode` reste la référence Application/Sales. La normalisation barcode effectue trim + majuscules invariantes et conserve les zéros initiaux.
+- Les opérations Catalogue multi-entités utilisent un contexte court et un seul `SaveChangesAsync`, transaction EF atomique. Aucun retry automatique n’est effectué après conflit `rowversion`.
+- Le prix courant et l’historique append-only sont modifiés dans le même commit. Le modèle validé ne comportant pas de période de fin, aucun ancien historique n’est clôturé artificiellement.
+- Le Desktop compose le Catalogue SQL uniquement lorsque la connexion hors dépôt cible `Pharmacy_Development`. En absence de configuration ou en panne, le shell démarre mais aucun fallback vers `InMemoryProductCatalogReader` n’est autorisé.
+- La disponibilité stock du POS reste synthétique, calculée et conservée en mémoire à partir du `ProductId` résolu par SQL, sans identifiant codé en dur ni table Stock.
+- Les dix produits et quatre catégories Demo proviennent d’un seed manuel idempotent protégé ; les migrations restent sans donnée.

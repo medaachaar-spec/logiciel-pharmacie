@@ -42,7 +42,7 @@ public static class HomePresentationModel
         new[]
         {
             new DemoSystemState("Application", "Locale", "Exécution desktop sans service web"),
-            new DemoSystemState("Base de données", "Non connectée", "Connexion volontairement différée"),
+            new DemoSystemState("Catalogue SQL", "Voir diagnostic", "Seed manuel de dix références Demo"),
             new DemoSystemState("Périphériques", "Non configurés", "Scanner et imprimantes non testés"),
             new DemoSystemState("Sauvegarde", "Non configurée", "Planification volontairement différée")
         };

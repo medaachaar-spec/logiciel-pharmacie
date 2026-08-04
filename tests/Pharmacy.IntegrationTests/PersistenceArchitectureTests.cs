@@ -75,7 +75,7 @@ public sealed class PersistenceArchitectureTests
 
         Assert.All(prohibited, token =>
             Assert.DoesNotContain(token, source, StringComparison.OrdinalIgnoreCase));
-        Assert.Contains("AddInMemorySalesAdapters", source, StringComparison.Ordinal);
+        Assert.Contains("AddCatalogBackedSales", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -243,7 +243,7 @@ public sealed class PersistenceArchitectureTests
     }
 
     [Fact]
-    public void SalesContractsStillHaveOnlyInMemoryInfrastructureImplementations()
+    public void DesktopCompositionUsesSqlCatalogAndKeepsOnlyDraftStateInMemory()
     {
         var contracts = new[]
         {
@@ -259,9 +259,20 @@ public sealed class PersistenceArchitectureTests
             .Where(type => !type.IsAbstract && contracts.Any(contract => contract.IsAssignableFrom(type)))
             .ToArray();
 
-        Assert.Equal(5, implementations.Length);
-        Assert.All(implementations, implementation =>
-            Assert.Equal("Pharmacy.Infrastructure.Sales.InMemory", implementation.Namespace));
+        Assert.Contains(implementations, implementation =>
+            implementation.FullName == "Pharmacy.Infrastructure.Catalog.SqlProductCatalogReader");
+        Assert.Contains(implementations, implementation =>
+            implementation.FullName == "Pharmacy.Infrastructure.Sales.InMemory.SyntheticCatalogStockAvailabilityReader");
+
+        var composition = File.ReadAllText(PathAt(
+            "src",
+            "Pharmacy.Desktop",
+            "SalesServiceCollectionExtensions.cs"));
+        Assert.Contains("AddSqlCatalogAdaptersFromEnvironment", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain("InMemoryProductCatalogReader", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain("InMemoryStockAvailabilityReader", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain(implementations, implementation =>
+            !implementation.IsAbstract && typeof(ISaleFinalizer).IsAssignableFrom(implementation));
     }
 
     private static PharmacyDbContext CreateModelContext()

@@ -89,7 +89,7 @@ public static class AppNavigationCatalog
                 AppNavigationGroup.Management,
                 UiIconName.Catalog,
                 0,
-                AppNavigationAccessState.Soon,
+                AppNavigationAccessState.Available,
                 false,
                 AppNavigationKind.Business,
                 "catalog",

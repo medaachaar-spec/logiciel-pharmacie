@@ -1,0 +1,191 @@
+.catalog-page {
+    display: grid;
+    gap: var(--space-6);
+}
+
+.catalog-header,
+.catalog-section-heading,
+.catalog-action-row,
+.catalog-inline-form,
+.catalog-toolbar__actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+}
+
+.catalog-toolbar,
+.catalog-panel {
+    min-width: 0;
+    padding: var(--space-4);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-large);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-small);
+}
+
+.catalog-filter-grid,
+.catalog-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+    align-items: end;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+}
+
+.catalog-filter-grid label,
+.catalog-form-grid label,
+.catalog-inline-form label,
+.catalog-category-form label {
+    display: grid;
+    min-width: 0;
+    gap: var(--space-1);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-bold);
+}
+
+.catalog-workspace {
+    display: grid;
+    grid-template-columns: minmax(22rem, 0.9fr) minmax(28rem, 1.1fr);
+    align-items: start;
+    gap: var(--space-4);
+}
+
+.catalog-section-heading {
+    margin-bottom: var(--space-3);
+}
+
+.catalog-section-heading h2,
+.catalog-section-heading p {
+    margin-bottom: 0;
+}
+
+.catalog-section-heading > span {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-small);
+}
+
+.catalog-table-scroll {
+    max-width: 100%;
+    overflow: auto;
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-medium);
+}
+
+.catalog-table {
+    width: 100%;
+    min-width: 42rem;
+    border-collapse: collapse;
+    font-size: var(--font-size-small);
+}
+
+.catalog-table th,
+.catalog-table td {
+    padding: var(--space-2) var(--space-3);
+    border-bottom: var(--border-width) solid var(--color-border);
+    text-align: left;
+    vertical-align: top;
+}
+
+.catalog-table th {
+    position: sticky;
+    z-index: 1;
+    top: 0;
+    color: var(--color-text-secondary);
+    background: var(--color-surface-subtle);
+}
+
+.catalog-table td small {
+    display: block;
+    color: var(--color-text-secondary);
+}
+
+.catalog-row--selected {
+    background: var(--color-accent-subtle);
+}
+
+.catalog-table--compact {
+    min-width: 36rem;
+}
+
+.catalog-subsection {
+    display: grid;
+    gap: var(--space-3);
+    margin-top: var(--space-6);
+    padding-top: var(--space-4);
+    border-top: var(--border-width) solid var(--color-border);
+}
+
+.catalog-subsection h3,
+.catalog-price {
+    margin-bottom: 0;
+}
+
+.catalog-inline-form {
+    justify-content: flex-start;
+    align-items: end;
+}
+
+.catalog-inline-form label {
+    flex: 1 1 12rem;
+}
+
+.catalog-check {
+    display: flex !important;
+    flex: 0 0 auto !important;
+    align-items: center;
+    min-height: var(--control-height-medium);
+}
+
+.catalog-barcode-list {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    gap: var(--space-2);
+    list-style: none;
+}
+
+.catalog-barcode-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-small);
+}
+
+.catalog-category-layout {
+    display: grid;
+    grid-template-columns: minmax(22rem, 1.2fr) minmax(16rem, 0.8fr);
+    gap: var(--space-4);
+}
+
+.catalog-category-form {
+    display: grid;
+    align-content: start;
+    gap: var(--space-3);
+}
+
+@media (max-width: 75rem) {
+    .catalog-workspace,
+    .catalog-category-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 48rem) {
+    .catalog-header,
+    .catalog-section-heading,
+    .catalog-action-row {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .catalog-toolbar,
+    .catalog-panel {
+        padding: var(--space-3);
+    }
+}

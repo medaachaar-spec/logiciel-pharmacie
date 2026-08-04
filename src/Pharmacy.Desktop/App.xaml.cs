@@ -16,7 +16,7 @@ public partial class App : System.Windows.Application
 
         var services = new ServiceCollection();
         services.AddWpfBlazorWebView();
-        services.AddInMemorySalesAdapters();
+        services.AddCatalogBackedSales();
 
 #if DEBUG
         services.AddBlazorWebViewDeveloperTools();

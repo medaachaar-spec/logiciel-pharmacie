@@ -14,9 +14,9 @@
         </div>
     </header>
 
-    <UiAlert Title="Mode démonstration — moteur Sales Application en mémoire — aucune opération persistée"
+    <UiAlert Title="Mode démonstration — Catalogue SQL et brouillon Sales en mémoire"
              Variant="UiAlertVariant.Warning">
-        Catalogue et panier passent par Application et Infrastructure en mémoire. Paiements, suspensions et impressions restent des simulations Desktop perdues à la fermeture.
+        La recherche et les prix viennent de SQL Server. Panier, stock synthétique, paiements, suspensions et impressions restent en mémoire ; aucune vente n’est persistée.
     </UiAlert>
 
     @if (Session.IsInitializing)
@@ -38,7 +38,7 @@
         @if (Session.Step != DemoPosStep.Success)
         {
             <section class="pos-session-strip" aria-label="État du brouillon Sales Application">
-                <UiBadge Text="Application Sales — mémoire" Variant="UiBadgeVariant.Information" />
+                <UiBadge Text="Catalogue SQL — brouillon mémoire" Variant="UiBadgeVariant.Information" />
                 <span><strong>Brouillon</strong> @DraftReference</span>
                 <span><strong>Version</strong> @Session.CurrentDraft.Version</span>
                 <span><strong>Lignes</strong> @Session.CurrentDraft.LineCount</span>
@@ -218,7 +218,7 @@
                             }
                             else if (!string.IsNullOrWhiteSpace(searchTerm) && Session.SearchResults.Count == 0)
                             {
-                                <p class="ui-field__error" role="status">Aucun résultat dans le catalogue Application en mémoire.</p>
+                                <p class="ui-field__error" role="status">Aucun résultat vendable dans le Catalogue SQL.</p>
                             }
                             else if (Session.IsSearching)
                             {

@@ -16,6 +16,8 @@ internal sealed class ProductEntity
 
     public string? BrandName { get; set; }
 
+    public bool IsActive { get; set; } = true;
+
     public DateTime CreatedAtUtc { get; set; }
 
     public DateTime UpdatedAtUtc { get; set; }

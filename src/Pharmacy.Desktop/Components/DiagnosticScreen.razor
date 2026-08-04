@@ -1,13 +1,14 @@
 @page "/diagnostic"
+@inject GetCatalogDiagnosticsHandler CatalogDiagnostics
 
-<PageTitle>Logiciel Pharmacie — Diagnostic Sprint 1</PageTitle>
+<PageTitle>Logiciel Pharmacie — Diagnostic Catalogue SQL</PageTitle>
 
 <div class="page-stack">
     <header class="hero" aria-labelledby="page-title">
         <div>
             <p class="eyebrow">Socle desktop local</p>
             <h1 id="page-title" tabindex="-1">Logiciel Pharmacie</h1>
-            <p class="subtitle">Fondations techniques — Sprint 1</p>
+            <p class="subtitle">Diagnostic technique — Catalogue SQL Sprint 10</p>
         </div>
         <div class="ready-badge" role="status">
             <span class="ready-dot" aria-hidden="true"></span>
@@ -47,6 +48,36 @@
                 </div>
             </article>
         </div>
+    </section>
+
+    <section class="details-panel" aria-labelledby="catalog-diagnostic-title">
+        <div>
+            <p class="section-kicker">Persistance Catalogue</p>
+            <h2 id="catalog-diagnostic-title">SQL Server</h2>
+        </div>
+        @if (catalogDiagnostics is null)
+        {
+            <UiSpinner Label="Lecture du diagnostic SQL" />
+        }
+        else
+        {
+            <dl class="environment-grid">
+                <div><dt>Fournisseur</dt><dd>@catalogDiagnostics.Provider</dd></div>
+                <div><dt>Base</dt><dd>@catalogDiagnostics.DatabaseName</dd></div>
+                <div><dt>Connectivité</dt><dd>@(catalogDiagnostics.IsReachable ? "Disponible" : "Indisponible")</dd></div>
+                <div><dt>Migration</dt><dd>@catalogDiagnostics.MigrationStatus</dd></div>
+                <div><dt>Produits Demo actifs</dt><dd>@catalogDiagnostics.ActiveDemoProductCount</dd></div>
+                <div><dt>Stock</dt><dd>Synthétique en mémoire</dd></div>
+                <div><dt>Ventes</dt><dd>Non persistées</dd></div>
+                <div><dt>Connexion</dt><dd>@(catalogDiagnostics.IsConfigured ? "Fournie hors dépôt" : "Non configurée")</dd></div>
+            </dl>
+            @if (!catalogDiagnostics.IsReachable)
+            {
+                <UiAlert Title="Catalogue SQL indisponible" Variant="UiAlertVariant.Warning">
+                    Le shell reste opérationnel. Aucun fallback vers le catalogue mémoire n’est effectué.
+                </UiAlert>
+            }
+        }
     </section>
 
     <section class="details-panel" aria-labelledby="environment-title">
@@ -92,13 +123,14 @@
 
     <footer class="scope-notes" aria-label="Limites du socle technique">
         <span>Données synthétiques uniquement</span>
-        <span>Aucune base de données connectée</span>
-        <span>Aucun module métier chargé</span>
+        <span>Aucune connexion complète affichée</span>
+        <span>Aucune vente persistée</span>
     </footer>
 </div>
 
 @code {
     private int interactionCount;
+    private CatalogDiagnosticsView? catalogDiagnostics;
 
     private string InteractionMessage => interactionCount == 0
         ? "Test non exécuté"
@@ -119,5 +151,10 @@
     private void TestInteractivity()
     {
         interactionCount++;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        catalogDiagnostics = await CatalogDiagnostics.HandleAsync();
     }
 }

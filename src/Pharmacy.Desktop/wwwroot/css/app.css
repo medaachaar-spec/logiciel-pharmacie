@@ -4,6 +4,7 @@
 @import url("./utilities.css");
 @import url("./shell.css");
 @import url("./pos.css");
+@import url("./catalog.css");
 
 .development-shell {
     min-height: 100vh;

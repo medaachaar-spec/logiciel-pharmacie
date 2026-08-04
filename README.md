@@ -55,6 +55,8 @@ Le Sprint 8 connecte le parcours nominal du POS à la chaîne `Desktop → Appli
 
 Le Sprint 9 ajoute `Persistence Foundation V0.1` dans Infrastructure avec EF Core SQL Server 10.0.10, un outil local `dotnet-ef`, un `PharmacyDbContext` design-time sécurisé et la migration `InitialCatalogPersistenceV01`. La base locale `Pharmacy_Development` contient uniquement cinq tables vides du schéma `catalog`, suivant le modèle Phase 3 (`ProductLocalSettings` plutôt que la cible indicative `ProductReferences`). La validation automatisée utilise une vraie instance SQL Server 2025 Developer ; la validation sur SQL Server 2025 Express reste obligatoire avant le pilote. Le Desktop et le POS demeurent connectés exclusivement aux adaptateurs Sales en mémoire.
 
+Le Sprint 10 rend le Catalogue réellement persistant. La migration minimale `CatalogPersistenceEnhancementsV01` ajoute l’activation globale manquante à `catalog.Products`. Les recherches du POS utilisent désormais `SqlProductCatalogReader` pour le nom, la présentation, la référence interne et les barcodes actifs ; les prix viennent de SQL Server. La page `/module/catalog` gère produits, catégories, activation, barcodes, prix et historique avec concurrence `rowversion`. Le panier Sales, le stock synthétique, les suspensions, paiements et impressions restent en mémoire et aucune vente n’est enregistrée dans SQL Server.
+
 ### Commandes de persistance contrôlées
 
 La connexion n’est jamais stockée dans le dépôt. Elle doit être fournie temporairement par `PHARMACY_SQLSERVER_CONNECTION` pour les commandes EF ou `PHARMACY_TEST_SQLSERVER_CONNECTION` pour les tests SQL réels.
@@ -68,6 +70,17 @@ dotnet ef migrations list `
 ```
 
 Le script de contrôle en lecture seule se trouve dans `database/verification/verify_sprint09_schema.sql`. Aucune migration n’est exécutée automatiquement au lancement de l’application.
+
+Seed et vérification Sprint 10, exclusivement sur `Pharmacy_Development` :
+
+```powershell
+sqlcmd -S <instance-explicite> -d Pharmacy_Development -E -C -b -f 65001 `
+  -i .\database\dev\seed_synthetic_catalog_v01.sql
+sqlcmd -S <instance-explicite> -d Pharmacy_Development -E -C -b -f 65001 `
+  -i .\database\verification\verify_sprint10_catalog.sql
+```
+
+Le seed manuel est transactionnel et idempotent. Le script `database/dev/clear_synthetic_catalog_v01.sql` supprime uniquement les références `DEMO-*` et leurs dépendances. `-C` reste une exception locale provisoire tant que le certificat SQL de développement n’est pas approuvé.
 
 En configuration Debug, le groupe `Développement` donne également accès à :
 

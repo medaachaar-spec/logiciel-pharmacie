@@ -54,7 +54,7 @@ public sealed class SalesArchitectureTests
     }
 
     [Fact]
-    public void Check60_InfrastructureContainsOnlyApprovedInMemorySalesAdapters()
+    public void Check60_InfrastructureContainsSqlCatalogAndApprovedInMemorySalesState()
     {
         var contractTypes = new[]
         {
@@ -70,9 +70,10 @@ public sealed class SalesArchitectureTests
                 && contractTypes.Any(contract => contract.IsAssignableFrom(type)))
             .ToArray();
 
-        Assert.Equal(5, implementations.Length);
-        Assert.All(implementations, implementation =>
-            Assert.Equal("Pharmacy.Infrastructure.Sales.InMemory", implementation.Namespace));
+        Assert.Contains(implementations, implementation =>
+            implementation.FullName == "Pharmacy.Infrastructure.Catalog.SqlProductCatalogReader");
+        Assert.Contains(implementations, implementation =>
+            implementation.FullName == "Pharmacy.Infrastructure.Sales.InMemory.SyntheticCatalogStockAvailabilityReader");
         Assert.DoesNotContain(infrastructureTypes, type =>
             !type.IsAbstract && typeof(ISaleFinalizer).IsAssignableFrom(type));
     }
@@ -91,7 +92,8 @@ public sealed class SalesArchitectureTests
                 "DemoPosPage.razor"));
 
         Assert.Contains("SalesPosCoordinator", desktopSource, StringComparison.Ordinal);
-        Assert.Contains("AddInMemorySalesAdapters", desktopSource, StringComparison.Ordinal);
+        Assert.Contains("AddCatalogBackedSales", desktopSource, StringComparison.Ordinal);
+        Assert.Contains("AddSqlCatalogAdaptersFromEnvironment", desktopSource, StringComparison.Ordinal);
         Assert.Contains("@inject SalesPosCoordinator", page, StringComparison.Ordinal);
         Assert.DoesNotContain("InMemorySaleDraftStore", page, StringComparison.Ordinal);
     }
@@ -130,8 +132,11 @@ public sealed class SalesArchitectureTests
         Assert.Equal(
             new[]
             {
+                "database/dev/clear_synthetic_catalog_v01.sql",
+                "database/dev/seed_synthetic_catalog_v01.sql",
                 "database/scripts/001_initial_catalog_foundation_idempotent.sql",
-                "database/verification/verify_sprint09_schema.sql"
+                "database/verification/verify_sprint09_schema.sql",
+                "database/verification/verify_sprint10_catalog.sql",
             },
             sqlFiles);
     }

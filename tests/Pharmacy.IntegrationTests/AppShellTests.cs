@@ -186,7 +186,7 @@ public sealed class AppShellTests
 
         Assert.Contains("Local", source, StringComparison.Ordinal);
         Assert.Contains("Données de démonstration", source, StringComparison.Ordinal);
-        Assert.Contains("Base de données non connectée", source, StringComparison.Ordinal);
+        Assert.Contains("Catalogue SQL : voir Diagnostic", source, StringComparison.Ordinal);
         Assert.Contains("BuildConfiguration", source, StringComparison.Ordinal);
         Assert.Contains("Shell : prêt pour revue", source, StringComparison.Ordinal);
     }
@@ -249,7 +249,7 @@ public sealed class AppShellTests
     {
         var source = DesktopText("Components", "Pages", "HomePresentationModel.cs");
 
-        Assert.Contains("\"Non connectée\"", source, StringComparison.Ordinal);
+        Assert.Contains("\"Voir diagnostic\"", source, StringComparison.Ordinal);
         Assert.Contains("\"Non configurés\"", source, StringComparison.Ordinal);
         Assert.Contains("\"Non configurée\"", source, StringComparison.Ordinal);
     }
@@ -317,7 +317,7 @@ public sealed class AppShellTests
         var uiLab = DesktopText("Components", "Pages", "UiLab.razor");
 
         Assert.Contains("@page \"/diagnostic\"", diagnostic, StringComparison.Ordinal);
-        Assert.Contains("Diagnostic Sprint 1", diagnostic, StringComparison.Ordinal);
+        Assert.Contains("Diagnostic Catalogue SQL", diagnostic, StringComparison.Ordinal);
         Assert.Contains("@page \"/ui-lab\"", uiLab, StringComparison.Ordinal);
         Assert.Contains("UI Lab — Fondations visuelles V0.1", uiLab, StringComparison.Ordinal);
     }

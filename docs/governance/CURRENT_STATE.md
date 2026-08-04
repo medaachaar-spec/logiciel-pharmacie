@@ -8,7 +8,7 @@ Date de mise à jour : 2026-08-03
 - Phase 2 fonctionnelle : PASS.
 - Phase 3 modèle de données : PASS.
 - Phase 4 UX/UI : PASS.
-- Phase 5 code-first : fondation technique Sprint 1, `UI Foundations V0.1` Sprint 2, shell applicatif V0.1 Sprint 3, POS synthétique V0.1 Sprint 4 et continuité POS V0.2 Sprint 5 créés ; noyau Sales Sprint 6, cas d’utilisation/adaptateurs mémoire Sprint 7, connexion progressive du POS au Sprint 8, puis fondation SQL Server et schéma physique Catalogue Sprint 9 sans connexion du POS à SQL.
+- Phase 5 code-first : fondations Sprint 1 à 5, noyau Sales Sprint 6, cas d’utilisation/adaptateurs mémoire Sprint 7, connexion du POS à Application Sprint 8, fondation SQL Server Sprint 9, puis Catalogue persistant et recherches POS SQL Sprint 10.
 
 ## État du développement
 
@@ -16,11 +16,11 @@ Date de mise à jour : 2026-08-03
 - Dépôt réel : `C:\Users\HP\Desktop\Logiciel pharmacie`.
 - Branche active : `main`.
 - Sprint 0 : `IMPLEMENTED — FOUNDATION READY WITH WARNINGS` après correction de classification Sprint 0.1.
-- Git : dépôt local sur `49c2ff2`, zéro remote ; changements Sprint 9 laissés hors index pour revue, aucun commit ou push Sprint 9.
+- Git : dépôt local sur `e9a5fcf`, zéro remote ; changements Sprint 10 laissés hors index pour revue, aucun commit ou push Sprint 10.
 - Solution .NET créée : OUI — `Pharmacy.slnx`, six projets .NET 10.
-- Code frontend : POS Application Integration V0.1 — shell WPF/Blazor Hybrid, Ventes connecté aux handlers Sales pour catalogue/panier/version, suspensions Desktop restaurées par handlers, TPE ambigu et impression toujours simulés ; sept pages provisoires, diagnostic et UI Lab Debug.
-- Code backend : PERSISTENCE FOUNDATION V0.1 — Domain/Application inchangés ; Infrastructure conserve cinq adaptateurs Sales en mémoire et ajoute un DbContext Catalogue interne non branché au Desktop.
-- Base SQL Server métier : `Pharmacy_Development` créée sur SQL Server 2025 Developer avec cinq tables Catalogue vides, migration initiale appliquée et compatibilité 170 ; cible Express non encore validée.
+- Code frontend : page Catalogue SQL fonctionnelle ; POS connecté au lecteur SQL et aux prix persistés ; Diagnostic SQL sûr ; six autres modules restent provisoires, UI Lab disponible en Debug.
+- Code backend : contrats et handlers Catalogue dans Application ; lecteur/store/diagnostic SQL dans Infrastructure ; brouillons Sales et disponibilité synthétique restent en mémoire.
+- Base SQL Server métier : `Pharmacy_Development` sur SQL Server 2025 Developer, compatibilité 170, deux migrations appliquées, dix produits et quatre catégories entièrement synthétiques ; cible Express non encore validée.
 - CI : NON DÉMARRÉE.
 
 ## Prérequis détectés au Sprint 0
@@ -51,7 +51,7 @@ Date de mise à jour : 2026-08-03
 
 ## Prochaine étape autorisée
 
-Effectuer la revue manuelle de la base Sprint 9 dans SSMS : instance, `Pharmacy_Development`, cinq tables `catalog`, colonnes/types, PK/FK/index/contraintes, quatre `rowversion` et historique EF. Conserver le POS sur les adaptateurs mémoire ; ne créer aucune persistance Sales ou migration automatique. Traiter la confiance TLS et valider SQL Server 2025 Express avant toute certification pilote.
+Effectuer la revue manuelle Sprint 10 dans SSMS et Desktop : dix produits Demo, catégories, barcodes, prix/historique, rowversions, page Catalogue, recherches/scans POS SQL, panne SQL sûre, clavier et responsive. Ne persister ni vente ni stock. Traiter la confiance TLS et valider SQL Server 2025 Express avant toute certification pilote.
 
 ## Interdictions actuelles
 
@@ -202,3 +202,17 @@ Effectuer la revue manuelle de la base Sprint 9 dans SSMS : instance, `Pharmacy_
 - Architecture : Domain/Application/Desktop inchangés par la fondation ; POS toujours en mémoire ; aucune implémentation SQL Sales ou migration automatique.
 - Sécurité : aucun secret, mot de passe, compte SQL ou connexion réelle versionné ; scan spécialisé sans détection active.
 - Git : branche `main`, HEAD initial `49c2ff2`, index vide, zéro nouveau commit, remote ou push.
+
+## Mise à jour après le Sprint 10
+
+- Statut : `IMPLEMENTED — SQL CATALOG VALIDATION PASS — MANUAL CATALOG REVIEW REQUIRED`.
+- Application : contrats spécifiques, modèles de liste/détail immuables, handlers produits/catégories, rowversions Base64 et dix erreurs structurées.
+- Infrastructure : `SqlProductCatalogReader`, store transactionnel, diagnostic sûr et disponibilité synthétique dynamique sans `ProductId` codé en dur.
+- Migration : `CatalogPersistenceEnhancementsV01` ajoute seulement `Products.IsActive` et son index ; migration Sprint 9 inchangée et aucune migration automatique.
+- SQL : migration appliquée à `Pharmacy_Development`, seed manuel exécuté deux fois sans duplication, dix produits Demo, quatre catégories, dix barcodes et dix historiques initiaux.
+- POS : recherche exacte/résultats/prix depuis SQL ; brouillon Sales, stock, paiements, suspensions et impression toujours en mémoire ; aucune vente persistée.
+- Desktop : Catalogue fonctionnel, filtres, détail, création/modification, activation, barcodes, prix/historique, catégories, états indisponible/loading/empty et anti-double-soumission.
+- Panne SQL : shell et outils techniques démarrent, Catalogue/POS signalent l’indisponibilité, aucun fallback mémoire.
+- Tests : 300 contrôles après ajout de 17 tests Sprint 10 ; SQL Server réel, transactions, rollback, concurrence et base temporaire supprimée.
+- Gate restant : revue manuelle Catalogue/POS/Diagnostic, validation Express et remédiation du certificat TLS local.
+- Git : branche `main`, HEAD initial `e9a5fcf`, index vide, zéro nouveau commit, remote ou push.

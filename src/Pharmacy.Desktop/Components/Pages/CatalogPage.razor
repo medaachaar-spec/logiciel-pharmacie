@@ -1,0 +1,549 @@
+@page "/module/catalog"
+@implements IAsyncDisposable
+@inject CatalogCoordinator Catalog
+
+<PageTitle>Catalogue SQL — Logiciel Pharmacie</PageTitle>
+
+<div class="page-content catalog-page">
+    <header class="page-header catalog-header">
+        <div>
+            <p class="eyebrow">Catalogue</p>
+            <h1>Catalogue SQL</h1>
+            <p class="page-subtitle">Références, catégories, codes-barres et prix persistés dans SQL Server.</p>
+        </div>
+        <UiBadge Text="SQL Server — données Demo" Variant="UiBadgeVariant.Information" />
+    </header>
+
+    <UiAlert Title="Périmètre Sprint 10" Variant="UiAlertVariant.Warning">
+        La création d’un produit ne crée aucun stock. Le stock du POS reste synthétique et les ventes ne sont pas persistées.
+    </UiAlert>
+
+    @if (!string.IsNullOrWhiteSpace(Catalog.Message))
+    {
+        <UiAlert Title="@(Catalog.ErrorCode is null ? "Information" : "Action non réalisée")"
+                 Variant="@(Catalog.ErrorCode is null ? UiAlertVariant.Success : UiAlertVariant.Warning)">
+            @Catalog.Message
+        </UiAlert>
+    }
+
+    <section class="catalog-toolbar" aria-labelledby="catalog-search-title" aria-busy="@Catalog.IsBusy.ToString().ToLowerInvariant()">
+        <div>
+            <p class="section-kicker">Recherche SQL</p>
+            <h2 id="catalog-search-title">Produits</h2>
+        </div>
+        <div class="catalog-filter-grid">
+            <label>
+                <span>Nom, présentation, référence ou barcode</span>
+                <input class="ui-field__control"
+                       type="search"
+                       value="@searchText"
+                       @oninput="OnSearchInput"
+                       @onkeydown="HandleSearchKeyDownAsync"
+                       placeholder="DEMO-000001 ou Produit Démo"
+                       disabled="@Catalog.IsBusy" />
+            </label>
+            <label>
+                <span>État</span>
+                <select class="ui-field__control" @bind="statusFilter" disabled="@Catalog.IsBusy">
+                    <option value="@CatalogProductStatusFilter.All">Tous</option>
+                    <option value="@CatalogProductStatusFilter.Active">Actifs</option>
+                    <option value="@CatalogProductStatusFilter.Inactive">Inactifs</option>
+                </select>
+            </label>
+            <label>
+                <span>Catégorie</span>
+                <select class="ui-field__control" @bind="categoryFilter" disabled="@Catalog.IsBusy">
+                    <option value="">Toutes</option>
+                    @foreach (var category in Catalog.Categories)
+                    {
+                        <option value="@category.CategoryId">@category.Name</option>
+                    }
+                </select>
+            </label>
+            <div class="catalog-toolbar__actions">
+                <UiButton IsLoading="@Catalog.IsBusy" OnClick="SearchAsync">Rechercher</UiButton>
+                <UiButton Variant="UiButtonVariant.Secondary" Disabled="@Catalog.IsBusy" OnClick="ToggleCreateProductAsync">
+                    @(showCreateProduct ? "Fermer la création" : "Nouveau produit")
+                </UiButton>
+            </div>
+        </div>
+    </section>
+
+    @if (showCreateProduct)
+    {
+        <section class="catalog-panel" aria-labelledby="create-product-title">
+            <div class="catalog-section-heading">
+                <div>
+                    <p class="section-kicker">Création transactionnelle</p>
+                    <h2 id="create-product-title">Nouveau produit synthétique</h2>
+                </div>
+                <span>Aucun stock créé</span>
+            </div>
+            <div class="catalog-form-grid">
+                <label><span>Désignation *</span><input class="ui-field__control" @bind="createName" disabled="@Catalog.IsBusy" /></label>
+                <label><span>Présentation</span><input class="ui-field__control" @bind="createPresentation" disabled="@Catalog.IsBusy" /></label>
+                <label><span>Référence interne *</span><input class="ui-field__control" @bind="createInternalCode" placeholder="DEMO-000011" disabled="@Catalog.IsBusy" /></label>
+                <label>
+                    <span>Catégorie *</span>
+                    <select class="ui-field__control" @bind="createCategoryId" disabled="@Catalog.IsBusy">
+                        <option value="0">Sélectionner</option>
+                        @foreach (var category in Catalog.Categories.Where(item => item.IsActive))
+                        {
+                            <option value="@category.CategoryId">@category.Name</option>
+                        }
+                    </select>
+                </label>
+                <label><span>Prix initial MAD</span><input class="ui-field__control" type="number" min="0" step="0.0001" @bind="createPrice" disabled="@Catalog.IsBusy" /></label>
+                <label><span>Barcode Demo</span><input class="ui-field__control" @bind="createBarcode" placeholder="DEMO-BARCODE-000011" disabled="@Catalog.IsBusy" /></label>
+            </div>
+            <UiButton IsLoading="@Catalog.IsBusy" OnClick="CreateProductAsync">Créer le produit</UiButton>
+        </section>
+    }
+
+    <div class="catalog-workspace">
+        <section class="catalog-panel catalog-list-panel" aria-labelledby="catalog-list-title">
+            <div class="catalog-section-heading">
+                <h2 id="catalog-list-title">Liste limitée</h2>
+                <span>@Catalog.Products.Count résultat(s)</span>
+            </div>
+            @if (!Catalog.IsInitialized && Catalog.IsBusy)
+            {
+                <UiSpinner Label="Chargement du Catalogue SQL" />
+            }
+            else if (Catalog.Products.Count == 0)
+            {
+                <UiEmptyState Title="Aucun produit"
+                              Description="Aucun produit ne correspond aux filtres, ou le Catalogue SQL est indisponible." />
+            }
+            else
+            {
+                <div class="catalog-table-scroll" tabindex="0" aria-label="Table des produits du Catalogue">
+                    <table class="catalog-table">
+                        <thead>
+                            <tr><th>Référence</th><th>Désignation</th><th>Catégorie</th><th>Prix</th><th>État</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var product in Catalog.Products)
+                            {
+                                <tr class="@(Catalog.SelectedProduct?.ProductId == product.ProductId ? "catalog-row--selected" : null)">
+                                    <td><strong>@product.InternalCode</strong><small>@product.PrimaryBarcode</small></td>
+                                    <td>@product.Name<small>@product.Presentation</small></td>
+                                    <td>@product.CategoryName</td>
+                                    <td>@product.CurrentSalePrice.ToString("0.00") MAD</td>
+                                    <td>@(product.IsActive && product.IsLocallyActive ? "Actif" : "Inactif")</td>
+                                    <td><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" Disabled="@Catalog.IsBusy" OnClick="args => SelectProductAsync(product.ProductId)">Ouvrir</UiButton></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+
+        <section class="catalog-panel catalog-details-panel" aria-labelledby="catalog-details-title">
+            @if (Catalog.SelectedProduct is null)
+            {
+                <UiEmptyState Title="Sélectionnez un produit"
+                              Description="La fiche détaillée affichera identité, paramètres locaux, codes-barres et historique des prix." />
+            }
+            else
+            {
+                var product = Catalog.SelectedProduct;
+                <div class="catalog-section-heading">
+                    <div>
+                        <p class="section-kicker">Fiche produit</p>
+                        <h2 id="catalog-details-title">@product.InternalCode</h2>
+                    </div>
+                    <UiBadge Text="@(product.IsActive && product.IsLocallyActive ? "Actif" : "Inactif")"
+                             Variant="@(product.IsActive && product.IsLocallyActive ? UiBadgeVariant.Success : UiBadgeVariant.Warning)" />
+                </div>
+
+                <div class="catalog-form-grid">
+                    <label><span>Désignation *</span><input class="ui-field__control" @bind="editName" disabled="@Catalog.IsBusy" /></label>
+                    <label><span>Présentation</span><input class="ui-field__control" @bind="editPresentation" disabled="@Catalog.IsBusy" /></label>
+                    <label><span>Référence interne *</span><input class="ui-field__control" @bind="editInternalCode" disabled="@Catalog.IsBusy" /></label>
+                    <label>
+                        <span>Catégorie *</span>
+                        <select class="ui-field__control" @bind="editCategoryId" disabled="@Catalog.IsBusy">
+                            @foreach (var category in Catalog.Categories)
+                            {
+                                <option value="@category.CategoryId">@category.Name</option>
+                            }
+                        </select>
+                    </label>
+                </div>
+                <div class="catalog-action-row">
+                    <UiButton IsLoading="@Catalog.IsBusy" OnClick="UpdateProductAsync">Enregistrer identité et paramètres</UiButton>
+                    <UiButton Variant="@(product.IsActive && product.IsLocallyActive ? UiButtonVariant.Danger : UiButtonVariant.Secondary)"
+                              Disabled="@Catalog.IsBusy"
+                              OnClick="ToggleProductActivationAsync">
+                        @(product.IsActive && product.IsLocallyActive ? "Désactiver" : "Réactiver")
+                    </UiButton>
+                    <UiButton Variant="UiButtonVariant.Tertiary" Disabled="@Catalog.IsBusy" OnClick="ReloadSelectedAsync">Recharger</UiButton>
+                </div>
+
+                <section class="catalog-subsection" aria-labelledby="barcode-title">
+                    <h3 id="barcode-title">Codes-barres</h3>
+                    <div class="catalog-inline-form">
+                        <label><span>Nouveau code</span><input class="ui-field__control" @bind="newBarcode" placeholder="DEMO-BARCODE-..." disabled="@Catalog.IsBusy" /></label>
+                        <label class="catalog-check"><input type="checkbox" @bind="newBarcodePrimary" disabled="@Catalog.IsBusy" /> Principal</label>
+                        <UiButton Size="UiButtonSize.Small" Disabled="@Catalog.IsBusy" OnClick="AddBarcodeAsync">Ajouter</UiButton>
+                    </div>
+                    @if (product.Barcodes.Count == 0)
+                    {
+                        <p class="u-muted">Aucun code-barres.</p>
+                    }
+                    else
+                    {
+                        <ul class="catalog-barcode-list">
+                            @foreach (var barcode in product.Barcodes)
+                            {
+                                <li>
+                                    <span><strong>@barcode.Value</strong> — @(barcode.IsActive ? "Actif" : "Inactif") @(barcode.IsPrimary ? "— Principal" : null)</span>
+                                    <UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Tertiary" Disabled="@Catalog.IsBusy" OnClick="args => ToggleBarcodeAsync(barcode)">
+                                        @(barcode.IsActive ? "Désactiver" : "Activer")
+                                    </UiButton>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </section>
+
+                <section class="catalog-subsection" aria-labelledby="price-title">
+                    <h3 id="price-title">Prix et historique</h3>
+                    <p class="catalog-price">Prix courant : <strong>@product.CurrentSalePrice.ToString("0.0000") @product.CurrencyCode</strong></p>
+                    <div class="catalog-inline-form">
+                        <label><span>Nouveau prix</span><input class="ui-field__control" type="number" min="0" step="0.0001" @bind="newPrice" disabled="@Catalog.IsBusy" /></label>
+                        <label><span>Motif</span><input class="ui-field__control" @bind="priceReason" disabled="@Catalog.IsBusy" /></label>
+                        <UiButton Size="UiButtonSize.Small" Disabled="@Catalog.IsBusy" OnClick="ChangePriceAsync">Changer le prix</UiButton>
+                    </div>
+                    <div class="catalog-table-scroll" tabindex="0" aria-label="Historique des prix">
+                        <table class="catalog-table catalog-table--compact">
+                            <thead><tr><th>Date UTC</th><th>Ancien</th><th>Nouveau</th><th>Origine</th><th>Motif</th></tr></thead>
+                            <tbody>
+                                @foreach (var history in product.PriceHistory)
+                                {
+                                    <tr>
+                                        <td>@history.EffectiveAtUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                                        <td>@(history.OldPrice?.ToString("0.0000") ?? "—")</td>
+                                        <td>@history.NewPrice.ToString("0.0000")</td>
+                                        <td>@history.ChangeOrigin</td>
+                                        <td>@history.Reason</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            }
+        </section>
+    </div>
+
+    <section class="catalog-panel" aria-labelledby="categories-title">
+        <div class="catalog-section-heading">
+            <div><p class="section-kicker">Configuration</p><h2 id="categories-title">Catégories</h2></div>
+            <span>Aucune suppression physique</span>
+        </div>
+        <div class="catalog-category-layout">
+            <div class="catalog-table-scroll" tabindex="0">
+                <table class="catalog-table catalog-table--compact">
+                    <thead><tr><th>Code</th><th>Nom</th><th>État</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var category in Catalog.Categories)
+                        {
+                            <tr>
+                                <td>@category.Code</td><td>@category.Name</td><td>@(category.IsActive ? "Active" : "Inactive")</td>
+                                <td><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Tertiary" Disabled="@Catalog.IsBusy" OnClick="args => EditCategory(category)">Modifier</UiButton></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="catalog-category-form">
+                <label><span>Code *</span><input class="ui-field__control" @bind="categoryCode" disabled="@Catalog.IsBusy" /></label>
+                <label><span>Nom *</span><input class="ui-field__control" @bind="categoryName" disabled="@Catalog.IsBusy" /></label>
+                <label><span>Ordre</span><input class="ui-field__control" type="number" min="0" @bind="categorySortOrder" disabled="@Catalog.IsBusy" /></label>
+                <div class="catalog-action-row">
+                    <UiButton Size="UiButtonSize.Small" Disabled="@Catalog.IsBusy" OnClick="SaveCategoryAsync">@(editedCategory is null ? "Créer" : "Enregistrer")</UiButton>
+                    @if (editedCategory is not null)
+                    {
+                        <UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" Disabled="@Catalog.IsBusy" OnClick="ToggleCategoryActivationAsync">
+                            @(editedCategory.IsActive ? "Désactiver" : "Réactiver")
+                        </UiButton>
+                        <UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Tertiary" OnClick="CancelCategoryEditAsync">Annuler</UiButton>
+                    }
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private string? searchText;
+    private CatalogProductStatusFilter statusFilter;
+    private string categoryFilter = string.Empty;
+    private bool showCreateProduct;
+    private string createName = string.Empty;
+    private string? createPresentation;
+    private string createInternalCode = string.Empty;
+    private long createCategoryId;
+    private decimal createPrice;
+    private string? createBarcode;
+    private string editName = string.Empty;
+    private string? editPresentation;
+    private string editInternalCode = string.Empty;
+    private long editCategoryId;
+    private string newBarcode = string.Empty;
+    private bool newBarcodePrimary;
+    private decimal newPrice;
+    private string? priceReason;
+    private CatalogCategoryView? editedCategory;
+    private string categoryCode = string.Empty;
+    private string categoryName = string.Empty;
+    private int categorySortOrder;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Catalog.InitializeAsync(lifetime.Token);
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();
+        lifetime.Dispose();
+        return ValueTask.CompletedTask;
+    }
+
+    private void OnSearchInput(ChangeEventArgs args) => searchText = args.Value?.ToString();
+
+    private async Task HandleSearchKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (string.Equals(args.Key, "Enter", StringComparison.Ordinal))
+        {
+            await SearchCoreAsync();
+        }
+    }
+
+    private Task SearchAsync(MouseEventArgs _) => SearchCoreAsync();
+
+    private Task SearchCoreAsync() => Catalog.SearchAsync(
+        searchText,
+        statusFilter,
+        long.TryParse(categoryFilter, out var categoryId) ? categoryId : null,
+        lifetime.Token);
+
+    private Task ToggleCreateProductAsync(MouseEventArgs _)
+    {
+        showCreateProduct = !showCreateProduct;
+        return Task.CompletedTask;
+    }
+
+    private async Task CreateProductAsync(MouseEventArgs _)
+    {
+        var barcodes = string.IsNullOrWhiteSpace(createBarcode)
+            ? Array.Empty<CatalogBarcodeInput>()
+            : new[] { new CatalogBarcodeInput(createBarcode, true) };
+        await Catalog.CreateProductAsync(
+            new CreateCatalogProductCommand(
+                createName,
+                createPresentation,
+                createCategoryId,
+                createInternalCode,
+                createPrice,
+                barcodes),
+            lifetime.Token);
+
+        if (Catalog.ErrorCode is null)
+        {
+            showCreateProduct = false;
+            ResetCreateForm();
+            LoadEditForm();
+        }
+    }
+
+    private async Task SelectProductAsync(long productId)
+    {
+        await Catalog.SelectAsync(productId, lifetime.Token);
+        LoadEditForm();
+    }
+
+    private async Task ReloadSelectedAsync(MouseEventArgs _)
+    {
+        if (Catalog.SelectedProduct is null) return;
+        await SelectProductAsync(Catalog.SelectedProduct.ProductId);
+    }
+
+    private async Task UpdateProductAsync(MouseEventArgs _)
+    {
+        var product = Catalog.SelectedProduct;
+        if (product is null) return;
+        await Catalog.UpdateProductAsync(
+            new UpdateCatalogProductCommand(
+                product.ProductId,
+                editName,
+                editPresentation,
+                editCategoryId,
+                editInternalCode,
+                product.IsSellable,
+                product.IsPurchasable,
+                product.TracksLots,
+                product.TracksExpiry,
+                product.DiscountAllowed,
+                product.QuantityScale,
+                product.StorageLocation,
+                product.MinimumStock,
+                product.MaximumStock,
+                product.ProductRowVersion,
+                product.LocalSettingsRowVersion),
+            lifetime.Token);
+        LoadEditForm();
+    }
+
+    private async Task ToggleProductActivationAsync(MouseEventArgs _)
+    {
+        var product = Catalog.SelectedProduct;
+        if (product is null) return;
+        var activate = !(product.IsActive && product.IsLocallyActive);
+        await Catalog.SetActivationAsync(
+            new SetCatalogProductActivationCommand(
+                product.ProductId,
+                activate,
+                activate,
+                product.ProductRowVersion,
+                product.LocalSettingsRowVersion),
+            lifetime.Token);
+        LoadEditForm();
+    }
+
+    private async Task AddBarcodeAsync(MouseEventArgs _)
+    {
+        var product = Catalog.SelectedProduct;
+        if (product is null) return;
+        await Catalog.AddBarcodeAsync(
+            new AddCatalogBarcodeCommand(product.ProductId, newBarcode, newBarcodePrimary),
+            lifetime.Token);
+        if (Catalog.ErrorCode is null)
+        {
+            newBarcode = string.Empty;
+            newBarcodePrimary = false;
+        }
+    }
+
+    private Task ToggleBarcodeAsync(CatalogBarcodeView barcode)
+    {
+        var product = Catalog.SelectedProduct;
+        return product is null
+            ? Task.CompletedTask
+            : Catalog.UpdateBarcodeAsync(
+                new UpdateCatalogBarcodeCommand(
+                    product.ProductId,
+                    barcode.BarcodeId,
+                    barcode.Value,
+                    barcode.IsPrimary,
+                    !barcode.IsActive,
+                    barcode.RowVersion,
+                    barcode.BarcodeType),
+                lifetime.Token);
+    }
+
+    private async Task ChangePriceAsync(MouseEventArgs _)
+    {
+        var product = Catalog.SelectedProduct;
+        if (product is null) return;
+        await Catalog.ChangePriceAsync(
+            new ChangeCatalogProductPriceCommand(
+                product.ProductId,
+                newPrice,
+                priceReason,
+                product.LocalSettingsRowVersion),
+            lifetime.Token);
+        if (Catalog.ErrorCode is null)
+        {
+            newPrice = Catalog.SelectedProduct?.CurrentSalePrice ?? 0m;
+            priceReason = null;
+        }
+    }
+
+    private void LoadEditForm()
+    {
+        var product = Catalog.SelectedProduct;
+        if (product is null) return;
+        editName = product.Name;
+        editPresentation = product.Presentation;
+        editInternalCode = product.InternalCode;
+        editCategoryId = product.CategoryId;
+        newPrice = product.CurrentSalePrice;
+    }
+
+    private void ResetCreateForm()
+    {
+        createName = string.Empty;
+        createPresentation = null;
+        createInternalCode = string.Empty;
+        createCategoryId = 0;
+        createPrice = 0m;
+        createBarcode = null;
+    }
+
+    private Task EditCategory(CatalogCategoryView category)
+    {
+        editedCategory = category;
+        categoryCode = category.Code;
+        categoryName = category.Name;
+        categorySortOrder = category.SortOrder;
+        return Task.CompletedTask;
+    }
+
+    private async Task SaveCategoryAsync(MouseEventArgs _)
+    {
+        if (editedCategory is null)
+        {
+            await Catalog.CreateCategoryAsync(
+                new CreateCatalogCategoryCommand(categoryCode, categoryName, categorySortOrder),
+                lifetime.Token);
+        }
+        else
+        {
+            await Catalog.UpdateCategoryAsync(
+                new UpdateCatalogCategoryCommand(
+                    editedCategory.CategoryId,
+                    categoryCode,
+                    categoryName,
+                    categorySortOrder,
+                    editedCategory.DefaultTracksLots,
+                    editedCategory.DefaultTracksExpiry,
+                    editedCategory.DefaultDiscountAllowed,
+                    editedCategory.RowVersion),
+                lifetime.Token);
+        }
+
+        if (Catalog.ErrorCode is null) ResetCategoryForm();
+    }
+
+    private async Task ToggleCategoryActivationAsync(MouseEventArgs _)
+    {
+        if (editedCategory is null) return;
+        await Catalog.SetCategoryActivationAsync(
+            new SetCatalogCategoryActivationCommand(
+                editedCategory.CategoryId,
+                !editedCategory.IsActive,
+                editedCategory.RowVersion),
+            lifetime.Token);
+        if (Catalog.ErrorCode is null) ResetCategoryForm();
+    }
+
+    private Task CancelCategoryEditAsync(MouseEventArgs _)
+    {
+        ResetCategoryForm();
+        return Task.CompletedTask;
+    }
+
+    private void ResetCategoryForm()
+    {
+        editedCategory = null;
+        categoryCode = string.Empty;
+        categoryName = string.Empty;
+        categorySortOrder = 0;
+    }
+}

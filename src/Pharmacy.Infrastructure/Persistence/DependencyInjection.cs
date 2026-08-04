@@ -18,7 +18,7 @@ public static class DependencyInjection
                 nameof(connectionString));
         }
 
-        services.AddDbContext<PharmacyDbContext>(options =>
+        services.AddDbContextFactory<PharmacyDbContext>(options =>
             options.UsePharmacySqlServer(connectionString));
         return services;
     }

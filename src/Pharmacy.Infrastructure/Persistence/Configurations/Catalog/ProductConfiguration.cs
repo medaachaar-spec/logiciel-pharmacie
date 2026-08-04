@@ -40,6 +40,9 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<ProductEnt
         builder.Property(product => product.BrandName)
             .HasColumnType("nvarchar(160)")
             .HasMaxLength(160);
+        builder.Property(product => product.IsActive)
+            .HasDefaultValue(true)
+            .IsRequired();
         builder.Property(product => product.CreatedAtUtc)
             .HasColumnType("datetime2(7)")
             .IsRequired();
@@ -52,5 +55,7 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<ProductEnt
 
         builder.HasIndex(product => product.Name)
             .HasDatabaseName("IX_catalog_Products_Name");
+        builder.HasIndex(product => product.IsActive)
+            .HasDatabaseName("IX_catalog_Products_IsActive");
     }
 }
