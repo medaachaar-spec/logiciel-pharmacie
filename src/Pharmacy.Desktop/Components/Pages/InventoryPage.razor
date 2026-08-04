@@ -1,0 +1,518 @@
+@page "/module/inventory"
+@inject InventoryCoordinator Inventory
+
+<PageTitle>Stock SQL — Logiciel Pharmacie</PageTitle>
+
+<div class="page-content inventory-page">
+    <header class="page-header inventory-header" aria-labelledby="inventory-title">
+        <div>
+            <p class="eyebrow">Stock</p>
+            <h1 id="inventory-title" tabindex="-1">Stock SQL</h1>
+            <p class="page-subtitle">Lots, mouvements et inventaires persistés dans SQL Server.</p>
+        </div>
+        <UiBadge Text="SQL actif — ventes non persistées" Variant="UiBadgeVariant.Information" />
+    </header>
+
+    <UiAlert Title="Périmètre Sprint 11" Variant="UiAlertVariant.Warning">
+        Le Stock et la disponibilité du POS proviennent de SQL Server. Les ventes restent non persistées et ne consomment aucun stock.
+    </UiAlert>
+
+    @if (!Inventory.IsInitialized && Inventory.ErrorCode is null)
+    {
+        <section class="inventory-state catalog-panel" role="status" aria-live="polite">
+            <UiSpinner Label="Chargement du Stock SQL" />
+        </section>
+    }
+    else if (Inventory.ErrorCode == "inventory.database.unavailable")
+    {
+        <UiAlert Title="Stock SQL indisponible" Variant="UiAlertVariant.Warning">
+            <p>@Inventory.Message</p>
+            <p>Le shell reste accessible. Vérifiez la configuration locale dans Diagnostic puis réessayez.</p>
+            <UiButton OnClick="ReloadAsync">Réessayer</UiButton>
+        </UiAlert>
+    }
+    else
+    {
+        @if (!string.IsNullOrWhiteSpace(Inventory.Message))
+        {
+            <UiAlert Title="@(Inventory.ErrorCode is null ? "Opération réalisée" : "Action non réalisée")"
+                     Variant="@(Inventory.ErrorCode is null ? UiAlertVariant.Success : UiAlertVariant.Warning)">
+                @Inventory.Message
+            </UiAlert>
+        }
+
+        <section class="inventory-summary" aria-labelledby="inventory-summary-title">
+            <h2 id="inventory-summary-title" class="sr-only">Indicateurs du stock</h2>
+            <UiCard Density="UiCardDensity.Compact">
+                <div class="inventory-metric"><strong>@Inventory.Products.Count</strong><span>produits affichés</span></div>
+            </UiCard>
+            <UiCard Density="UiCardDensity.Compact">
+                <div class="inventory-metric"><strong>@Inventory.Products.Sum(item => item.SellableQuantity)</strong><span>unités vendables</span></div>
+            </UiCard>
+            <UiCard Density="UiCardDensity.Compact">
+                <div class="inventory-metric"><strong>@Inventory.ExpiredBatches.Count</strong><span>soldes expirés visibles</span></div>
+            </UiCard>
+            <UiCard Density="UiCardDensity.Compact">
+                <div class="inventory-metric"><strong>@Inventory.Sessions.Count</strong><span>inventaires récents</span></div>
+            </UiCard>
+        </section>
+
+        <section class="catalog-toolbar inventory-toolbar" aria-labelledby="stock-search-title" aria-busy="@Inventory.IsBusy.ToString().ToLowerInvariant()">
+            <div>
+                <p class="section-kicker">Recherche SQL</p>
+                <h2 id="stock-search-title">Rechercher dans le stock</h2>
+            </div>
+
+            <div class="catalog-filter-grid inventory-filters" role="search">
+                <UiTextField Id="stock-search"
+                             Label="Produit, référence ou code-barres"
+                             Type="UiTextFieldType.Search"
+                             Placeholder="DEMO-000001"
+                             Value="@searchText"
+                             ValueChanged="SetSearchText" />
+                <UiSelect Id="stock-location"
+                          Label="Emplacement"
+                          Placeholder="Tous les emplacements"
+                          Options="@LocationOptions"
+                          Value="@locationFilter"
+                          ValueChanged="SetLocationFilter" />
+                <UiSelect Id="stock-availability"
+                          Label="Disponibilité"
+                          Placeholder="Tous les états"
+                          Options="@AvailabilityOptions"
+                          Value="@availabilityFilter"
+                          ValueChanged="SetAvailabilityFilter" />
+                <div class="catalog-toolbar__actions">
+                    <UiButton IsLoading="@Inventory.IsBusy" OnClick="SearchAsync">Rechercher</UiButton>
+                    <UiButton Variant="UiButtonVariant.Secondary" Disabled="@Inventory.IsBusy" OnClick="ReloadAsync">Actualiser</UiButton>
+                </div>
+            </div>
+        </section>
+
+        <section class="catalog-panel inventory-panel inventory-list-panel" aria-labelledby="stock-list-title">
+            <div class="catalog-section-heading inventory-section-heading">
+                <div>
+                    <p class="section-kicker">Lecture SQL</p>
+                    <h2 id="stock-list-title">Résumé par produit</h2>
+                </div>
+                <span>@Inventory.Products.Count résultat(s)</span>
+            </div>
+
+            @if (Inventory.Products.Count == 0)
+            {
+                <UiEmptyState Title="Aucun produit pour ces critères"
+                              Description="Modifiez la recherche ou le filtre. Aucune donnée n’a été créée automatiquement." />
+            }
+            else
+            {
+                <div class="catalog-table-scroll inventory-table-wrap" tabindex="0" role="region" aria-label="Produits et quantités">
+                    <table class="catalog-table inventory-table">
+                        <thead>
+                            <tr><th>Référence</th><th>Produit</th><th>Vendable</th><th>Total</th><th>Expiré</th><th>Lots</th><th><span class="sr-only">Action</span></th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var product in Inventory.Products)
+                            {
+                                <tr class="@(Inventory.SelectedProduct?.ProductId == product.ProductId ? "catalog-row--selected" : null)">
+                                    <td><code>@product.InternalCode</code></td>
+                                    <td>@product.ProductName</td>
+                                    <td><strong>@product.SellableQuantity</strong></td>
+                                    <td>@product.TotalQuantity</td>
+                                    <td><span class="@(product.ExpiredQuantity > 0 ? "inventory-expired" : null)">@product.ExpiredQuantity</span></td>
+                                    <td>@product.BatchCount</td>
+                                    <td><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" OnClick="@(() => SelectProductAsync(product.ProductId))">Détails</UiButton></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+
+        <section class="catalog-panel inventory-panel inventory-details-panel" aria-labelledby="stock-details-title">
+            @if (Inventory.SelectedProduct is null)
+            {
+                <div class="catalog-section-heading inventory-section-heading">
+                    <div>
+                        <p class="section-kicker">Fiche stock</p>
+                        <h2 id="stock-details-title">Détail du produit</h2>
+                    </div>
+                </div>
+                <UiEmptyState Title="Sélectionnez un produit"
+                              Description="Le détail affichera les lots, les balances, les mouvements et les opérations de stock disponibles." />
+            }
+            else
+            {
+                <div class="catalog-section-heading inventory-section-heading">
+                    <div>
+                        <p class="section-kicker">@Inventory.SelectedProduct.InternalCode</p>
+                        <h2 id="stock-details-title">@Inventory.SelectedProduct.ProductName</h2>
+                    </div>
+                    <div class="inventory-heading-metrics">
+                        <UiBadge Text="@($"Vendable {Inventory.SelectedProduct.SellableQuantity}")" Variant="UiBadgeVariant.Success" />
+                        <UiBadge Text="@($"Total {Inventory.SelectedProduct.TotalQuantity}")" Variant="UiBadgeVariant.Neutral" />
+                    </div>
+                </div>
+
+                <div class="inventory-detail-grid">
+                    <section class="inventory-subpanel" aria-labelledby="sellable-balances-title">
+                        <h3 id="sellable-balances-title">Lots et balances vendables</h3>
+                        @if (SellableBalances.Count == 0)
+                        {
+                            <p class="inventory-muted">Aucun solde vendable.</p>
+                        }
+                        else
+                        {
+                            @foreach (var balance in SellableBalances)
+                            {
+                                <label class="inventory-balance-option">
+                                    <input type="radio" name="balance" value="@balance.BalanceId" checked="@(selectedBalanceId == balance.BalanceId)" @onchange="@(() => SelectBalance(balance.BalanceId))" />
+                                    <span><strong>@(balance.LotNumber ?? "Sans lot")</strong> — @balance.AvailableQuantity unité(s)</span>
+                                    <small>@balance.LocationName · péremption @(balance.ExpiryDate?.ToString("dd/MM/yyyy") ?? "non suivie")</small>
+                                </label>
+                            }
+                        }
+                    </section>
+                    <section class="inventory-subpanel" aria-labelledby="expired-balances-title">
+                        <h3 id="expired-balances-title">Lots expirés — non vendables</h3>
+                        @if (ExpiredSelectedBalances.Count == 0)
+                        {
+                            <p class="inventory-muted">Aucun lot expiré pour ce produit.</p>
+                        }
+                        else
+                        {
+                            @foreach (var balance in ExpiredSelectedBalances)
+                            {
+                                <div class="inventory-expired-card">
+                                    <strong>@(balance.LotNumber ?? "Sans lot")</strong>
+                                    <span>@balance.AvailableQuantity unité(s) · expiré le @balance.ExpiryDate?.ToString("dd/MM/yyyy")</span>
+                                </div>
+                            }
+                        }
+                    </section>
+                </div>
+
+                <div class="inventory-action-grid catalog-subsection">
+                    <form class="inventory-form" @onsubmit="RequestMovementAsync" @onsubmit:preventDefault>
+                        <h3>Ouverture ou ajustement</h3>
+                        <UiSelect Id="movement-type" Label="Type"
+                                  Options="@MovementOptions" Value="@movementType" ValueChanged="SetMovementType" Required="true" />
+                        <UiTextField Id="movement-quantity" Label="Quantité entière" Type="UiTextFieldType.Number"
+                                     Value="@movementQuantity" ValueChanged="SetMovementQuantity" Required="true" />
+                        <UiTextField Id="movement-reason" Label="Motif" Value="@movementReason" ValueChanged="SetMovementReason" Required="true" />
+                        <p class="inventory-muted">Le solde sélectionné et le mouvement sont écrits dans une même transaction. Une baisse ne peut jamais rendre le stock négatif.</p>
+                        <UiButton ButtonType="UiButtonType.Submit" Disabled="@(Inventory.IsBusy || SelectedBalance is null)">Vérifier l’opération</UiButton>
+                    </form>
+
+                    <section class="inventory-form" aria-labelledby="fefo-title">
+                        <h3 id="fefo-title">Proposition FEFO</h3>
+                        <p>Les lots vendables sont présentés par péremption la plus proche. Cette proposition descriptive ne consomme aucun stock.</p>
+                        <ol class="inventory-fefo">
+                            @foreach (var balance in SellableBalances.OrderBy(item => item.ExpiryDate is null).ThenBy(item => item.ExpiryDate).ThenBy(item => item.BatchId))
+                            {
+                                <li>@(balance.LotNumber ?? "Sans lot") — @balance.AvailableQuantity unité(s) — @(balance.ExpiryDate?.ToString("dd/MM/yyyy") ?? "sans péremption")</li>
+                            }
+                        </ol>
+                    </section>
+                </div>
+
+                @if (confirmMovement)
+                {
+                    <div class="inventory-confirmation" role="alertdialog" aria-modal="true" aria-labelledby="movement-confirm-title" tabindex="-1">
+                        <div>
+                            <h3 id="movement-confirm-title">Confirmer le mouvement</h3>
+                            <p>@MovementConfirmationText</p>
+                        </div>
+                        <div class="inventory-confirmation-actions">
+                            <UiButton Variant="UiButtonVariant.Secondary" OnClick="CancelMovementConfirmationAsync">Annuler</UiButton>
+                            <UiButton Variant="@(ParsedMovementType == StockMovementType.ManualDecrease ? UiButtonVariant.Danger : UiButtonVariant.Primary)" OnClick="ConfirmMovementAsync">Confirmer</UiButton>
+                        </div>
+                    </div>
+                }
+
+                <div class="catalog-subsection inventory-history">
+                    <h3>Historique des mouvements</h3>
+                    <div class="catalog-table-scroll inventory-table-wrap" tabindex="0" role="region" aria-label="Journal des mouvements">
+                        <table class="catalog-table catalog-table--compact inventory-table inventory-table--compact">
+                        <thead><tr><th>Date UTC</th><th>Type</th><th>Lot</th><th>Quantité</th><th>Avant</th><th>Après</th><th>Motif</th></tr></thead>
+                        <tbody>
+                            @foreach (var movement in Inventory.Movements)
+                            {
+                                <tr><td>@movement.OccurredAtUtc.ToString("dd/MM/yyyy HH:mm")</td><td>@movement.MovementType</td><td>@(movement.LotNumber ?? "—")</td><td>@movement.Quantity</td><td>@movement.QuantityBefore</td><td>@movement.QuantityAfter</td><td>@movement.Reason</td></tr>
+                            }
+                        </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+        </section>
+
+        <section class="catalog-panel inventory-panel inventory-sessions-panel" aria-labelledby="inventory-session-title">
+            <div class="catalog-section-heading inventory-section-heading">
+                <div><p class="section-kicker">Comptage contrôlé</p><h2 id="inventory-session-title">Sessions d’inventaire</h2></div>
+                <UiBadge Text="Finalisation atomique" Variant="UiBadgeVariant.Information" />
+            </div>
+
+            <div class="inventory-action-grid">
+                <form class="inventory-form" @onsubmit="CreateSessionAsync" @onsubmit:preventDefault>
+                    <h3>Nouvelle session</h3>
+                    <UiTextField Id="session-reference" Label="Référence unique" Value="@sessionReference" ValueChanged="SetSessionReference" Required="true" />
+                    <UiSelect Id="session-location" Label="Emplacement" Options="@LocationOptions" Value="@sessionLocation" ValueChanged="SetSessionLocation" Required="true" />
+                    <UiButton ButtonType="UiButtonType.Submit" Disabled="@Inventory.IsBusy">Créer et démarrer</UiButton>
+                </form>
+
+                <section class="inventory-form" aria-labelledby="recent-sessions-title">
+                    <h3 id="recent-sessions-title">Sessions récentes</h3>
+                    @if (Inventory.Sessions.Count == 0)
+                    {
+                        <p class="inventory-muted">Aucune session d’inventaire.</p>
+                    }
+                    else
+                    {
+                        <ul class="inventory-session-list">
+                            @foreach (var session in Inventory.Sessions)
+                            {
+                                <li>
+                                    <button type="button" @onclick="@(() => SelectSessionAsync(session.SessionId))">
+                                        <strong>@session.Reference</strong><span>@session.LocationCode · @session.Status · @session.Lines.Count ligne(s)</span>
+                                    </button>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </section>
+            </div>
+
+            @if (Inventory.SelectedSession is not null)
+            {
+                <div class="catalog-subsection inventory-session-detail">
+                    <div class="catalog-section-heading inventory-section-heading">
+                        <div><h3>@Inventory.SelectedSession.Reference</h3><p>@Inventory.SelectedSession.LocationCode · @Inventory.SelectedSession.Status</p></div>
+                        @if (Inventory.SelectedSession.Status == InventorySessionStatus.InProgress)
+                        {
+                            <div class="inventory-confirmation-actions">
+                                <UiButton Variant="UiButtonVariant.Secondary" OnClick="RequestCancelSessionAsync">Annuler la session</UiButton>
+                                <UiButton Disabled="@Inventory.SelectedSession.Lines.Any(line => line.CountedQuantity is null)" OnClick="RequestFinalizeSessionAsync">Finaliser</UiButton>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="catalog-table-scroll inventory-table-wrap" tabindex="0" role="region" aria-label="Lignes de comptage">
+                        <table class="catalog-table inventory-table">
+                            <thead><tr><th>Produit</th><th>Lot</th><th>Théorique</th><th>Compté</th><th>Écart</th><th><span class="sr-only">Action</span></th></tr></thead>
+                            <tbody>
+                                @foreach (var line in Inventory.SelectedSession.Lines)
+                                {
+                                    <tr>
+                                        <td>@line.InternalCode — @line.ProductName</td><td>@(line.LotNumber ?? "—")</td><td>@line.ExpectedQuantity</td>
+                                        <td><input class="ui-field__control inventory-count-input" type="number" min="0" value="@CountValue(line)" disabled="@(Inventory.SelectedSession.Status != InventorySessionStatus.InProgress)" @oninput="@(args => SetCountValue(line.CountLineId, args.Value?.ToString()))" aria-label="Quantité comptée pour @line.ProductName" /></td>
+                                        <td>@(line.DifferenceQuantity?.ToString("+0;-0;0") ?? "—")</td>
+                                        <td><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" Disabled="@(Inventory.SelectedSession.Status != InventorySessionStatus.InProgress)" OnClick="@(() => SaveCountAsync(line.CountLineId))">Enregistrer</UiButton></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+
+            @if (confirmSessionAction is not null)
+            {
+                <div class="inventory-confirmation" role="alertdialog" aria-modal="true" aria-labelledby="session-confirm-title" tabindex="-1">
+                    <div><h3 id="session-confirm-title">Confirmer l’action</h3><p>@SessionConfirmationText</p></div>
+                    <div class="inventory-confirmation-actions">
+                        <UiButton Variant="UiButtonVariant.Secondary" OnClick="DismissSessionConfirmationAsync">Retour</UiButton>
+                        <UiButton Variant="@(confirmSessionAction == "cancel" ? UiButtonVariant.Danger : UiButtonVariant.Primary)" OnClick="ConfirmSessionActionAsync">Confirmer</UiButton>
+                    </div>
+                </div>
+            }
+        </section>
+    }
+</div>
+
+@code {
+    private string? searchText;
+    private string? locationFilter;
+    private string? availabilityFilter;
+    private long? selectedBalanceId;
+    private string? movementType = nameof(StockMovementType.ManualIncrease);
+    private string? movementQuantity = "1";
+    private string? movementReason = "Ajustement manuel contrôlé";
+    private bool confirmMovement;
+    private string? sessionReference = $"INV-{DateTime.UtcNow:yyyyMMdd-HHmm}";
+    private string? sessionLocation;
+    private string? confirmSessionAction;
+    private readonly Dictionary<long, string?> countValues = new();
+
+    private IReadOnlyList<UiSelectOption> LocationOptions => Inventory.Locations
+        .Where(location => location.IsActive)
+        .Select(location => new UiSelectOption(location.LocationId.ToString(), $"{location.Code} — {location.Name}"))
+        .ToArray();
+
+    private static IReadOnlyList<UiSelectOption> AvailabilityOptions { get; } = new[]
+    {
+        new UiSelectOption(nameof(StockAvailabilityFilter.Available), "Disponible"),
+        new UiSelectOption(nameof(StockAvailabilityFilter.OutOfStock), "Épuisé"),
+        new UiSelectOption(nameof(StockAvailabilityFilter.Expired), "Avec stock expiré")
+    };
+
+    private static IReadOnlyList<UiSelectOption> MovementOptions { get; } = new[]
+    {
+        new UiSelectOption(nameof(StockMovementType.Opening), "Ouverture de stock"),
+        new UiSelectOption(nameof(StockMovementType.ManualIncrease), "Ajustement en hausse"),
+        new UiSelectOption(nameof(StockMovementType.ManualDecrease), "Ajustement en baisse")
+    };
+
+    private IReadOnlyList<StockBatchView> SellableBalances => Inventory.SelectedProduct?.Balances
+        .Where(balance => !balance.IsExpired && balance.IsBatchActive)
+        .ToArray() ?? Array.Empty<StockBatchView>();
+
+    private IReadOnlyList<StockBatchView> ExpiredSelectedBalances => Inventory.SelectedProduct?.Balances
+        .Where(balance => balance.IsExpired)
+        .ToArray() ?? Array.Empty<StockBatchView>();
+
+    private StockBatchView? SelectedBalance => Inventory.SelectedProduct?.Balances
+        .SingleOrDefault(balance => balance.BalanceId == selectedBalanceId);
+
+    private StockMovementType ParsedMovementType => Enum.TryParse<StockMovementType>(movementType, out var parsed)
+        ? parsed
+        : StockMovementType.ManualIncrease;
+
+    private string MovementConfirmationText => SelectedBalance is null
+        ? "Sélectionnez d’abord un lot ou un solde."
+        : $"{ParsedMovementType} de {movementQuantity} unité(s) sur {(SelectedBalance.LotNumber ?? "le solde sans lot")} à {SelectedBalance.LocationCode}. Le motif sera journalisé.";
+
+    private string SessionConfirmationText => confirmSessionAction == "cancel"
+        ? "La session sera annulée sans modifier les balances de stock."
+        : "Les écarts seront transformés en mouvements et les balances seront ajustées dans une transaction unique. Cette action est définitive.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Inventory.InitializeAsync();
+        sessionLocation = Inventory.Locations.FirstOrDefault(location => location.IsPrimary && location.IsActive)?.LocationId.ToString()
+            ?? Inventory.Locations.FirstOrDefault(location => location.IsActive)?.LocationId.ToString();
+    }
+
+    private Task ReloadAsync() => Inventory.InitializeAsync();
+
+    private Task SearchAsync()
+    {
+        var locationId = long.TryParse(locationFilter, out var parsedLocation) ? parsedLocation : (long?)null;
+        var availability = Enum.TryParse<StockAvailabilityFilter>(availabilityFilter, out var parsedAvailability)
+            ? parsedAvailability
+            : StockAvailabilityFilter.All;
+        return Inventory.SearchAsync(new StockSearchCriteria(searchText, locationId, availability));
+    }
+
+    private async Task SelectProductAsync(long productId)
+    {
+        var locationId = long.TryParse(locationFilter, out var parsedLocation) ? parsedLocation : (long?)null;
+        await Inventory.SelectProductAsync(productId, locationId);
+        selectedBalanceId = SellableBalances.FirstOrDefault()?.BalanceId
+            ?? ExpiredSelectedBalances.FirstOrDefault()?.BalanceId;
+    }
+
+    private Task RequestMovementAsync()
+    {
+        confirmMovement = true;
+        return Task.CompletedTask;
+    }
+
+    private Task CancelMovementConfirmationAsync()
+    {
+        confirmMovement = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task ConfirmMovementAsync()
+    {
+        var balance = SelectedBalance;
+        confirmMovement = false;
+
+        if (balance is null || !int.TryParse(movementQuantity, out var quantity))
+        {
+            return;
+        }
+
+        await Inventory.RecordMovementAsync(
+            ParsedMovementType,
+            balance.ProductId,
+            balance.LocationId,
+            balance.BatchId,
+            quantity,
+            movementReason ?? string.Empty,
+            balance.BalanceRowVersion);
+        selectedBalanceId = Inventory.SelectedProduct?.Balances.FirstOrDefault(item => item.BalanceId == balance.BalanceId)?.BalanceId;
+    }
+
+    private async Task CreateSessionAsync()
+    {
+        if (long.TryParse(sessionLocation, out var locationId))
+        {
+            await Inventory.CreateAndStartSessionAsync(sessionReference ?? string.Empty, locationId);
+        }
+    }
+
+    private async Task SelectSessionAsync(long sessionId)
+    {
+        await Inventory.SelectSessionAsync(sessionId);
+        countValues.Clear();
+    }
+
+    private async Task SaveCountAsync(long countLineId)
+    {
+        if (int.TryParse(CountValue(countLineId), out var countedQuantity))
+        {
+            await Inventory.SaveCountAsync(countLineId, countedQuantity);
+        }
+    }
+
+    private string? CountValue(InventoryCountLineView line) => CountValue(line.CountLineId) ?? line.CountedQuantity?.ToString();
+
+    private string? CountValue(long countLineId) => countValues.GetValueOrDefault(countLineId);
+
+    private void SetCountValue(long countLineId, string? value) => countValues[countLineId] = value;
+
+    private Task RequestFinalizeSessionAsync()
+    {
+        confirmSessionAction = "finalize";
+        return Task.CompletedTask;
+    }
+
+    private Task RequestCancelSessionAsync()
+    {
+        confirmSessionAction = "cancel";
+        return Task.CompletedTask;
+    }
+
+    private Task DismissSessionConfirmationAsync()
+    {
+        confirmSessionAction = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task ConfirmSessionActionAsync()
+    {
+        var action = confirmSessionAction;
+        confirmSessionAction = null;
+
+        if (action == "cancel")
+        {
+            await Inventory.CancelSessionAsync();
+        }
+        else
+        {
+            await Inventory.FinalizeSessionAsync();
+        }
+    }
+
+    private void SelectBalance(long balanceId) => selectedBalanceId = balanceId;
+    private Task SetSearchText(string? value) { searchText = value; return Task.CompletedTask; }
+    private Task SetLocationFilter(string? value) { locationFilter = value; return Task.CompletedTask; }
+    private Task SetAvailabilityFilter(string? value) { availabilityFilter = value; return Task.CompletedTask; }
+    private Task SetMovementType(string? value) { movementType = value; return Task.CompletedTask; }
+    private Task SetMovementQuantity(string? value) { movementQuantity = value; return Task.CompletedTask; }
+    private Task SetMovementReason(string? value) { movementReason = value; return Task.CompletedTask; }
+    private Task SetSessionReference(string? value) { sessionReference = value; return Task.CompletedTask; }
+    private Task SetSessionLocation(string? value) { sessionLocation = value; return Task.CompletedTask; }
+}

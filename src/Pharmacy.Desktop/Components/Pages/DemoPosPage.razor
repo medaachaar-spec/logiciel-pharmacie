@@ -10,13 +10,13 @@
         <div>
             <p class="pos-kicker">Ventes</p>
             <h1>Nouvelle vente</h1>
-            <p class="page-subtitle">Continuité de vente avec données exclusivement synthétiques.</p>
+            <p class="page-subtitle">Catalogue et disponibilité issus de SQL Server, vente toujours simulée.</p>
         </div>
     </header>
 
-    <UiAlert Title="Mode démonstration — Catalogue SQL et brouillon Sales en mémoire"
+    <UiAlert Title="Mode démonstration — Catalogue et Stock SQL"
              Variant="UiAlertVariant.Warning">
-        La recherche et les prix viennent de SQL Server. Panier, stock synthétique, paiements, suspensions et impressions restent en mémoire ; aucune vente n’est persistée.
+        La recherche, les prix et la disponibilité viennent de SQL Server. Panier, paiements, suspensions et impressions restent en mémoire ; la vente n’est pas persistée et le stock n’est pas consommé.
     </UiAlert>
 
     @if (Session.IsInitializing)
@@ -207,7 +207,7 @@
                             @if (Session.LastErrorCode == "sales.product.not_found")
                             {
                                 <UiAlert Title="Code inconnu" Variant="UiAlertVariant.Warning">
-                                    <p>Aucun produit synthétique ne correspond à ce code. Aucun produit n’a été créé.</p>
+                                    <p>Aucun produit du Catalogue SQL ne correspond à ce code. Aucun produit n’a été créé.</p>
                                     <div class="pos-incident-actions">
                                         <UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" OnClick="ClearSearchAsync">
                                             Effacer la recherche

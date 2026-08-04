@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Pharmacy.Application.Catalog.Contracts;
 using Pharmacy.Application.Sales.Contracts;
 using Pharmacy.Infrastructure.Persistence;
-using Pharmacy.Infrastructure.Sales.InMemory;
 
 namespace Pharmacy.Infrastructure.Catalog;
 
@@ -38,7 +37,6 @@ public static class CatalogServiceCollectionExtensions
             provider.GetRequiredService<SqlCatalogStore>());
         services.AddTransient<ICatalogCategoryReader, SqlCatalogCategoryReader>();
         services.AddTransient<ICatalogDiagnosticsReader, SqlCatalogDiagnosticsReader>();
-        services.AddSingleton<IStockAvailabilityReader, SyntheticCatalogStockAvailabilityReader>();
         return services;
     }
 

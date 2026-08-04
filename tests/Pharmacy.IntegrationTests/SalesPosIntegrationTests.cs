@@ -430,7 +430,7 @@ public sealed class SalesPosIntegrationTests
         var page = DesktopText("Components", "Pages", "DemoPosPage.razor");
 
         Assert.Contains("@inject SalesPosCoordinator", page, StringComparison.Ordinal);
-        Assert.Contains("Mode démonstration — Catalogue SQL et brouillon Sales en mémoire", page, StringComparison.Ordinal);
+        Assert.Contains("Mode démonstration — Catalogue et Stock SQL", page, StringComparison.Ordinal);
         Assert.All(razorSources, source =>
         {
             Assert.DoesNotContain("new InMemory", source, StringComparison.Ordinal);

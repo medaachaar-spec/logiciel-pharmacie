@@ -73,7 +73,7 @@ public sealed class SalesArchitectureTests
         Assert.Contains(implementations, implementation =>
             implementation.FullName == "Pharmacy.Infrastructure.Catalog.SqlProductCatalogReader");
         Assert.Contains(implementations, implementation =>
-            implementation.FullName == "Pharmacy.Infrastructure.Sales.InMemory.SyntheticCatalogStockAvailabilityReader");
+            implementation.FullName == "Pharmacy.Infrastructure.Inventory.SqlInventoryStockAvailabilityReader");
         Assert.DoesNotContain(infrastructureTypes, type =>
             !type.IsAbstract && typeof(ISaleFinalizer).IsAssignableFrom(type));
     }
@@ -119,7 +119,7 @@ public sealed class SalesArchitectureTests
     }
 
     [Fact]
-    public void Check63_RepositoryContainsOnlyApprovedSprint09SqlFiles()
+    public void Check63_RepositoryContainsOnlyApprovedSqlFilesThroughSprint11()
     {
         var sqlFiles = Directory
             .EnumerateFiles(RepositoryRoot, "*.sql", SearchOption.AllDirectories)
@@ -133,10 +133,14 @@ public sealed class SalesArchitectureTests
             new[]
             {
                 "database/dev/clear_synthetic_catalog_v01.sql",
+                "database/dev/clear_synthetic_inventory_v01.sql",
                 "database/dev/seed_synthetic_catalog_v01.sql",
+                "database/dev/seed_synthetic_inventory_v01.sql",
                 "database/scripts/001_initial_catalog_foundation_idempotent.sql",
+                "database/scripts/003_inventory_persistence_v01_idempotent.sql",
                 "database/verification/verify_sprint09_schema.sql",
                 "database/verification/verify_sprint10_catalog.sql",
+                "database/verification/verify_sprint11_inventory.sql",
             },
             sqlFiles);
     }

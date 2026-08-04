@@ -40,7 +40,7 @@ public sealed class SqlServerPersistenceIntegrationTests
             {
                 await context.Database.MigrateAsync(cancellationToken);
                 Assert.Empty(await context.Database.GetPendingMigrationsAsync(cancellationToken));
-                Assert.Single(await context.Database.GetAppliedMigrationsAsync(cancellationToken), migration =>
+                Assert.Contains(await context.Database.GetAppliedMigrationsAsync(cancellationToken), migration =>
                     migration.EndsWith("_InitialCatalogPersistenceV01", StringComparison.Ordinal));
             }
 

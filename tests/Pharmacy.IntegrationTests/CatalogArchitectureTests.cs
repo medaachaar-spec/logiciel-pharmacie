@@ -35,9 +35,9 @@ public sealed class CatalogArchitectureTests
 
         Assert.DoesNotContain("DbContext", desktop, StringComparison.Ordinal);
         Assert.Contains("AddSqlCatalogAdaptersFromEnvironment", composition, StringComparison.Ordinal);
+        Assert.Contains("AddSqlInventoryAdapters", composition, StringComparison.Ordinal);
         Assert.DoesNotContain("InMemoryProductCatalogReader", composition, StringComparison.Ordinal);
-        Assert.Contains("SyntheticCatalogStockAvailabilityReader", AllText(
-            PathAt("src", "Pharmacy.Infrastructure"), "*.cs"), StringComparison.Ordinal);
+        Assert.DoesNotContain("SyntheticCatalogStockAvailabilityReader", composition, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -115,7 +115,7 @@ public sealed class CatalogArchitectureTests
         Assert.Contains("Catalog.IsBusy", page, StringComparison.Ordinal);
         Assert.Contains("Aucun fallback", diagnostic, StringComparison.Ordinal);
         Assert.Contains("Catalogue SQL", pos, StringComparison.Ordinal);
-        Assert.Contains("aucune vente n’est persistée", pos, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("vente n’est pas persistée", pos, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

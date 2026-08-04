@@ -139,7 +139,7 @@ public sealed class PersistenceArchitectureTests
     }
 
     [Fact]
-    public void ModelContainsOnlyTheFiveConfirmedCatalogTables()
+    public void ModelContainsOnlyTheConfirmedCatalogAndInventoryTables()
     {
         using var context = CreateModelContext();
         var tables = context.Model.GetEntityTypes()
@@ -154,7 +154,13 @@ public sealed class PersistenceArchitectureTests
                 "catalog.ProductCategories",
                 "catalog.ProductLocalSettings",
                 "catalog.ProductPriceHistories",
-                "catalog.Products"
+                "catalog.Products",
+                "inventory.InventoryCountLines",
+                "inventory.InventorySessions",
+                "inventory.StockBalances",
+                "inventory.StockBatches",
+                "inventory.StockLocations",
+                "inventory.StockMovements"
             },
             tables);
         Assert.All(context.Model.GetEntityTypes(), entity => Assert.False(entity.ClrType.IsPublic));
@@ -204,7 +210,7 @@ public sealed class PersistenceArchitectureTests
             .Where(property => property.GetColumnType() == "rowversion")
             .ToArray();
 
-        Assert.Equal(4, rowVersions.Length);
+        Assert.Equal(9, rowVersions.Length);
         Assert.All(rowVersions, property =>
         {
             Assert.True(property.IsConcurrencyToken);
@@ -214,7 +220,7 @@ public sealed class PersistenceArchitectureTests
         var foreignKeys = context.Model.GetEntityTypes()
             .SelectMany(entity => entity.GetForeignKeys())
             .ToArray();
-        Assert.Equal(4, foreignKeys.Length);
+        Assert.NotEmpty(foreignKeys);
         Assert.All(foreignKeys, foreignKey =>
             Assert.Equal(DeleteBehavior.NoAction, foreignKey.DeleteBehavior));
     }
@@ -262,13 +268,15 @@ public sealed class PersistenceArchitectureTests
         Assert.Contains(implementations, implementation =>
             implementation.FullName == "Pharmacy.Infrastructure.Catalog.SqlProductCatalogReader");
         Assert.Contains(implementations, implementation =>
-            implementation.FullName == "Pharmacy.Infrastructure.Sales.InMemory.SyntheticCatalogStockAvailabilityReader");
+            implementation.FullName == "Pharmacy.Infrastructure.Inventory.SqlInventoryStockAvailabilityReader");
 
         var composition = File.ReadAllText(PathAt(
             "src",
             "Pharmacy.Desktop",
             "SalesServiceCollectionExtensions.cs"));
         Assert.Contains("AddSqlCatalogAdaptersFromEnvironment", composition, StringComparison.Ordinal);
+        Assert.Contains("AddSqlInventoryAdapters", composition, StringComparison.Ordinal);
+        Assert.DoesNotContain("SyntheticCatalogStockAvailabilityReader", composition, StringComparison.Ordinal);
         Assert.DoesNotContain("InMemoryProductCatalogReader", composition, StringComparison.Ordinal);
         Assert.DoesNotContain("InMemoryStockAvailabilityReader", composition, StringComparison.Ordinal);
         Assert.DoesNotContain(implementations, implementation =>

@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Pharmacy.Application.Catalog.Commands;
 using Pharmacy.Application.Catalog.Queries;
+using Pharmacy.Application.Inventory.Commands;
+using Pharmacy.Application.Inventory.Queries;
 using Pharmacy.Application.Sales.Catalog.Queries;
 using Pharmacy.Application.Sales.Contracts;
 using Pharmacy.Application.Sales.Drafts.Commands;
@@ -8,7 +10,9 @@ using Pharmacy.Application.Sales.Drafts.Queries;
 using Pharmacy.Application.Sales.Finalization.Commands;
 using Pharmacy.Desktop.Components.Pos;
 using Pharmacy.Desktop.Components.Catalog;
+using Pharmacy.Desktop.Components.Inventory;
 using Pharmacy.Infrastructure.Catalog;
+using Pharmacy.Infrastructure.Inventory;
 using Pharmacy.Infrastructure.Sales.InMemory;
 
 namespace Pharmacy.Desktop;
@@ -20,6 +24,7 @@ public static class SalesServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddSqlCatalogAdaptersFromEnvironment();
+        services.AddSqlInventoryAdapters();
         services.AddSingleton<ISaleDraftStore, InMemorySaleDraftStore>();
         services.AddSingleton<ISaleDraftIdGenerator, InMemorySaleDraftIdGenerator>();
         services.AddSingleton<ISaleFinalizationPreparationStore, InMemorySaleFinalizationPreparationStore>();
@@ -49,9 +54,13 @@ public static class SalesServiceCollectionExtensions
         services.AddTransient<UpdateCatalogCategoryHandler>();
         services.AddTransient<SetCatalogCategoryActivationHandler>();
 
+        services.AddTransient<InventoryQueryHandlers>();
+        services.AddTransient<InventoryCommandHandlers>();
+
         services.AddScoped<DemoTicketPrintService>();
         services.AddScoped<SalesPosCoordinator>();
         services.AddScoped<CatalogCoordinator>();
+        services.AddScoped<InventoryCoordinator>();
         return services;
     }
 }

@@ -1,3 +1,5 @@
+using Pharmacy.Infrastructure.Persistence.Entities.Inventory;
+
 namespace Pharmacy.Infrastructure.Persistence.Entities.Catalog;
 
 internal sealed class ProductEntity
@@ -31,4 +33,16 @@ internal sealed class ProductEntity
 
     public ICollection<ProductPriceHistoryEntity> PriceHistory { get; } =
         new List<ProductPriceHistoryEntity>();
+
+    public ICollection<StockBatchEntity> StockBatches { get; } =
+        new List<StockBatchEntity>();
+
+    public ICollection<StockBalanceEntity> StockBalances { get; } =
+        new List<StockBalanceEntity>();
+
+    public ICollection<StockMovementEntity> StockMovements { get; } =
+        new List<StockMovementEntity>();
+
+    public ICollection<InventoryCountLineEntity> InventoryCountLines { get; } =
+        new List<InventoryCountLineEntity>();
 }

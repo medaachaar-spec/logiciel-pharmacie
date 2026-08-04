@@ -347,6 +347,462 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Inventory.InventoryCountLineEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int?>("CountedQuantity")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ExpectedQuantity")
+                        .HasColumnType("int");
+
+                    b.Property<long>("InventorySessionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("LastOperationFingerprint")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<Guid?>("LastOperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("ProductId")
+                        .HasColumnType("bigint");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<long?>("StockBatchId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id")
+                        .HasName("PK_inventory_InventoryCountLines");
+
+                    b.HasIndex("LastOperationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_inventory_InventoryCountLines_LastOperationId")
+                        .HasFilter("[LastOperationId] IS NOT NULL");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("StockBatchId");
+
+                    b.HasIndex("InventorySessionId", "ProductId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_inventory_InventoryCountLines_Session_Product_NoBatch")
+                        .HasFilter("[StockBatchId] IS NULL");
+
+                    b.HasIndex("InventorySessionId", "ProductId", "StockBatchId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_inventory_InventoryCountLines_Session_Product_Batch")
+                        .HasFilter("[StockBatchId] IS NOT NULL");
+
+                    b.ToTable("InventoryCountLines", "inventory", t =>
+                        {
+                            t.HasCheckConstraint("CK_inventory_InventoryCountLines_CountedQuantity_NonNegative", "[CountedQuantity] IS NULL OR [CountedQuantity] >= 0");
+
+                            t.HasCheckConstraint("CK_inventory_InventoryCountLines_ExpectedQuantity_NonNegative", "[ExpectedQuantity] >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Inventory.InventorySessionEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("CancellationFingerprint")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<Guid?>("CancellationOperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<string>("CreationFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<Guid>("CreationOperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("FinalizationFingerprint")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<Guid?>("FinalizationOperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("StartOperationFingerprint")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<Guid?>("StartOperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<long>("StockLocationId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id")
+                        .HasName("PK_inventory_InventorySessions");
+
+                    b.HasIndex("CancellationOperationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_inventory_InventorySessions_CancellationOperationId")
+                        .HasFilter("[CancellationOperationId] IS NOT NULL");
+
+                    b.HasIndex("CreationOperationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_inventory_InventorySessions_CreationOperationId");
+
+                    b.HasIndex("FinalizationOperationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_inventory_InventorySessions_FinalizationOperationId")
+                        .HasFilter("[FinalizationOperationId] IS NOT NULL");
+
+                    b.HasIndex("Reference")
+                        .IsUnique()
+                        .HasDatabaseName("UX_inventory_InventorySessions_Reference");
+
+                    b.HasIndex("StartOperationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_inventory_InventorySessions_StartOperationId")
+                        .HasFilter("[StartOperationId] IS NOT NULL");
+
+                    b.HasIndex("StockLocationId", "Status")
+                        .HasDatabaseName("IX_inventory_InventorySessions_LocationId_Status");
+
+                    b.ToTable("InventorySessions", "inventory", t =>
+                        {
+                            t.HasCheckConstraint("CK_inventory_InventorySessions_CompletedAtUtc", "[CompletedAtUtc] IS NULL OR [CompletedAtUtc] >= [StartedAtUtc]");
+
+                            t.HasCheckConstraint("CK_inventory_InventorySessions_CreationFingerprint_NotBlank", "LEN(LTRIM(RTRIM([CreationFingerprint]))) > 0");
+
+                            t.HasCheckConstraint("CK_inventory_InventorySessions_Reference_NotBlank", "LEN(LTRIM(RTRIM([Reference]))) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Inventory.StockBalanceEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("AvailableQuantity")
+                        .HasColumnType("int");
+
+                    b.Property<long>("ProductId")
+                        .HasColumnType("bigint");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<long?>("StockBatchId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("StockLocationId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_inventory_StockBalances");
+
+                    b.HasIndex("StockBatchId")
+                        .HasDatabaseName("IX_inventory_StockBalances_StockBatchId");
+
+                    b.HasIndex("ProductId", "StockLocationId")
+                        .HasDatabaseName("IX_inventory_StockBalances_ProductId_StockLocationId");
+
+                    b.HasIndex("StockLocationId", "ProductId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_inventory_StockBalances_Location_Product_NoBatch")
+                        .HasFilter("[StockBatchId] IS NULL");
+
+                    b.HasIndex("StockLocationId", "ProductId", "StockBatchId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_inventory_StockBalances_Location_Product_Batch")
+                        .HasFilter("[StockBatchId] IS NOT NULL");
+
+                    b.ToTable("StockBalances", "inventory", t =>
+                        {
+                            t.HasCheckConstraint("CK_inventory_StockBalances_AvailableQuantity_NonNegative", "[AvailableQuantity] >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Inventory.StockBatchEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("BatchNumber")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<string>("CreationFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<Guid>("CreationOperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly?>("ExpiryDate")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<long>("ProductId")
+                        .HasColumnType("bigint");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Id")
+                        .HasName("PK_inventory_StockBatches");
+
+                    b.HasIndex("CreationOperationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_inventory_StockBatches_CreationOperationId");
+
+                    b.HasIndex("ExpiryDate")
+                        .HasDatabaseName("IX_inventory_StockBatches_ExpiryDate");
+
+                    b.HasIndex("ProductId", "BatchNumber")
+                        .IsUnique()
+                        .HasDatabaseName("UX_inventory_StockBatches_ProductId_BatchNumber")
+                        .HasFilter("[BatchNumber] IS NOT NULL");
+
+                    b.ToTable("StockBatches", "inventory", t =>
+                        {
+                            t.HasCheckConstraint("CK_inventory_StockBatches_BatchNumber_NotBlank", "[BatchNumber] IS NULL OR LEN(LTRIM(RTRIM([BatchNumber]))) > 0");
+
+                            t.HasCheckConstraint("CK_inventory_StockBatches_CreationFingerprint_NotBlank", "LEN(LTRIM(RTRIM([CreationFingerprint]))) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Inventory.StockLocationEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<string>("CreationFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<Guid>("CreationOperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LastOperationFingerprint")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<Guid?>("LastOperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Id")
+                        .HasName("PK_inventory_StockLocations");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("UX_inventory_StockLocations_Code");
+
+                    b.HasIndex("CreationOperationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_inventory_StockLocations_CreationOperationId");
+
+                    b.HasIndex("IsPrimary")
+                        .IsUnique()
+                        .HasDatabaseName("UX_inventory_StockLocations_OnePrimary")
+                        .HasFilter("[IsPrimary] = 1");
+
+                    b.HasIndex("LastOperationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_inventory_StockLocations_LastOperationId")
+                        .HasFilter("[LastOperationId] IS NOT NULL");
+
+                    b.ToTable("StockLocations", "inventory", t =>
+                        {
+                            t.HasCheckConstraint("CK_inventory_StockLocations_Code_NotBlank", "LEN(LTRIM(RTRIM([Code]))) > 0");
+
+                            t.HasCheckConstraint("CK_inventory_StockLocations_CreationFingerprint_NotBlank", "LEN(LTRIM(RTRIM([CreationFingerprint]))) > 0");
+
+                            t.HasCheckConstraint("CK_inventory_StockLocations_Name_NotBlank", "LEN(LTRIM(RTRIM([Name]))) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Inventory.StockMovementEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<string>("MovementType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<string>("OperationFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("ProductId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<int>("QuantityAfter")
+                        .HasColumnType("int");
+
+                    b.Property<int>("QuantityBefore")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("SourceReference")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<long?>("StockBatchId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("StockLocationId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id")
+                        .HasName("PK_inventory_StockMovements");
+
+                    b.HasIndex("OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_inventory_StockMovements_OperationId");
+
+                    b.HasIndex("StockBatchId")
+                        .HasDatabaseName("IX_inventory_StockMovements_StockBatchId");
+
+                    b.HasIndex("ProductId", "OccurredAtUtc")
+                        .HasDatabaseName("IX_inventory_StockMovements_ProductId_OccurredAtUtc");
+
+                    b.HasIndex("StockLocationId", "OccurredAtUtc")
+                        .HasDatabaseName("IX_inventory_StockMovements_LocationId_OccurredAtUtc");
+
+                    b.ToTable("StockMovements", "inventory", t =>
+                        {
+                            t.HasCheckConstraint("CK_inventory_StockMovements_Balances_NonNegative", "[QuantityBefore] >= 0 AND [QuantityAfter] >= 0");
+
+                            t.HasCheckConstraint("CK_inventory_StockMovements_Direction", "(([MovementType] IN (N'Opening', N'ManualIncrease', N'InventoryIncrease') AND [QuantityAfter] = [QuantityBefore] + [Quantity]) OR ([MovementType] IN (N'ManualDecrease', N'InventoryDecrease') AND [QuantityAfter] = [QuantityBefore] - [Quantity]))");
+
+                            t.HasCheckConstraint("CK_inventory_StockMovements_Fingerprint_NotBlank", "LEN(LTRIM(RTRIM([OperationFingerprint]))) > 0");
+
+                            t.HasCheckConstraint("CK_inventory_StockMovements_Quantity_Positive", "[Quantity] > 0");
+
+                            t.HasCheckConstraint("CK_inventory_StockMovements_Reason_NotBlank", "LEN(LTRIM(RTRIM([Reason]))) > 0");
+
+                            t.HasCheckConstraint("CK_inventory_StockMovements_SourceType_NotBlank", "LEN(LTRIM(RTRIM([SourceType]))) > 0");
+                        });
+                });
+
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Catalog.ProductBarcodeEntity", b =>
                 {
                     b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Catalog.ProductEntity", "Product")
@@ -392,6 +848,117 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Inventory.InventoryCountLineEntity", b =>
+                {
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Inventory.InventorySessionEntity", "InventorySession")
+                        .WithMany("Lines")
+                        .HasForeignKey("InventorySessionId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_inventory_InventoryCountLines_InventorySessions_InventorySessionId");
+
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Catalog.ProductEntity", "Product")
+                        .WithMany("InventoryCountLines")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_inventory_InventoryCountLines_Products_ProductId");
+
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Inventory.StockBatchEntity", "StockBatch")
+                        .WithMany("InventoryCountLines")
+                        .HasForeignKey("StockBatchId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_inventory_InventoryCountLines_StockBatches_StockBatchId");
+
+                    b.Navigation("InventorySession");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("StockBatch");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Inventory.InventorySessionEntity", b =>
+                {
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Inventory.StockLocationEntity", "StockLocation")
+                        .WithMany("InventorySessions")
+                        .HasForeignKey("StockLocationId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_inventory_InventorySessions_StockLocations_StockLocationId");
+
+                    b.Navigation("StockLocation");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Inventory.StockBalanceEntity", b =>
+                {
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Catalog.ProductEntity", "Product")
+                        .WithMany("StockBalances")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_inventory_StockBalances_Products_ProductId");
+
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Inventory.StockBatchEntity", "StockBatch")
+                        .WithMany("Balances")
+                        .HasForeignKey("StockBatchId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_inventory_StockBalances_StockBatches_StockBatchId");
+
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Inventory.StockLocationEntity", "StockLocation")
+                        .WithMany("Balances")
+                        .HasForeignKey("StockLocationId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_inventory_StockBalances_StockLocations_StockLocationId");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("StockBatch");
+
+                    b.Navigation("StockLocation");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Inventory.StockBatchEntity", b =>
+                {
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Catalog.ProductEntity", "Product")
+                        .WithMany("StockBatches")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_inventory_StockBatches_Products_ProductId");
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Inventory.StockMovementEntity", b =>
+                {
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Catalog.ProductEntity", "Product")
+                        .WithMany("StockMovements")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_inventory_StockMovements_Products_ProductId");
+
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Inventory.StockBatchEntity", "StockBatch")
+                        .WithMany("Movements")
+                        .HasForeignKey("StockBatchId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_inventory_StockMovements_StockBatches_StockBatchId");
+
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Inventory.StockLocationEntity", "StockLocation")
+                        .WithMany("Movements")
+                        .HasForeignKey("StockLocationId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_inventory_StockMovements_StockLocations_StockLocationId");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("StockBatch");
+
+                    b.Navigation("StockLocation");
+                });
+
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Catalog.ProductCategoryEntity", b =>
                 {
                     b.Navigation("ProductSettings");
@@ -401,9 +968,40 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                 {
                     b.Navigation("Barcodes");
 
+                    b.Navigation("InventoryCountLines");
+
                     b.Navigation("LocalSettings");
 
                     b.Navigation("PriceHistory");
+
+                    b.Navigation("StockBalances");
+
+                    b.Navigation("StockBatches");
+
+                    b.Navigation("StockMovements");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Inventory.InventorySessionEntity", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Inventory.StockBatchEntity", b =>
+                {
+                    b.Navigation("Balances");
+
+                    b.Navigation("InventoryCountLines");
+
+                    b.Navigation("Movements");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Inventory.StockLocationEntity", b =>
+                {
+                    b.Navigation("Balances");
+
+                    b.Navigation("InventorySessions");
+
+                    b.Navigation("Movements");
                 });
 #pragma warning restore 612, 618
         }

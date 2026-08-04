@@ -218,10 +218,10 @@ public sealed class SqlCatalogIntegrationTests
                 "SELECT COUNT(*) FROM catalog.ProductCategories WHERE Id = @id;",
                 new SqlParameter("@id", SqlDbType.BigInt) { Value = staleCategory.CategoryId }));
 
-            Assert.Equal(0, await ScalarAsync<int>(
+            Assert.Equal(6, await ScalarAsync<int>(
                 databaseConnection.ConnectionString,
                 "SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id " +
-                "WHERE s.name = N'inventory' OR t.name LIKE N'%Stock%';"));
+                "WHERE s.name = N'inventory';"));
 
             var seedScript = await File.ReadAllTextAsync(Path.Combine(
                 RepositoryRoot, "database", "dev", "seed_synthetic_catalog_v01.sql"),

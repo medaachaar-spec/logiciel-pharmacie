@@ -108,3 +108,14 @@ Figma n’est pas obligatoire. Le prototype frontend sera construit directement 
 - Le Desktop compose le Catalogue SQL uniquement lorsque la connexion hors dépôt cible `Pharmacy_Development`. En absence de configuration ou en panne, le shell démarre mais aucun fallback vers `InMemoryProductCatalogReader` n’est autorisé.
 - La disponibilité stock du POS reste synthétique, calculée et conservée en mémoire à partir du `ProductId` résolu par SQL, sans identifiant codé en dur ni table Stock.
 - Les dix produits et quatre catégories Demo proviennent d’un seed manuel idempotent protégé ; les migrations restent sans donnée.
+
+## Décisions techniques locales — Sprint 11
+
+- Le schéma physique Inventory V0.1 se limite à six tables : emplacements, lots, balances, mouvements, sessions et lignes. Les besoins multi-emplacements restent à confirmer sur le terrain, mais un emplacement explicite est requis par le prompt Sprint 11.
+- Les quantités Inventory sont des `int` et aucun `ReservedQuantity` n’est ajouté. La vente fractionnée et la réservation restent différées.
+- Un mouvement et sa balance sont écrits dans une transaction unique ; les contraintes SQL interdisent les quantités de mouvement non positives, les balances négatives et les incohérences avant/après.
+- L’idempotence combine un `OperationId` unique et une empreinte structurelle. Une réutilisation équivalente est stable ; une réutilisation incohérente est un conflit.
+- Les lots expirés restent consultables mais sont exclus de la disponibilité POS. FEFO est une proposition descriptive basée sur la date métier injectée, configurable et sans affirmation réglementaire.
+- Les sessions utilisent `Draft`, `InProgress`, `Completed`, `Cancelled`. Les états `ReadyForReview`/`Validated` évoqués en Phase 3 sont différés, conformément au périmètre minimal du sprint.
+- La disponibilité du POS vient exclusivement de SQL Inventory. Le brouillon, le paiement, les suspensions et l’impression restent en mémoire ; le succès simulé ne consomme aucun stock.
+- Le seed/clear Inventory cible des identifiants Demo canoniques exacts pour préserver toute donnée manuelle ou non Demo. Aucune donnée réelle n’est supprimée et aucune migration ne contient de seed.

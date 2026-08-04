@@ -15,7 +15,7 @@
     </header>
 
     <UiAlert Title="Périmètre Sprint 10" Variant="UiAlertVariant.Warning">
-        La création d’un produit ne crée aucun stock. Le stock du POS reste synthétique et les ventes ne sont pas persistées.
+        La création d’un produit ne crée aucun stock. La disponibilité du POS vient du Stock SQL et les ventes ne sont pas persistées.
     </UiAlert>
 
     @if (!string.IsNullOrWhiteSpace(Catalog.Message))

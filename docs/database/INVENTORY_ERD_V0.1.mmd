@@ -1,0 +1,12 @@
+erDiagram
+    catalog_Products ||--o{ inventory_StockBatches : "possède"
+    catalog_Products ||--o{ inventory_StockBalances : "est agrégé dans"
+    catalog_Products ||--o{ inventory_StockMovements : "est expliqué par"
+    inventory_StockLocations ||--o{ inventory_StockBalances : "contient"
+    inventory_StockLocations ||--o{ inventory_StockMovements : "localise"
+    inventory_StockLocations ||--o{ inventory_InventorySessions : "est inventorié"
+    inventory_StockBatches o|--o{ inventory_StockBalances : "détaille"
+    inventory_StockBatches o|--o{ inventory_StockMovements : "détaille"
+    inventory_InventorySessions ||--o{ inventory_InventoryCountLines : "capture"
+    catalog_Products ||--o{ inventory_InventoryCountLines : "est compté"
+    inventory_StockBatches o|--o{ inventory_InventoryCountLines : "est compté"

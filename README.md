@@ -43,7 +43,7 @@ dotnet test .\Pharmacy.slnx -c Debug --no-build
 dotnet run --project .\src\Pharmacy.Desktop\Pharmacy.Desktop.csproj -c Debug
 ```
 
-Après le lancement, l’application ouvre l’accueil synthétique du shell V0.1. La barre latérale expose les domaines prévus de la V1. `Ventes` ouvre le POS V0.2, vertical slice de démonstration entièrement local et non persistant ; les sept autres domaines non implémentés ouvrent une page provisoire descriptive.
+Après le lancement, l’application ouvre l’accueil du shell V0.1. `Ventes`, `Catalogue` et `Stock` sont fonctionnels ; cinq autres domaines restent provisoires. Catalogue et disponibilité Stock utilisent SQL Server, tandis que la vente, le paiement et l’impression restent non persistés/simulés.
 
 Le POS V0.2 conserve le parcours nominal V0.1 et ajoute les incidents de code inconnu/disponibilité, la suspension et la reprise contrôlée de paniers, l’abandon du brouillon, la machine d’états du TPE ambigu et une impression post-vente entièrement simulée. Tous les montants sont calculés avec `decimal` ; aucune donnée bancaire ou réelle n’est collectée, aucune donnée n’est persistée, aucun stock n’est modifié et aucun ticket réel n’est produit. Les spécifications et limites sont documentées dans `docs/ux/POS_V0.1.md` et `docs/ux/POS_V0.2_CONTINUITY.md`.
 
@@ -55,7 +55,9 @@ Le Sprint 8 connecte le parcours nominal du POS à la chaîne `Desktop → Appli
 
 Le Sprint 9 ajoute `Persistence Foundation V0.1` dans Infrastructure avec EF Core SQL Server 10.0.10, un outil local `dotnet-ef`, un `PharmacyDbContext` design-time sécurisé et la migration `InitialCatalogPersistenceV01`. La base locale `Pharmacy_Development` contient uniquement cinq tables vides du schéma `catalog`, suivant le modèle Phase 3 (`ProductLocalSettings` plutôt que la cible indicative `ProductReferences`). La validation automatisée utilise une vraie instance SQL Server 2025 Developer ; la validation sur SQL Server 2025 Express reste obligatoire avant le pilote. Le Desktop et le POS demeurent connectés exclusivement aux adaptateurs Sales en mémoire.
 
-Le Sprint 10 rend le Catalogue réellement persistant. La migration minimale `CatalogPersistenceEnhancementsV01` ajoute l’activation globale manquante à `catalog.Products`. Les recherches du POS utilisent désormais `SqlProductCatalogReader` pour le nom, la présentation, la référence interne et les barcodes actifs ; les prix viennent de SQL Server. La page `/module/catalog` gère produits, catégories, activation, barcodes, prix et historique avec concurrence `rowversion`. Le panier Sales, le stock synthétique, les suspensions, paiements et impressions restent en mémoire et aucune vente n’est enregistrée dans SQL Server.
+Le Sprint 10 rend le Catalogue réellement persistant. La migration minimale `CatalogPersistenceEnhancementsV01` ajoute l’activation globale manquante à `catalog.Products`. Les recherches du POS utilisent désormais `SqlProductCatalogReader` pour le nom, la présentation, la référence interne et les barcodes actifs ; les prix viennent de SQL Server. La page `/module/catalog` gère produits, catégories, activation, barcodes, prix et historique avec concurrence `rowversion`.
+
+Le Sprint 11 ajoute le moteur Inventory SQL V0.1 : six tables pour emplacements, lots, balances, mouvements et inventaires, plus les contrats/handlers Domain et Application. La page `/module/inventory` expose recherche, filtres, lots expirés, historique, ajustements et comptages. Le POS lit désormais la disponibilité SQL et exclut les lots expirés ; une vente simulée ne réserve ni ne décrémente le stock. La migration `InventoryPersistenceV01` reste manuelle et aucune connexion n’est versionnée.
 
 ### Commandes de persistance contrôlées
 
@@ -81,6 +83,21 @@ sqlcmd -S <instance-explicite> -d Pharmacy_Development -E -C -b -f 65001 `
 ```
 
 Le seed manuel est transactionnel et idempotent. Le script `database/dev/clear_synthetic_catalog_v01.sql` supprime uniquement les références `DEMO-*` et leurs dépendances. `-C` reste une exception locale provisoire tant que le certificat SQL de développement n’est pas approuvé.
+
+Migration, seed et vérification Sprint 11, exclusivement avec une connexion fournie hors dépôt et la base `Pharmacy_Development` :
+
+```powershell
+$env:PHARMACY_SQLSERVER_CONNECTION = '<connexion locale Pharmacy_Development>'
+dotnet tool run dotnet-ef database update `
+  --project .\src\Pharmacy.Infrastructure `
+  --startup-project .\src\Pharmacy.Infrastructure
+sqlcmd -S <instance-explicite> -d Pharmacy_Development -E -C -b -f 65001 `
+  -i .\database\dev\seed_synthetic_inventory_v01.sql
+sqlcmd -S <instance-explicite> -d Pharmacy_Development -E -C -b -f 65001 `
+  -i .\database\verification\verify_sprint11_inventory.sql
+```
+
+Le clear Inventory est conservateur et ne supprime que les artefacts portant les identifiants Demo canoniques. Ne jamais utiliser ces scripts sur une autre base.
 
 En configuration Debug, le groupe `Développement` donne également accès à :
 

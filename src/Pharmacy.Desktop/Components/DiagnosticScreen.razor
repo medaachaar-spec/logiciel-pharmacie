@@ -1,14 +1,15 @@
 @page "/diagnostic"
 @inject GetCatalogDiagnosticsHandler CatalogDiagnostics
+@inject InventoryQueryHandlers InventoryQueries
 
-<PageTitle>Logiciel Pharmacie — Diagnostic Catalogue SQL</PageTitle>
+<PageTitle>Logiciel Pharmacie — Diagnostic SQL</PageTitle>
 
 <div class="page-stack">
     <header class="hero" aria-labelledby="page-title">
         <div>
             <p class="eyebrow">Socle desktop local</p>
             <h1 id="page-title" tabindex="-1">Logiciel Pharmacie</h1>
-            <p class="subtitle">Diagnostic technique — Catalogue SQL Sprint 10</p>
+            <p class="subtitle">Diagnostic technique — Catalogue et Stock SQL</p>
         </div>
         <div class="ready-badge" role="status">
             <span class="ready-dot" aria-hidden="true"></span>
@@ -67,7 +68,7 @@
                 <div><dt>Connectivité</dt><dd>@(catalogDiagnostics.IsReachable ? "Disponible" : "Indisponible")</dd></div>
                 <div><dt>Migration</dt><dd>@catalogDiagnostics.MigrationStatus</dd></div>
                 <div><dt>Produits Demo actifs</dt><dd>@catalogDiagnostics.ActiveDemoProductCount</dd></div>
-                <div><dt>Stock</dt><dd>Synthétique en mémoire</dd></div>
+                <div><dt>Stock</dt><dd>Réel dans SQL Server</dd></div>
                 <div><dt>Ventes</dt><dd>Non persistées</dd></div>
                 <div><dt>Connexion</dt><dd>@(catalogDiagnostics.IsConfigured ? "Fournie hors dépôt" : "Non configurée")</dd></div>
             </dl>
@@ -75,6 +76,36 @@
             {
                 <UiAlert Title="Catalogue SQL indisponible" Variant="UiAlertVariant.Warning">
                     Le shell reste opérationnel. Aucun fallback vers le catalogue mémoire n’est effectué.
+                </UiAlert>
+            }
+        }
+    </section>
+
+    <section class="details-panel" aria-labelledby="inventory-diagnostic-title">
+        <div>
+            <p class="section-kicker">Persistance Inventory</p>
+            <h2 id="inventory-diagnostic-title">Stock SQL réel</h2>
+        </div>
+        @if (inventoryDiagnostics is null)
+        {
+            <UiSpinner Label="Lecture du diagnostic Inventory SQL" />
+        }
+        else
+        {
+            <dl class="environment-grid">
+                <div><dt>Base</dt><dd>@inventoryDiagnostics.DatabaseName</dd></div>
+                <div><dt>Connectivité</dt><dd>@(inventoryDiagnostics.IsReachable ? "Disponible" : "Indisponible")</dd></div>
+                <div><dt>Migrations</dt><dd>@inventoryDiagnostics.MigrationStatus</dd></div>
+                <div><dt>Emplacements</dt><dd>@inventoryDiagnostics.LocationCount</dd></div>
+                <div><dt>Lots</dt><dd>@inventoryDiagnostics.BatchCount</dd></div>
+                <div><dt>Balances positives</dt><dd>@inventoryDiagnostics.PositiveBalanceCount</dd></div>
+                <div><dt>Lots Demo expirés</dt><dd>@inventoryDiagnostics.ExpiredDemoBatchCount</dd></div>
+                <div><dt>Disponibilité POS</dt><dd>@(inventoryDiagnostics.IsReachable ? "Stock SQL actif" : "Indisponible — aucun fallback")</dd></div>
+            </dl>
+            @if (!inventoryDiagnostics.IsReachable)
+            {
+                <UiAlert Title="Stock SQL indisponible" Variant="UiAlertVariant.Warning">
+                    Le POS et la page Stock signalent l’indisponibilité. Aucun lecteur synthétique de secours n’est activé.
                 </UiAlert>
             }
         }
@@ -122,8 +153,8 @@
     </section>
 
     <footer class="scope-notes" aria-label="Limites du socle technique">
-        <span>Données synthétiques uniquement</span>
-        <span>Aucune connexion complète affichée</span>
+        <span>Catalogue et stock persistés dans SQL Server</span>
+        <span>Aucun secret de connexion affiché</span>
         <span>Aucune vente persistée</span>
     </footer>
 </div>
@@ -131,6 +162,7 @@
 @code {
     private int interactionCount;
     private CatalogDiagnosticsView? catalogDiagnostics;
+    private InventoryDiagnosticsView? inventoryDiagnostics;
 
     private string InteractionMessage => interactionCount == 0
         ? "Test non exécuté"
@@ -155,6 +187,10 @@
 
     protected override async Task OnInitializedAsync()
     {
-        catalogDiagnostics = await CatalogDiagnostics.HandleAsync();
+        var catalogTask = CatalogDiagnostics.HandleAsync();
+        var inventoryTask = InventoryQueries.GetDiagnosticsAsync();
+        await Task.WhenAll(catalogTask, inventoryTask);
+        catalogDiagnostics = await catalogTask;
+        inventoryDiagnostics = await inventoryTask;
     }
 }
