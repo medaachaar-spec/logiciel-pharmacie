@@ -1,0 +1,312 @@
+@page "/module/purchasing"
+@implements IAsyncDisposable
+@inject PurchasingCoordinator Purchasing
+
+<PageTitle>Achats et réceptions SQL — Logiciel Pharmacie</PageTitle>
+
+<div class="page-content catalog-page purchasing-page">
+    <header class="page-header catalog-header" aria-labelledby="purchasing-title">
+        <div>
+            <p class="eyebrow">Purchasing</p>
+            <h1 id="purchasing-title" tabindex="-1">Achats et réceptions SQL</h1>
+            <p class="page-subtitle">Fournisseurs, commandes d’achat et réceptions reliées au Stock SQL.</p>
+        </div>
+        <UiBadge Text="SQL Server — données Demo" Variant="UiBadgeVariant.Information" />
+    </header>
+
+    <UiAlert Title="Effets métier de la réception" Variant="UiAlertVariant.Warning">
+        Finaliser une réception augmente immédiatement le Stock SQL. Les ventes restent non persistées, aucun calcul de marge n’est réalisé et les exemples affichés sont synthétiques.
+    </UiAlert>
+
+    @if (!string.IsNullOrWhiteSpace(Purchasing.Message))
+    {
+        <UiAlert Title="@(Purchasing.ErrorCode is null ? "Opération réalisée" : "Action non réalisée")"
+                 Variant="@(Purchasing.ErrorCode is null ? UiAlertVariant.Success : UiAlertVariant.Warning)">
+            <span aria-live="polite">@Purchasing.Message</span>
+        </UiAlert>
+    }
+
+    <nav class="purchasing-tabs" aria-label="Zones Achats et réceptions">
+        <button type="button" class="@(activeTab == "suppliers" ? "purchasing-tab purchasing-tab--active" : "purchasing-tab")" aria-current="@(activeTab == "suppliers" ? "page" : null)" @onclick="ShowSuppliers">Fournisseurs</button>
+        <button type="button" class="@(activeTab == "orders" ? "purchasing-tab purchasing-tab--active" : "purchasing-tab")" aria-current="@(activeTab == "orders" ? "page" : null)" @onclick="ShowOrders">Commandes</button>
+        <button type="button" class="@(activeTab == "receipts" ? "purchasing-tab purchasing-tab--active" : "purchasing-tab")" aria-current="@(activeTab == "receipts" ? "page" : null)" @onclick="ShowReceipts">Réceptions</button>
+    </nav>
+
+    @if (Purchasing.IsBusy && Purchasing.Suppliers.Count == 0)
+    {
+        <section class="catalog-panel" role="status"><UiSpinner Label="Chargement de Purchasing SQL" /></section>
+    }
+    else if (Purchasing.ErrorCode == "purchasing.receipt.database_unavailable" && Purchasing.Suppliers.Count == 0)
+    {
+        <section class="catalog-panel" aria-labelledby="purchasing-unavailable-title">
+            <h2 id="purchasing-unavailable-title">SQL Purchasing indisponible</h2>
+            <p>Aucune donnée de secours n’est utilisée. Catalogue, Stock et POS conservent leur comportement sûr.</p>
+        </section>
+    }
+    else if (activeTab == "suppliers")
+    {
+        <section class="catalog-toolbar" aria-labelledby="supplier-search-title" aria-busy="@Purchasing.IsBusy.ToString().ToLowerInvariant()">
+            <div><p class="section-kicker">Annuaire SQL</p><h2 id="supplier-search-title">Fournisseurs</h2></div>
+            <div class="catalog-filter-grid">
+                <label><span>Code ou nom</span><input class="ui-field__control" type="search" @bind="supplierSearch" placeholder="DEMO-S12 ou Alpha" disabled="@Purchasing.IsBusy" /></label>
+                <label class="catalog-check"><input type="checkbox" @bind="includeInactiveSuppliers" disabled="@Purchasing.IsBusy" /> Inclure les fournisseurs inactifs</label>
+                <div class="catalog-toolbar__actions">
+                    <UiButton IsLoading="@Purchasing.IsBusy" OnClick="SearchSuppliersAsync">Rechercher</UiButton>
+                    <UiButton Variant="UiButtonVariant.Secondary" Disabled="@Purchasing.IsBusy" OnClick="StartSupplierCreationAsync">Nouveau fournisseur</UiButton>
+                </div>
+            </div>
+        </section>
+
+        <div class="catalog-workspace">
+            <section class="catalog-panel" aria-labelledby="supplier-list-title">
+                <div class="catalog-section-heading"><div><p class="section-kicker">Résultats</p><h2 id="supplier-list-title">Liste</h2></div><span>@Purchasing.Suppliers.Count fournisseur(s)</span></div>
+                @if (Purchasing.Suppliers.Count == 0)
+                {
+                    <p class="u-muted">Aucun fournisseur ne correspond à la recherche.</p>
+                }
+                else
+                {
+                    <div class="catalog-table-scroll" tabindex="0" role="region" aria-label="Liste des fournisseurs">
+                        <table class="catalog-table catalog-table--compact">
+                            <thead><tr><th>Code</th><th>Nom</th><th>État</th><th><span class="sr-only">Action</span></th></tr></thead>
+                            <tbody>
+                                @foreach (var supplier in Purchasing.Suppliers)
+                                {
+                                    <tr class="@(Purchasing.SelectedSupplier?.SupplierId == supplier.SupplierId ? "catalog-row--selected" : null)">
+                                        <td>@supplier.Code</td><td>@supplier.Name</td><td>@(supplier.IsActive ? "Actif" : "Inactif")</td>
+                                        <td><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Tertiary" Disabled="@Purchasing.IsBusy" OnClick="_ => SelectSupplierAsync(supplier)">Ouvrir</UiButton></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
+
+            <section class="catalog-panel" aria-labelledby="supplier-editor-title">
+                <div class="catalog-section-heading"><div><p class="section-kicker">@(creatingSupplier ? "Création" : "Fiche")</p><h2 id="supplier-editor-title">@(creatingSupplier ? "Nouveau fournisseur" : "Détail fournisseur")</h2></div><span>Aucune donnée bancaire ou fiscale</span></div>
+                @if (!creatingSupplier && Purchasing.SelectedSupplier is null)
+                {
+                    <p class="u-muted">Sélectionnez un fournisseur.</p>
+                }
+                else
+                {
+                    <form class="catalog-form-grid" @onsubmit="SaveSupplierAsync" @onsubmit:preventDefault>
+                        <label><span>Code interne *</span><input class="ui-field__control" @bind="supplierCode" maxlength="32" required disabled="@Purchasing.IsBusy" /></label>
+                        <label><span>Nom ou raison sociale *</span><input class="ui-field__control" @bind="supplierName" maxlength="200" required disabled="@Purchasing.IsBusy" /></label>
+                        <label><span>Téléphone</span><input class="ui-field__control" type="tel" @bind="supplierPhone" maxlength="32" disabled="@Purchasing.IsBusy" /></label>
+                        <label><span>E-mail</span><input class="ui-field__control" type="email" @bind="supplierEmail" maxlength="254" disabled="@Purchasing.IsBusy" /></label>
+                        <label class="purchasing-field--wide"><span>Adresse</span><textarea class="ui-field__control" @bind="supplierAddress" maxlength="500" disabled="@Purchasing.IsBusy"></textarea></label>
+                        <div class="catalog-action-row purchasing-field--wide">
+                            <UiButton ButtonType="UiButtonType.Submit" IsLoading="@Purchasing.IsBusy">@(creatingSupplier ? "Créer" : "Enregistrer")</UiButton>
+                            @if (!creatingSupplier && Purchasing.SelectedSupplier is not null)
+                            {
+                                <UiButton Variant="@(Purchasing.SelectedSupplier.IsActive ? UiButtonVariant.Danger : UiButtonVariant.Secondary)" Disabled="@Purchasing.IsBusy" OnClick="ToggleSupplierAsync">@(Purchasing.SelectedSupplier.IsActive ? "Désactiver" : "Réactiver")</UiButton>
+                            }
+                        </div>
+                    </form>
+                }
+            </section>
+        </div>
+    }
+    else if (activeTab == "orders")
+    {
+        <section class="catalog-toolbar" aria-labelledby="order-create-title">
+            <div><p class="section-kicker">Commande sans effet stock</p><h2 id="order-create-title">Nouvelle commande</h2></div>
+            <form class="catalog-filter-grid" @onsubmit="CreateOrderAsync" @onsubmit:preventDefault>
+                <label><span>Fournisseur actif *</span><select class="ui-field__control" @bind="newOrderSupplierId" required disabled="@Purchasing.IsBusy"><option value="0">Choisir</option>@foreach (var supplier in Purchasing.Suppliers.Where(x => x.IsActive)){<option value="@supplier.SupplierId">@supplier.Code — @supplier.Name</option>}</select></label>
+                <label><span>Numéro commande *</span><input class="ui-field__control" @bind="newOrderNumber" required maxlength="64" placeholder="DEMO-S12-PO-003" disabled="@Purchasing.IsBusy" /></label>
+                <label><span>Date commande</span><input class="ui-field__control" type="date" @bind="newOrderDate" disabled="@Purchasing.IsBusy" /></label>
+                <label><span>Date attendue</span><input class="ui-field__control" type="date" @bind="newOrderExpectedDate" disabled="@Purchasing.IsBusy" /></label>
+                <div class="catalog-toolbar__actions"><UiButton ButtonType="UiButtonType.Submit" IsLoading="@Purchasing.IsBusy">Créer le brouillon</UiButton></div>
+            </form>
+        </section>
+
+        <div class="catalog-workspace">
+            <section class="catalog-panel" aria-labelledby="order-list-title">
+                <div class="catalog-section-heading"><div><p class="section-kicker">Suivi</p><h2 id="order-list-title">Commandes</h2></div><span>@Purchasing.Orders.Count commande(s)</span></div>
+                @if (Purchasing.Orders.Count == 0)
+                {
+                    <p class="u-muted">Aucune commande.</p>
+                }
+                else
+                {
+                    <div class="catalog-table-scroll" tabindex="0" role="region" aria-label="Liste des commandes d’achat">
+                        <table class="catalog-table"><thead><tr><th>Numéro</th><th>Fournisseur</th><th>Statut</th><th>Date</th><th><span class="sr-only">Action</span></th></tr></thead>
+                        <tbody>@foreach (var orderItem in Purchasing.Orders){<tr class="@(Purchasing.SelectedOrder?.OrderId == orderItem.OrderId ? "catalog-row--selected" : null)"><td>@orderItem.OrderNumber</td><td>@orderItem.SupplierCode</td><td>@StatusLabel(orderItem.Status)</td><td>@orderItem.OrderDate.ToString("yyyy-MM-dd")</td><td><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Tertiary" Disabled="@Purchasing.IsBusy" OnClick="_ => SelectOrderAsync(orderItem)">Ouvrir</UiButton></td></tr>}</tbody></table>
+                    </div>
+                }
+            </section>
+
+            <section class="catalog-panel" aria-labelledby="order-detail-title">
+                @if (Purchasing.SelectedOrder is not { } order)
+                {
+                    <h2 id="order-detail-title">Détail commande</h2><p class="u-muted">Sélectionnez une commande.</p>
+                }
+                else
+                {
+                    <div class="catalog-section-heading"><div><p class="section-kicker">@StatusLabel(order.Status)</p><h2 id="order-detail-title">@order.OrderNumber</h2></div><span>Total descriptif : @order.DescriptiveTotal.ToString("0.00") MAD</span></div>
+                    <p>@order.SupplierCode — @order.SupplierName · Reçues et restantes calculées depuis les réceptions finalisées.</p>
+                    @if (order.Status == PurchaseOrderStatus.Draft)
+                    {
+                        <form class="catalog-inline-form" @onsubmit="AddOrderLineAsync" @onsubmit:preventDefault>
+                            <label><span>Produit Catalogue *</span><select class="ui-field__control" @bind="newLineProductId" required disabled="@Purchasing.IsBusy"><option value="0">Choisir</option>@foreach (var product in Purchasing.Products){<option value="@product.ProductId">@product.InternalCode — @product.Name</option>}</select></label>
+                            <label><span>Quantité *</span><input class="ui-field__control" type="number" min="1" step="1" @bind="newLineQuantity" disabled="@Purchasing.IsBusy" /></label>
+                            <label><span>Prix achat unitaire</span><input class="ui-field__control" type="number" min="0" step="0.0001" @bind="newLinePrice" disabled="@Purchasing.IsBusy" /></label>
+                            <UiButton ButtonType="UiButtonType.Submit" Size="UiButtonSize.Small" IsLoading="@Purchasing.IsBusy">Ajouter ou fusionner</UiButton>
+                        </form>
+                    }
+                    @if (order.Lines.Count == 0)
+                    {
+                        <p class="u-muted">Commande vide : la confirmation est impossible.</p>
+                    }
+                    else
+                    {
+                        <div class="catalog-table-scroll purchasing-table-space" tabindex="0" role="region" aria-label="Lignes de commande">
+                            <table class="catalog-table"><thead><tr><th>Produit</th><th>Commandé</th><th>Reçu</th><th>Reste</th><th>Prix achat</th><th><span class="sr-only">Actions</span></th></tr></thead>
+                            <tbody>@foreach (var line in order.Lines){<tr><td><strong>@line.ProductCodeSnapshot</strong><small>@line.ProductNameSnapshot</small></td><td>@line.OrderedQuantity</td><td>@line.ReceivedQuantity</td><td>@line.RemainingQuantity</td><td>@(line.UnitPurchasePrice?.ToString("0.0000") ?? "—")</td><td>@if(order.Status==PurchaseOrderStatus.Draft){<div class="purchasing-row-actions"><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Tertiary" Disabled="@Purchasing.IsBusy" OnClick="_ => EditOrderLineAsync(line)">Modifier</UiButton><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Danger" Disabled="@Purchasing.IsBusy" OnClick="_ => RemoveOrderLineAsync(line)">Retirer</UiButton></div>}</td></tr>}</tbody></table>
+                        </div>
+                    }
+                    @if (editedLine is not null && order.Status == PurchaseOrderStatus.Draft)
+                    {
+                        <form class="catalog-inline-form catalog-subsection" @onsubmit="UpdateOrderLineAsync" @onsubmit:preventDefault>
+                            <label><span>Quantité modifiée</span><input class="ui-field__control" type="number" min="1" step="1" @bind="editedLineQuantity" /></label>
+                            <label><span>Prix achat</span><input class="ui-field__control" type="number" min="0" step="0.0001" @bind="editedLinePrice" /></label>
+                            <UiButton ButtonType="UiButtonType.Submit" Size="UiButtonSize.Small" IsLoading="@Purchasing.IsBusy">Enregistrer la ligne</UiButton>
+                        </form>
+                    }
+                    <div class="catalog-action-row catalog-subsection">
+                        @if (order.Status == PurchaseOrderStatus.Draft){<UiButton IsLoading="@Purchasing.IsBusy" Disabled="@(order.Lines.Count == 0)" OnClick="ConfirmOrderAsync">Confirmer la commande</UiButton>}
+                        @if (order.Status is PurchaseOrderStatus.Draft or PurchaseOrderStatus.Confirmed){<UiButton Variant="UiButtonVariant.Danger" Disabled="@Purchasing.IsBusy" OnClick="RequestOrderCancellationAsync">Annuler la commande</UiButton>}
+                        @if (order.Status is PurchaseOrderStatus.Confirmed or PurchaseOrderStatus.PartiallyReceived){<UiButton Variant="UiButtonVariant.Secondary" Disabled="@Purchasing.IsBusy" OnClick="_ => PrepareReceiptForOrderAsync(order)">Préparer une réception</UiButton>}
+                    </div>
+                    @if (confirmOrderCancellation)
+                    {
+                        <form class="purchasing-confirmation" role="alertdialog" aria-labelledby="cancel-order-title" @onsubmit="CancelOrderAsync" @onsubmit:preventDefault>
+                            <h3 id="cancel-order-title">Confirmer l’annulation</h3><p>La commande restera dans l’historique. Une commande déjà reçue ne peut pas être annulée.</p>
+                            <label><span>Motif obligatoire</span><input class="ui-field__control" @bind="orderCancellationReason" required maxlength="500" /></label>
+                            <div class="catalog-action-row"><UiButton ButtonType="UiButtonType.Submit" Variant="UiButtonVariant.Danger" IsLoading="@Purchasing.IsBusy">Confirmer l’annulation</UiButton><UiButton Variant="UiButtonVariant.Tertiary" OnClick="CloseCancellationAsync">Retour</UiButton></div>
+                        </form>
+                    }
+                }
+            </section>
+        </div>
+    }
+    else
+    {
+        <section class="catalog-toolbar" aria-labelledby="receipt-form-title" aria-busy="@Purchasing.IsBusy.ToString().ToLowerInvariant()">
+            <div><p class="section-kicker">Transaction stock atomique</p><h2 id="receipt-form-title">Préparer une réception</h2></div>
+            <div class="catalog-form-grid">
+                <label><span>Commande (facultative)</span><select class="ui-field__control" @bind="receiptOrderId" disabled="@Purchasing.IsBusy"><option value="0">Réception directe</option>@foreach (var order in Purchasing.Orders.Where(x => x.Status is PurchaseOrderStatus.Confirmed or PurchaseOrderStatus.PartiallyReceived)){<option value="@order.OrderId">@order.OrderNumber — @order.SupplierCode</option>}</select></label>
+                <label><span>Fournisseur *</span><select class="ui-field__control" @bind="receiptSupplierId" required disabled="@(Purchasing.IsBusy || receiptOrderId > 0)"><option value="0">Choisir</option>@foreach (var supplier in Purchasing.Suppliers.Where(x => x.IsActive)){<option value="@supplier.SupplierId">@supplier.Code — @supplier.Name</option>}</select></label>
+                <label><span>Emplacement *</span><select class="ui-field__control" @bind="receiptLocationId" required disabled="@Purchasing.IsBusy"><option value="0">Choisir</option>@foreach (var location in Purchasing.Locations){<option value="@location.LocationId">@location.Code — @location.Name</option>}</select></label>
+                <label><span>Numéro BL fournisseur *</span><input class="ui-field__control" @bind="deliveryNoteNumber" required maxlength="128" disabled="@Purchasing.IsBusy" /></label>
+                <label><span>Date du document *</span><input class="ui-field__control" type="date" @bind="receiptDocumentDate" disabled="@Purchasing.IsBusy" /></label>
+                <div class="catalog-toolbar__actions"><UiButton Variant="UiButtonVariant.Secondary" Disabled="@Purchasing.IsBusy" OnClick="PrepareReceiptAsync">Préparer les lignes</UiButton></div>
+            </div>
+            @if (receiptOrderId == 0)
+            {
+                <p class="purchasing-direct-warning">Réception directe : aucune commande ne sera rapprochée. Cette voie validée est réservée au prototype autorisé et doit rester explicitement contrôlée.</p>
+            }
+        </section>
+
+        <section class="catalog-panel" aria-labelledby="receipt-lines-title">
+            <div class="catalog-section-heading"><div><p class="section-kicker">Aperçu avant finalisation</p><h2 id="receipt-lines-title">Lignes à recevoir</h2></div><span>@receiptDraftLines.Count ligne(s)</span></div>
+            @if (receiptOrderId == 0)
+            {
+                <div class="catalog-inline-form">
+                    <label><span>Produit Catalogue</span><select class="ui-field__control" @bind="directReceiptProductId" disabled="@Purchasing.IsBusy"><option value="0">Choisir</option>@foreach (var product in Purchasing.Products){<option value="@product.ProductId">@product.InternalCode — @product.Name</option>}</select></label>
+                    <UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" Disabled="@Purchasing.IsBusy" OnClick="AddDirectReceiptLineAsync">Ajouter une ligne directe</UiButton>
+                </div>
+            }
+            @if (receiptDraftLines.Count == 0)
+            {
+                <p class="u-muted">Choisissez une commande et préparez ses reliquats, ou ajoutez un produit à la réception directe.</p>
+            }
+            else
+            {
+                <div class="catalog-table-scroll purchasing-table-space" tabindex="0" role="region" aria-label="Lignes de réception à finaliser">
+                    <table class="catalog-table purchasing-receipt-table">
+                        <thead><tr><th>Produit</th><th>Reste commande</th><th>Quantité reçue *</th><th>Prix achat *</th><th>Lot</th><th>Péremption</th><th><span class="sr-only">Action</span></th></tr></thead>
+                        <tbody>
+                            @foreach (var line in receiptDraftLines)
+                            {
+                                <tr>
+                                    <td><strong>@line.Product.InternalCode</strong><small>@line.Product.Name</small></td><td>@(line.RemainingQuantity?.ToString() ?? "Direct")</td>
+                                    <td><input class="ui-field__control" type="number" min="1" step="1" max="@line.RemainingQuantity" @bind="line.Quantity" aria-label="Quantité reçue pour @line.Product.Name" disabled="@Purchasing.IsBusy" /></td>
+                                    <td><input class="ui-field__control" type="number" min="0" step="0.0001" @bind="line.UnitPurchasePrice" aria-label="Prix d’achat de @line.Product.Name" disabled="@Purchasing.IsBusy" /></td>
+                                    <td><input class="ui-field__control" @bind="line.LotNumber" required="@line.Product.TracksLots" aria-label="Lot de @line.Product.Name" disabled="@Purchasing.IsBusy" /></td>
+                                    <td><input class="ui-field__control" type="date" @bind="line.ExpiryDate" required="@line.Product.TracksExpiry" aria-label="Péremption de @line.Product.Name" disabled="@Purchasing.IsBusy" /></td>
+                                    <td><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Tertiary" Disabled="@Purchasing.IsBusy" OnClick="_ => RemoveReceiptLineAsync(line)">Retirer</UiButton></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="catalog-action-row catalog-subsection"><span>Total descriptif : <strong>@receiptDraftLines.Sum(x => x.Quantity * x.UnitPurchasePrice).ToString("0.00") MAD</strong> — le prix de vente ne sera pas modifié.</span><UiButton IsLoading="@Purchasing.IsBusy" OnClick="RequestReceiptFinalizationAsync">Vérifier et finaliser</UiButton></div>
+            }
+            @if (confirmReceiptFinalization)
+            {
+                <div class="purchasing-confirmation" role="alertdialog" aria-modal="true" aria-labelledby="confirm-receipt-title" tabindex="-1">
+                    <h3 id="confirm-receipt-title">Confirmer la réception</h3>
+                    <p>@receiptDraftLines.Sum(x => x.Quantity) unité(s) seront ajoutées au Stock SQL, avec un mouvement par ligne. Cette action est idempotente et ne peut pas être modifiée après finalisation.</p>
+                    <div class="catalog-action-row"><UiButton IsLoading="@Purchasing.IsBusy" OnClick="FinalizeReceiptAsync">Finaliser maintenant</UiButton><UiButton Variant="UiButtonVariant.Tertiary" Disabled="@Purchasing.IsBusy" OnClick="CloseReceiptConfirmationAsync">Retour</UiButton></div>
+                </div>
+            }
+        </section>
+
+        <section class="catalog-panel" aria-labelledby="receipt-history-title">
+            <div class="catalog-section-heading"><div><p class="section-kicker">Journal immuable</p><h2 id="receipt-history-title">Réceptions terminées</h2></div><span>@Purchasing.Receipts.Count réception(s)</span></div>
+            @if (Purchasing.Receipts.Count == 0)
+            {
+                <p class="u-muted">Aucune réception finalisée.</p>
+            }
+            else
+            {
+                <div class="catalog-table-scroll" tabindex="0" role="region" aria-label="Réceptions finalisées"><table class="catalog-table"><thead><tr><th>Référence</th><th>BL</th><th>Fournisseur</th><th>Type</th><th>Reçu UTC</th><th>Total</th></tr></thead><tbody>@foreach(var receipt in Purchasing.Receipts){<tr><td>@receipt.ReceiptNumber</td><td>@receipt.DeliveryNoteNumber</td><td>@receipt.SupplierCode</td><td>@(receipt.ReceiptType == GoodsReceiptType.Direct ? "Directe" : "Commande")</td><td>@receipt.ReceivedAtUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@receipt.DescriptiveTotal.ToString("0.00") MAD</td></tr>}</tbody></table></div>
+            }
+        </section>
+    }
+</div>
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private string activeTab = "suppliers";
+    private string? supplierSearch; private bool includeInactiveSuppliers = true; private bool creatingSupplier;
+    private string supplierCode = string.Empty; private string supplierName = string.Empty; private string? supplierPhone; private string? supplierEmail; private string? supplierAddress;
+    private long newOrderSupplierId; private string newOrderNumber = string.Empty; private DateOnly newOrderDate = DateOnly.FromDateTime(DateTime.Today); private DateOnly? newOrderExpectedDate;
+    private long newLineProductId; private int newLineQuantity = 1; private decimal? newLinePrice; private PurchaseOrderLineView? editedLine; private int editedLineQuantity; private decimal? editedLinePrice; private bool confirmOrderCancellation; private string orderCancellationReason = string.Empty;
+    private long receiptOrderId; private long receiptSupplierId; private long receiptLocationId; private string deliveryNoteNumber = string.Empty; private DateOnly receiptDocumentDate = DateOnly.FromDateTime(DateTime.Today); private long directReceiptProductId; private readonly List<ReceiptDraftLine> receiptDraftLines = []; private bool confirmReceiptFinalization; private Guid receiptOperationId = Guid.NewGuid();
+
+    protected override async Task OnInitializedAsync() { await Purchasing.InitializeAsync(lifetime.Token); receiptLocationId = Purchasing.Locations.FirstOrDefault(x => x.IsPrimary)?.LocationId ?? Purchasing.Locations.FirstOrDefault()?.LocationId ?? 0; LoadSupplierForm(); }
+    public ValueTask DisposeAsync() { lifetime.Cancel(); lifetime.Dispose(); return ValueTask.CompletedTask; }
+    private void ShowSuppliers() => activeTab = "suppliers";
+    private void ShowOrders() => activeTab = "orders";
+    private void ShowReceipts() => activeTab = "receipts";
+    private Task SearchSuppliersAsync(MouseEventArgs _) => Purchasing.SearchSuppliersAsync(supplierSearch, includeInactiveSuppliers, lifetime.Token);
+    private Task StartSupplierCreationAsync(MouseEventArgs _) { creatingSupplier = true; supplierCode = supplierName = string.Empty; supplierPhone = supplierEmail = supplierAddress = null; return Task.CompletedTask; }
+    private Task SelectSupplierAsync(SupplierView supplier) { Purchasing.SelectSupplier(supplier.SupplierId); creatingSupplier = false; LoadSupplierForm(); return Task.CompletedTask; }
+    private void LoadSupplierForm() { var s=Purchasing.SelectedSupplier; if(s is null)return; supplierCode=s.Code; supplierName=s.Name; supplierPhone=s.Phone; supplierEmail=s.Email; supplierAddress=s.Address; }
+    private async Task SaveSupplierAsync() { if(creatingSupplier) await Purchasing.CreateSupplierAsync(new(supplierCode,supplierName,supplierPhone,supplierEmail,supplierAddress),lifetime.Token); else if(Purchasing.SelectedSupplier is { } s) await Purchasing.UpdateSupplierAsync(new(s.SupplierId,supplierCode,supplierName,supplierPhone,supplierEmail,supplierAddress,s.RowVersion),lifetime.Token); if(Purchasing.ErrorCode is null){creatingSupplier=false;LoadSupplierForm();} }
+    private async Task ToggleSupplierAsync(MouseEventArgs _) { await Purchasing.ToggleSupplierAsync(lifetime.Token); LoadSupplierForm(); }
+    private async Task CreateOrderAsync() { await Purchasing.CreateOrderAsync(new(newOrderSupplierId,newOrderNumber,newOrderDate,newOrderExpectedDate),lifetime.Token); if(Purchasing.ErrorCode is null){newOrderNumber=string.Empty;activeTab="orders";} }
+    private Task SelectOrderAsync(PurchaseOrderView order) { Purchasing.SelectOrder(order.OrderId); editedLine=null; confirmOrderCancellation=false; return Task.CompletedTask; }
+    private async Task AddOrderLineAsync() { await Purchasing.AddLineAsync(newLineProductId,newLineQuantity,newLinePrice,lifetime.Token); if(Purchasing.ErrorCode is null){newLineProductId=0;newLineQuantity=1;newLinePrice=null;} }
+    private Task EditOrderLineAsync(PurchaseOrderLineView line) { editedLine=line;editedLineQuantity=line.OrderedQuantity;editedLinePrice=line.UnitPurchasePrice;return Task.CompletedTask; }
+    private async Task UpdateOrderLineAsync() { if(editedLine is null)return;await Purchasing.UpdateLineAsync(editedLine,editedLineQuantity,editedLinePrice,lifetime.Token);if(Purchasing.ErrorCode is null)editedLine=null; }
+    private Task RemoveOrderLineAsync(PurchaseOrderLineView line)=>Purchasing.RemoveLineAsync(line,lifetime.Token);
+    private Task ConfirmOrderAsync(MouseEventArgs _)=>Purchasing.ConfirmOrderAsync(lifetime.Token);
+    private Task RequestOrderCancellationAsync(MouseEventArgs _){confirmOrderCancellation=true;return Task.CompletedTask;}
+    private async Task CancelOrderAsync(){await Purchasing.CancelOrderAsync(orderCancellationReason,lifetime.Token);if(Purchasing.ErrorCode is null){confirmOrderCancellation=false;orderCancellationReason=string.Empty;}}
+    private Task CloseCancellationAsync(MouseEventArgs _){confirmOrderCancellation=false;return Task.CompletedTask;}
+    private Task PrepareReceiptForOrderAsync(PurchaseOrderView order){receiptOrderId=order.OrderId;receiptSupplierId=order.SupplierId;PrepareOrderLines(order);activeTab="receipts";return Task.CompletedTask;}
+    private Task PrepareReceiptAsync(MouseEventArgs _){confirmReceiptFinalization=false;receiptDraftLines.Clear();if(receiptOrderId>0){var order=Purchasing.Orders.FirstOrDefault(x=>x.OrderId==receiptOrderId);if(order is not null){receiptSupplierId=order.SupplierId;PrepareOrderLines(order);}}receiptOperationId=Guid.NewGuid();return Task.CompletedTask;}
+    private void PrepareOrderLines(PurchaseOrderView order){receiptDraftLines.Clear();foreach(var line in order.Lines.Where(x=>x.RemainingQuantity>0)){var p=Purchasing.Products.FirstOrDefault(x=>x.ProductId==line.ProductId);if(p is not null)receiptDraftLines.Add(new(p,line.LineId,line.RemainingQuantity,line.RemainingQuantity,line.UnitPurchasePrice??0m));}}
+    private Task AddDirectReceiptLineAsync(MouseEventArgs _){var p=Purchasing.Products.FirstOrDefault(x=>x.ProductId==directReceiptProductId);if(p is not null&&!receiptDraftLines.Any(x=>x.Product.ProductId==p.ProductId))receiptDraftLines.Add(new(p,null,null,1,0m));return Task.CompletedTask;}
+    private Task RemoveReceiptLineAsync(ReceiptDraftLine line){receiptDraftLines.Remove(line);return Task.CompletedTask;}
+    private Task RequestReceiptFinalizationAsync(MouseEventArgs _){confirmReceiptFinalization=receiptSupplierId>0&&receiptLocationId>0&&!string.IsNullOrWhiteSpace(deliveryNoteNumber)&&receiptDraftLines.Count>0&&receiptDraftLines.All(x=>x.Quantity>0&&x.UnitPurchasePrice>=0m&&(!x.Product.TracksLots||!string.IsNullOrWhiteSpace(x.LotNumber))&&(!x.Product.TracksExpiry||x.ExpiryDate is not null));return Task.CompletedTask;}
+    private async Task FinalizeReceiptAsync(MouseEventArgs _){var order=receiptOrderId>0?Purchasing.Orders.FirstOrDefault(x=>x.OrderId==receiptOrderId):null;var lines=receiptDraftLines.Select(x=>new FinalizeGoodsReceiptLineCommand(x.Product.ProductId,x.OrderLineId,x.Quantity,x.UnitPurchasePrice,null,x.LotNumber,x.ExpiryDate)).ToArray();await Purchasing.FinalizeReceiptAsync(new(receiptOperationId,receiptSupplierId,order?.OrderId,receiptLocationId,deliveryNoteNumber,receiptDocumentDate,order?.RowVersion,lines),lifetime.Token);if(Purchasing.ErrorCode is null){confirmReceiptFinalization=false;receiptDraftLines.Clear();deliveryNoteNumber=string.Empty;receiptOperationId=Guid.NewGuid();}}
+    private Task CloseReceiptConfirmationAsync(MouseEventArgs _){confirmReceiptFinalization=false;return Task.CompletedTask;}
+    private static string StatusLabel(PurchaseOrderStatus status)=>status switch{PurchaseOrderStatus.Draft=>"Brouillon",PurchaseOrderStatus.Confirmed=>"Confirmée",PurchaseOrderStatus.PartiallyReceived=>"Partiellement reçue",PurchaseOrderStatus.FullyReceived=>"Entièrement reçue",PurchaseOrderStatus.Cancelled=>"Annulée",_=>status.ToString()};
+    private sealed class ReceiptDraftLine(PurchasableProductView product,long? orderLineId,int? remainingQuantity,int quantity,decimal unitPurchasePrice){public PurchasableProductView Product{get;}=product;public long? OrderLineId{get;}=orderLineId;public int? RemainingQuantity{get;}=remainingQuantity;public int Quantity{get;set;}=quantity;public decimal UnitPurchasePrice{get;set;}=unitPurchasePrice;public string? LotNumber{get;set;}public DateOnly? ExpiryDate{get;set;}}
+}

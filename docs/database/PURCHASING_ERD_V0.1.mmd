@@ -1,0 +1,12 @@
+erDiagram
+    Suppliers ||--o{ PurchaseOrders : places
+    Suppliers ||--o{ GoodsReceipts : supplies
+    PurchaseOrders ||--|{ PurchaseOrderLines : contains
+    PurchaseOrders o|--o{ GoodsReceipts : received_by
+    GoodsReceipts ||--|{ GoodsReceiptLines : contains
+    Products ||--o{ PurchaseOrderLines : ordered
+    Products ||--o{ GoodsReceiptLines : received
+    StockLocations ||--o{ GoodsReceipts : receives_at
+    PurchaseOrderLines o|--o{ GoodsReceiptLines : fulfills
+    StockBatches o|--o{ GoodsReceiptLines : identifies
+    StockMovements ||--|| GoodsReceiptLines : records

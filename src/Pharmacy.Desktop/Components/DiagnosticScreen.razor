@@ -1,6 +1,7 @@
 @page "/diagnostic"
 @inject GetCatalogDiagnosticsHandler CatalogDiagnostics
 @inject InventoryQueryHandlers InventoryQueries
+@inject PurchasingQueryHandlers PurchasingQueries
 
 <PageTitle>Logiciel Pharmacie — Diagnostic SQL</PageTitle>
 
@@ -9,7 +10,7 @@
         <div>
             <p class="eyebrow">Socle desktop local</p>
             <h1 id="page-title" tabindex="-1">Logiciel Pharmacie</h1>
-            <p class="subtitle">Diagnostic technique — Catalogue et Stock SQL</p>
+            <p class="subtitle">Diagnostic technique — Catalogue, Stock et Purchasing SQL</p>
         </div>
         <div class="ready-badge" role="status">
             <span class="ready-dot" aria-hidden="true"></span>
@@ -49,6 +50,36 @@
                 </div>
             </article>
         </div>
+    </section>
+
+    <section class="details-panel" aria-labelledby="purchasing-diagnostic-title">
+        <div>
+            <p class="section-kicker">Persistance Purchasing</p>
+            <h2 id="purchasing-diagnostic-title">Achats et réceptions SQL</h2>
+        </div>
+        @if (purchasingDiagnostics is null)
+        {
+            <UiSpinner Label="Lecture du diagnostic Purchasing SQL" />
+        }
+        else
+        {
+            <dl class="environment-grid">
+                <div><dt>Base</dt><dd>@purchasingDiagnostics.DatabaseName</dd></div>
+                <div><dt>Connectivité</dt><dd>@(purchasingDiagnostics.IsReachable ? "Disponible" : "Indisponible")</dd></div>
+                <div><dt>Migrations</dt><dd>@purchasingDiagnostics.MigrationStatus</dd></div>
+                <div><dt>Fournisseurs</dt><dd>@purchasingDiagnostics.SupplierCount</dd></div>
+                <div><dt>Commandes ouvertes</dt><dd>@purchasingDiagnostics.OpenOrderCount</dd></div>
+                <div><dt>Réceptions</dt><dd>@purchasingDiagnostics.ReceiptCount</dd></div>
+                <div><dt>Effet Stock</dt><dd>@(purchasingDiagnostics.IsReachable ? "Transaction SQL active" : "Aucune écriture")</dd></div>
+                <div><dt>Ventes</dt><dd>Toujours non persistées</dd></div>
+            </dl>
+            @if (!purchasingDiagnostics.IsReachable)
+            {
+                <UiAlert Title="Purchasing SQL indisponible" Variant="UiAlertVariant.Warning">
+                    Les commandes et réceptions sont bloquées sans fallback. Aucun stock n’est modifié.
+                </UiAlert>
+            }
+        }
     </section>
 
     <section class="details-panel" aria-labelledby="catalog-diagnostic-title">
@@ -163,6 +194,7 @@
     private int interactionCount;
     private CatalogDiagnosticsView? catalogDiagnostics;
     private InventoryDiagnosticsView? inventoryDiagnostics;
+    private PurchasingDiagnosticsView? purchasingDiagnostics;
 
     private string InteractionMessage => interactionCount == 0
         ? "Test non exécuté"
@@ -189,8 +221,10 @@
     {
         var catalogTask = CatalogDiagnostics.HandleAsync();
         var inventoryTask = InventoryQueries.GetDiagnosticsAsync();
-        await Task.WhenAll(catalogTask, inventoryTask);
+        var purchasingTask = PurchasingQueries.GetDiagnosticsAsync();
+        await Task.WhenAll(catalogTask, inventoryTask, purchasingTask);
         catalogDiagnostics = await catalogTask;
         inventoryDiagnostics = await inventoryTask;
+        purchasingDiagnostics = await purchasingTask;
     }
 }

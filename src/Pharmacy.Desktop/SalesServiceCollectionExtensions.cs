@@ -3,6 +3,8 @@ using Pharmacy.Application.Catalog.Commands;
 using Pharmacy.Application.Catalog.Queries;
 using Pharmacy.Application.Inventory.Commands;
 using Pharmacy.Application.Inventory.Queries;
+using Pharmacy.Application.Purchasing.Commands;
+using Pharmacy.Application.Purchasing.Queries;
 using Pharmacy.Application.Sales.Catalog.Queries;
 using Pharmacy.Application.Sales.Contracts;
 using Pharmacy.Application.Sales.Drafts.Commands;
@@ -11,8 +13,10 @@ using Pharmacy.Application.Sales.Finalization.Commands;
 using Pharmacy.Desktop.Components.Pos;
 using Pharmacy.Desktop.Components.Catalog;
 using Pharmacy.Desktop.Components.Inventory;
+using Pharmacy.Desktop.Components.Purchasing;
 using Pharmacy.Infrastructure.Catalog;
 using Pharmacy.Infrastructure.Inventory;
+using Pharmacy.Infrastructure.Purchasing;
 using Pharmacy.Infrastructure.Sales.InMemory;
 
 namespace Pharmacy.Desktop;
@@ -25,6 +29,7 @@ public static class SalesServiceCollectionExtensions
 
         services.AddSqlCatalogAdaptersFromEnvironment();
         services.AddSqlInventoryAdapters();
+        services.AddSqlPurchasingAdapters();
         services.AddSingleton<ISaleDraftStore, InMemorySaleDraftStore>();
         services.AddSingleton<ISaleDraftIdGenerator, InMemorySaleDraftIdGenerator>();
         services.AddSingleton<ISaleFinalizationPreparationStore, InMemorySaleFinalizationPreparationStore>();
@@ -56,11 +61,14 @@ public static class SalesServiceCollectionExtensions
 
         services.AddTransient<InventoryQueryHandlers>();
         services.AddTransient<InventoryCommandHandlers>();
+        services.AddTransient<PurchasingQueryHandlers>();
+        services.AddTransient<PurchasingCommandHandlers>();
 
         services.AddScoped<DemoTicketPrintService>();
         services.AddScoped<SalesPosCoordinator>();
         services.AddScoped<CatalogCoordinator>();
         services.AddScoped<InventoryCoordinator>();
+        services.AddScoped<PurchasingCoordinator>();
         return services;
     }
 }

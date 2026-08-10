@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Pharmacy.Infrastructure.Persistence.Entities.Catalog;
 using Pharmacy.Infrastructure.Persistence.Entities.Inventory;
+using Pharmacy.Infrastructure.Persistence.Entities.Purchasing;
 
 namespace Pharmacy.Infrastructure.Persistence;
 
@@ -32,6 +33,13 @@ public sealed class PharmacyDbContext : DbContext
     internal DbSet<InventorySessionEntity> InventorySessions => Set<InventorySessionEntity>();
 
     internal DbSet<InventoryCountLineEntity> InventoryCountLines => Set<InventoryCountLineEntity>();
+
+    internal DbSet<SupplierEntity> Suppliers => Set<SupplierEntity>();
+    internal DbSet<PurchaseOrderEntity> PurchaseOrders => Set<PurchaseOrderEntity>();
+    internal DbSet<PurchaseOrderLineEntity> PurchaseOrderLines => Set<PurchaseOrderLineEntity>();
+    internal DbSet<GoodsReceiptEntity> GoodsReceipts => Set<GoodsReceiptEntity>();
+    internal DbSet<GoodsReceiptLineEntity> GoodsReceiptLines => Set<GoodsReceiptLineEntity>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -1,0 +1,14 @@
+SET NOCOUNT ON;
+IF DB_NAME() <> N'Pharmacy_Development' THROW 51230, 'La vérification Sprint 12 cible uniquement Pharmacy_Development.', 1;
+IF (SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE s.name=N'purchasing') <> 5 THROW 51231, 'Le schéma purchasing doit contenir exactement cinq tables.', 1;
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.tables t ON t.object_id=c.object_id JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE s.name=N'purchasing' AND TYPE_NAME(c.user_type_id) IN (N'int',N'float',N'real',N'money',N'smallmoney') AND c.name=N'Id') THROW 51232, 'Toutes les PK Purchasing doivent être bigint.', 1;
+IF EXISTS (SELECT 1 FROM sys.foreign_keys fk JOIN sys.tables t ON t.object_id=fk.parent_object_id JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE s.name=N'purchasing' AND fk.delete_referential_action<>0) THROW 51233, 'Toutes les FK Purchasing doivent être NO ACTION.', 1;
+IF (SELECT COUNT(*) FROM purchasing.Suppliers WHERE Code LIKE N'DEMO-S12-%') NOT BETWEEN 3 AND 5 THROW 51234, 'Le seed doit fournir de trois à cinq fournisseurs Demo.', 1;
+IF NOT EXISTS (SELECT 1 FROM purchasing.PurchaseOrders WHERE OrderNumber=N'DEMO-S12-PO-001' AND Status=N'PartiallyReceived') THROW 51235, 'La commande partiellement reçue Demo est absente.', 1;
+IF NOT EXISTS (SELECT 1 FROM purchasing.GoodsReceipts WHERE OperationId='12000000-0000-0000-0000-000000000001' AND Status=N'Completed') THROW 51236, 'La réception Demo est absente.', 1;
+IF (SELECT COUNT(*) FROM purchasing.GoodsReceipts WHERE OperationId='12000000-0000-0000-0000-000000000001') <> 1 THROW 51237, 'La réception Demo a été dupliquée.', 1;
+IF (SELECT COUNT(*) FROM inventory.StockMovements WHERE OperationId='12000000-0000-0000-0000-000000001001' AND MovementType=N'PurchaseReceipt') <> 1 THROW 51238, 'Le mouvement de réception Demo doit être unique.', 1;
+IF EXISTS (SELECT 1 FROM purchasing.PurchaseOrderLines WHERE ReceivedQuantity<0 OR ReceivedQuantity>OrderedQuantity) THROW 51239, 'Les quantités reçues sortent des bornes.', 1;
+IF EXISTS (SELECT 1 FROM purchasing.GoodsReceiptLines WHERE Quantity<=0 OR UnitPurchasePrice<0) THROW 51240, 'Une ligne de réception viole ses contraintes métier.', 1;
+IF EXISTS (SELECT 1 FROM purchasing.GoodsReceiptLines l JOIN catalog.ProductLocalSettings s ON s.ProductId=l.ProductId WHERE s.InternalCode NOT LIKE N'DEMO-%' AND l.GoodsReceiptId IN (SELECT Id FROM purchasing.GoodsReceipts WHERE ReceiptNumber LIKE N'DEMO-S12-%')) THROW 51241, 'Le seed Purchasing référence une donnée non Demo.', 1;
+SELECT N'PASS' AS Sprint12Purchasing, (SELECT COUNT(*) FROM purchasing.Suppliers) AS Suppliers, (SELECT COUNT(*) FROM purchasing.PurchaseOrders) AS Orders, (SELECT COUNT(*) FROM purchasing.GoodsReceipts) AS Receipts;

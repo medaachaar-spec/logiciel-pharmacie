@@ -115,11 +115,11 @@ public static class AppNavigationCatalog
                 AppNavigationGroup.Management,
                 UiIconName.Purchasing,
                 2,
-                AppNavigationAccessState.Soon,
+                AppNavigationAccessState.Available,
                 false,
                 AppNavigationKind.Business,
                 "purchasing",
-                new[] { "Commandes fournisseurs", "Réceptions", "Retours et documents associés" }),
+                new[] { "Fournisseurs", "Commandes d’achat", "Réceptions partielles et directes" }),
             new(
                 "cash",
                 "Caisse",

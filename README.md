@@ -43,7 +43,7 @@ dotnet test .\Pharmacy.slnx -c Debug --no-build
 dotnet run --project .\src\Pharmacy.Desktop\Pharmacy.Desktop.csproj -c Debug
 ```
 
-Après le lancement, l’application ouvre l’accueil du shell V0.1. `Ventes`, `Catalogue` et `Stock` sont fonctionnels ; cinq autres domaines restent provisoires. Catalogue et disponibilité Stock utilisent SQL Server, tandis que la vente, le paiement et l’impression restent non persistés/simulés.
+Après le lancement, l’application ouvre l’accueil du shell V0.1. `Ventes`, `Catalogue`, `Stock` et `Achats et réceptions` sont fonctionnels ; quatre autres domaines restent provisoires. Catalogue, Stock et Purchasing utilisent SQL Server, tandis que la vente, le paiement et l’impression restent non persistés/simulés.
 
 Le POS V0.2 conserve le parcours nominal V0.1 et ajoute les incidents de code inconnu/disponibilité, la suspension et la reprise contrôlée de paniers, l’abandon du brouillon, la machine d’états du TPE ambigu et une impression post-vente entièrement simulée. Tous les montants sont calculés avec `decimal` ; aucune donnée bancaire ou réelle n’est collectée, aucune donnée n’est persistée, aucun stock n’est modifié et aucun ticket réel n’est produit. Les spécifications et limites sont documentées dans `docs/ux/POS_V0.1.md` et `docs/ux/POS_V0.2_CONTINUITY.md`.
 
@@ -59,6 +59,8 @@ Le Sprint 10 rend le Catalogue réellement persistant. La migration minimale `Ca
 
 Le Sprint 11 ajoute le moteur Inventory SQL V0.1 : six tables pour emplacements, lots, balances, mouvements et inventaires, plus les contrats/handlers Domain et Application. La page `/module/inventory` expose recherche, filtres, lots expirés, historique, ajustements et comptages. Le POS lit désormais la disponibilité SQL et exclut les lots expirés ; une vente simulée ne réserve ni ne décrémente le stock. La migration `InventoryPersistenceV01` reste manuelle et aucune connexion n’est versionnée.
 
+
+Le Sprint 12 ajoute le schéma Purchasing SQL V0.1 avec fournisseurs, commandes, lignes, réceptions et lignes de réception. La page `/module/purchasing` gère fournisseurs, brouillons/confirmations et réceptions partielles, complètes ou directes. Seule la finalisation d’une réception crée lots, mouvements `PurchaseReceipt` et augmentations de balances dans une transaction atomique ; elle ne modifie jamais automatiquement le prix de vente et ne calcule aucune marge. La migration `PurchasingPersistenceV01`, les seeds et les scripts restent manuels.
 ### Commandes de persistance contrôlées
 
 La connexion n’est jamais stockée dans le dépôt. Elle doit être fournie temporairement par `PHARMACY_SQLSERVER_CONNECTION` pour les commandes EF ou `PHARMACY_TEST_SQLSERVER_CONNECTION` pour les tests SQL réels.
@@ -98,6 +100,21 @@ sqlcmd -S <instance-explicite> -d Pharmacy_Development -E -C -b -f 65001 `
 ```
 
 Le clear Inventory est conservateur et ne supprime que les artefacts portant les identifiants Demo canoniques. Ne jamais utiliser ces scripts sur une autre base.
+
+Migration, seed et vérification Sprint 12 :
+
+```powershell
+$env:PHARMACY_SQLSERVER_CONNECTION = '<connexion locale Pharmacy_Development>'
+dotnet tool run dotnet-ef database update `
+  --project .\src\Pharmacy.Infrastructure `
+  --startup-project .\src\Pharmacy.Infrastructure
+sqlcmd -S <instance-explicite> -d Pharmacy_Development -E -C -b -f 65001 `
+  -i .\database\dev\seed_synthetic_purchasing_v01.sql
+sqlcmd -S <instance-explicite> -d Pharmacy_Development -E -C -b -f 65001 `
+  -i .\database\verification\verify_sprint12_purchasing.sql
+```
+
+Le clear Purchasing retire uniquement les fournisseurs/commandes/réception `DEMO-S12-*` et inverse le mouvement de seed associé. Il refuse une base autre que `Pharmacy_Development` et ne supprime aucun produit Catalogue ni stock non créé par ce seed.
 
 En configuration Debug, le groupe `Développement` donne également accès à :
 

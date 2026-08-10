@@ -318,7 +318,7 @@ public sealed class AppShellTests
         var uiLab = DesktopText("Components", "Pages", "UiLab.razor");
 
         Assert.Contains("@page \"/diagnostic\"", diagnostic, StringComparison.Ordinal);
-        Assert.Contains("Diagnostic technique — Catalogue et Stock SQL", diagnostic, StringComparison.Ordinal);
+        Assert.Contains("Diagnostic technique — Catalogue, Stock et Purchasing SQL", diagnostic, StringComparison.Ordinal);
         Assert.Contains("@page \"/ui-lab\"", uiLab, StringComparison.Ordinal);
         Assert.Contains("UI Lab — Fondations visuelles V0.1", uiLab, StringComparison.Ordinal);
     }

@@ -17,7 +17,7 @@ internal sealed class StockMovementConfiguration : IEntityTypeConfiguration<Stoc
             table.HasCheckConstraint("CK_inventory_StockMovements_Fingerprint_NotBlank", "LEN(LTRIM(RTRIM([OperationFingerprint]))) > 0");
             table.HasCheckConstraint(
                 "CK_inventory_StockMovements_Direction",
-                "(([MovementType] IN (N'Opening', N'ManualIncrease', N'InventoryIncrease') AND [QuantityAfter] = [QuantityBefore] + [Quantity]) OR " +
+                "(([MovementType] IN (N'Opening', N'ManualIncrease', N'InventoryIncrease', N'PurchaseReceipt') AND [QuantityAfter] = [QuantityBefore] + [Quantity]) OR " +
                 "([MovementType] IN (N'ManualDecrease', N'InventoryDecrease') AND [QuantityAfter] = [QuantityBefore] - [Quantity]))");
         });
         builder.HasKey(entity => entity.Id).HasName("PK_inventory_StockMovements");

@@ -26,7 +26,7 @@ public static class HomePresentationModel
         {
             new DemoQuickAction("Nouvelle vente", "Ouvrir la page provisoire Ventes", "/module/sales", UiIconName.Sales),
             new DemoQuickAction("Consulter le stock", "Ouvrir la page provisoire Stock", "/module/inventory", UiIconName.Inventory),
-            new DemoQuickAction("Enregistrer une réception", "Ouvrir la page provisoire Achats", "/module/purchasing", UiIconName.Purchasing),
+            new DemoQuickAction("Enregistrer une réception", "Ouvrir Achats et réceptions SQL", "/module/purchasing", UiIconName.Purchasing),
             new DemoQuickAction("Ouvrir la caisse", "Ouvrir la page provisoire Caisse", "/module/cash", UiIconName.Cash)
         };
 

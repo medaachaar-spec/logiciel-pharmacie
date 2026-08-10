@@ -1,6 +1,6 @@
 # CURRENT_STATE - Logiciel Pharmacie
 
-Date de mise à jour : 2026-08-04
+Date de mise à jour : 2026-08-10
 
 ## État fonctionnel et architectural
 
@@ -8,7 +8,7 @@ Date de mise à jour : 2026-08-04
 - Phase 2 fonctionnelle : PASS.
 - Phase 3 modèle de données : PASS.
 - Phase 4 UX/UI : PASS.
-- Phase 5 code-first : fondations Sprint 1 à 5, noyau Sales Sprint 6, cas d’utilisation/adaptateurs mémoire Sprint 7, connexion POS Sprint 8, fondation SQL Sprint 9, Catalogue persistant Sprint 10, puis Stock/lots/mouvements/inventaires SQL Sprint 11.
+- Phase 5 code-first : fondations Sprint 1 à 5, Sales Sprint 6 à 8, fondation SQL Sprint 9, Catalogue Sprint 10, Inventory Sprint 11 et Purchasing SQL Sprint 12.
 
 ## État du développement
 
@@ -16,11 +16,11 @@ Date de mise à jour : 2026-08-04
 - Dépôt réel : `C:\Users\HP\Desktop\Logiciel pharmacie`.
 - Branche active : `main`.
 - Sprint 0 : `IMPLEMENTED — FOUNDATION READY WITH WARNINGS` après correction de classification Sprint 0.1.
-- Git : dépôt local sur `58e7315`, zéro remote ; changements Sprint 11 laissés hors index pour revue, aucun commit ou push Sprint 11.
+- Git : dépôt local sur `a46ffb7`, zéro remote ; changements Sprint 12 laissés hors index pour revue, aucun commit ou push Sprint 12.
 - Solution .NET créée : OUI — `Pharmacy.slnx`, six projets .NET 10.
-- Code frontend : pages Catalogue et Stock SQL fonctionnelles ; POS connecté au Catalogue et à la disponibilité SQL ; Diagnostic SQL sûr ; cinq autres modules restent provisoires, UI Lab disponible en Debug.
-- Code backend : noyaux/handlers Catalogue et Inventory ; lecteurs/stores/diagnostics SQL ; brouillons Sales, paiements, suspensions et impressions restent en mémoire.
-- Base SQL Server métier : `Pharmacy_Development` sur SQL Server 2025 Developer, compatibilité 170, trois migrations appliquées ; seed Inventory avec un emplacement, cinq lots, douze balances/mouvements, plus une référence manuelle préservée ; cible Express non encore validée.
+- Code frontend : pages Catalogue, Stock et Achats/réceptions SQL fonctionnelles ; POS connecté au Catalogue et à la disponibilité SQL ; Diagnostic SQL sûr ; quatre autres modules restent provisoires, UI Lab disponible en Debug.
+- Code backend : noyaux/handlers Catalogue, Inventory et Purchasing ; lecteurs/stores/diagnostics SQL ; brouillons Sales, paiements, suspensions et impressions restent en mémoire.
+- Base SQL Server métier : `Pharmacy_Development` sur SQL Server 2025 Developer, compatibilité 170, quatre migrations appliquées ; seeds Catalogue/Inventory/Purchasing synthétiques ; cible Express non encore validée.
 - CI : NON DÉMARRÉE.
 
 ## Prérequis détectés au Sprint 0
@@ -51,7 +51,7 @@ Date de mise à jour : 2026-08-04
 
 ## Prochaine étape autorisée
 
-Effectuer la revue manuelle Sprint 11 dans SSMS et Desktop : schéma Inventory, balances/mouvements, lots expirés, page Stock, ajustements, inventaire, disponibilité POS SQL, panne SQL sûre, clavier et responsive. Ne persister aucune vente et ne consommer aucun stock depuis le POS simulé. Traiter la confiance TLS et valider SQL Server 2025 Express avant toute certification pilote.
+Effectuer la revue manuelle Sprint 12 dans SSMS et Desktop : fournisseurs, commande, réception partielle/complète/directe, lot, mouvement `PurchaseReceipt`, balance, duplicate BL, panne SQL sûre, clavier et responsive. Recontrôler Catalogue/Stock/POS. Traiter la confiance TLS et valider SQL Server 2025 Express avant toute certification pilote.
 
 ## Interdictions actuelles
 
@@ -231,3 +231,16 @@ Effectuer la revue manuelle Sprint 11 dans SSMS et Desktop : schéma Inventory, 
 - Écart : la vérification Sprint 10 historique voit onze références sous collation insensible à la casse à cause de `demo-manual-001`, donnée manuelle inactive préservée ; aucun clear large n’a été exécuté.
 - Gate restant : captures/revue manuelle Stock/POS/Diagnostic, SQL Server Express et certificat TLS local.
 - Git : branche `main`, HEAD initial `58e7315`, index vide, zéro nouveau commit, remote ou push.
+
+## Mise à jour après le Sprint 12
+
+- Statut : `IMPLEMENTED — SQL PURCHASING VALIDATION PASS — MANUAL RECEIVING REVIEW REQUIRED`.
+- Domain/Application : statuts et erreurs Purchasing, commandes/vues/contrats/handlers spécifiques, sans EF Core ni repository générique.
+- Persistence : cinq tables `purchasing`, quatre `rowversion`, prix d’achat `decimal(19,4)`, quantités `int`, FK `NO ACTION`, BL unique par fournisseur et réception append-only.
+- Transactions : finalisation sous stratégie EF + isolation Serializable ; réception, lot, mouvement `PurchaseReceipt`, balance et statut de commande dans un commit unique.
+- Idempotence/concurrence : `OperationId` + empreinte SHA-256, identifiants dérivés déterministes et tokens Base64 ; replay équivalent stable, contenu différent refusé.
+- Desktop : fournisseurs, commandes et réceptions liés/directes sur `/module/purchasing`, avertissements visibles, confirmation, anti-double-soumission et Diagnostic Purchasing.
+- SQL : migration `PurchasingPersistenceV01` appliquée ; seed double, verify, clear ciblé et reseed réussis avec quatre fournisseurs, deux commandes et une réception Demo.
+- Sécurité : aucune donnée bancaire/fiscale, marge, paiement fournisseur, connexion ou donnée réelle ; prix de vente inchangé.
+- Gate restant : captures/revue manuelle Achats/Stock/SSMS/panne SQL, SQL Server Express et certificat TLS local.
+- Git : branche `main`, HEAD initial `a46ffb7`, index vide, zéro nouveau commit, remote ou push.

@@ -119,3 +119,14 @@ Figma n’est pas obligatoire. Le prototype frontend sera construit directement 
 - Les sessions utilisent `Draft`, `InProgress`, `Completed`, `Cancelled`. Les états `ReadyForReview`/`Validated` évoqués en Phase 3 sont différés, conformément au périmètre minimal du sprint.
 - La disponibilité du POS vient exclusivement de SQL Inventory. Le brouillon, le paiement, les suspensions et l’impression restent en mémoire ; le succès simulé ne consomme aucun stock.
 - Le seed/clear Inventory cible des identifiants Demo canoniques exacts pour préserver toute donnée manuelle ou non Demo. Aucune donnée réelle n’est supprimée et aucune migration ne contient de seed.
+
+## Décisions techniques locales — Sprint 12
+
+- Le schéma Purchasing V0.1 reste limité aux cinq tables confirmées. Référencement fournisseur-produit, documents comptables, retours/avoirs, fiscalité, paiements et marges sont différés.
+- Les commandes utilisent `Draft`, `Confirmed`, `PartiallyReceived`, `FullyReceived`, `Cancelled`, conformément à Phase 2/3. Le brouillon de réception demeure local au Desktop ; seule une réception `Completed` est persistée.
+- La réception directe est autorisée par PUR-008 mais reste signalée comme voie prototype contrôlée, faute d’autorisation métier réelle au Sprint 12.
+- Les prix d’achat utilisent `decimal(19,4)`, exception validée de Phase 3, et restent des snapshots. Ils ne modifient pas le prix de vente et ne déclenchent aucun calcul de marge.
+- Une ligne de réception pointe directement vers son lot et son mouvement Stock ; aucune table intermédiaire spéculative de ventilation n’est ajoutée en V0.1.
+- La finalisation Purchasing étend le journal Inventory avec `PurchaseReceipt` et réalise réception, lot, mouvement, balance et commande dans une transaction Serializable. Les commandes confirmées seules n’ont aucun effet stock.
+- L’idempotence repose sur `OperationId` et une empreinte SHA-256 normalisée ; les identifiants techniques dérivés des lots/mouvements sont déterministes. Les conflits métier ou `rowversion` ne sont pas rejoués aveuglément.
+- Le seed/clear Purchasing est ciblé sur `DEMO-S12-*`, inverse uniquement son propre mouvement Stock et ne supprime aucun produit Catalogue ou stock extérieur au seed.

@@ -1,0 +1,16 @@
+.purchasing-page { min-width: 0; }
+.purchasing-tabs { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2); border: var(--border-width) solid var(--color-border); border-radius: var(--radius-large); background: var(--color-surface); box-shadow: var(--shadow-small); }
+.purchasing-tab { min-height: var(--control-height-medium); padding: var(--space-2) var(--space-4); border: var(--border-width) solid transparent; border-radius: var(--radius-medium); color: var(--color-text-secondary); background: transparent; font-weight: var(--font-weight-bold); }
+.purchasing-tab:hover { color: var(--color-accent-active); background: var(--color-accent-subtle); }
+.purchasing-tab--active { border-color: var(--color-accent-border); color: var(--color-accent-active); background: var(--color-accent-subtle); }
+.purchasing-field--wide { grid-column: 1 / -1; }
+.purchasing-field--wide textarea { min-height: calc(var(--control-height-medium) * 2); resize: vertical; }
+.purchasing-row-actions { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.purchasing-table-space { margin-top: var(--space-3); }
+.purchasing-confirmation { display: grid; gap: var(--space-3); margin-top: var(--space-4); padding: var(--space-4); border: var(--border-width) solid var(--color-warning-border); border-radius: var(--radius-medium); background: var(--color-warning-surface); }
+.purchasing-confirmation h3, .purchasing-confirmation p { margin-bottom: 0; }
+.purchasing-confirmation label { display: grid; gap: var(--space-1); color: var(--color-text-secondary); font-size: var(--font-size-small); font-weight: var(--font-weight-bold); }
+.purchasing-direct-warning { margin: var(--space-3) 0 0; padding: var(--space-3); border-left: calc(var(--border-width) * 3) solid var(--color-warning-border); color: var(--color-text-secondary); background: var(--color-warning-surface); font-size: var(--font-size-small); }
+.purchasing-receipt-table { min-width: 68rem; }
+.purchasing-receipt-table .ui-field__control { min-width: 8rem; }
+@media (max-width: 48rem) { .purchasing-tabs { align-items: stretch; flex-direction: column; } .purchasing-tab { width: 100%; } }

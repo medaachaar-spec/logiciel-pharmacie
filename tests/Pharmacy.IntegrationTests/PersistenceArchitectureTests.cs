@@ -139,7 +139,7 @@ public sealed class PersistenceArchitectureTests
     }
 
     [Fact]
-    public void ModelContainsOnlyTheConfirmedCatalogAndInventoryTables()
+    public void ModelContainsOnlyTheConfirmedCatalogInventoryAndPurchasingTables()
     {
         using var context = CreateModelContext();
         var tables = context.Model.GetEntityTypes()
@@ -160,7 +160,12 @@ public sealed class PersistenceArchitectureTests
                 "inventory.StockBalances",
                 "inventory.StockBatches",
                 "inventory.StockLocations",
-                "inventory.StockMovements"
+                "inventory.StockMovements",
+                "purchasing.GoodsReceiptLines",
+                "purchasing.GoodsReceipts",
+                "purchasing.PurchaseOrderLines",
+                "purchasing.PurchaseOrders",
+                "purchasing.Suppliers"
             },
             tables);
         Assert.All(context.Model.GetEntityTypes(), entity => Assert.False(entity.ClrType.IsPublic));
@@ -210,7 +215,7 @@ public sealed class PersistenceArchitectureTests
             .Where(property => property.GetColumnType() == "rowversion")
             .ToArray();
 
-        Assert.Equal(9, rowVersions.Length);
+        Assert.Equal(13, rowVersions.Length);
         Assert.All(rowVersions, property =>
         {
             Assert.True(property.IsConcurrencyToken);
