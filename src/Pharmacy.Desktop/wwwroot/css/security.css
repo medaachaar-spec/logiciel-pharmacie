@@ -1,0 +1,46 @@
+.security-stage {
+    display: grid;
+    min-height: 100vh;
+    padding: var(--space-8);
+    place-items: center;
+    background: linear-gradient(145deg, var(--color-accent-subtle), var(--color-app-background) 48%);
+}
+
+.security-card,
+.security-panel,
+.security-recovery {
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-large);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-small);
+}
+
+.security-card { width: min(100%, 34rem); padding: var(--space-8); }
+.security-card__kicker { color: var(--color-accent); font-size: var(--font-size-metadata); font-weight: var(--font-weight-bold); letter-spacing: .08em; text-transform: uppercase; }
+.security-card__intro { color: var(--color-text-secondary); }
+.security-card form, .security-panel form { display: grid; gap: var(--space-4); margin-top: var(--space-6); }
+.security-card label, .security-panel label { display: grid; gap: var(--space-1); color: var(--color-text-secondary); font-size: var(--font-size-small); font-weight: var(--font-weight-bold); }
+.security-card input, .security-panel input, .security-panel select { min-height: var(--control-height-medium); padding: var(--space-2) var(--space-3); border: var(--border-width) solid var(--color-border-strong); border-radius: var(--radius-small); color: var(--color-text-primary); background: var(--color-surface); }
+.security-card input:focus-visible, .security-panel input:focus-visible, .security-panel select:focus-visible, .security-card button:focus-visible, .security-panel button:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.security-card button, .security-panel button, .security-topbar-button { min-height: var(--control-height-small); padding: var(--space-2) var(--space-3); border: var(--border-width) solid var(--color-accent-border); border-radius: var(--radius-small); color: var(--color-accent-active); background: var(--color-surface); font-weight: var(--font-weight-bold); cursor: pointer; }
+.security-card .security-primary, .security-panel .security-primary { color: var(--color-text-inverse); background: var(--color-accent); }
+.security-feedback { margin-block: var(--space-4); padding: var(--space-3); border: var(--border-width) solid var(--color-information); border-radius: var(--radius-medium); color: var(--color-information); background: var(--color-information-surface); }
+.security-recovery { margin-top: var(--space-4); padding: var(--space-4); border-color: var(--color-warning); background: var(--color-warning-surface); }
+.security-recovery ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin-top: var(--space-3); }
+.security-recovery-form { margin-top: var(--space-6); }
+.security-admin { display: grid; gap: var(--space-6); }
+.security-admin__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.security-panel { min-width: 0; padding: var(--space-5); }
+.security-table-wrap { max-width: 100%; overflow-x: auto; }
+.security-panel table { width: 100%; border-collapse: collapse; }
+.security-panel th, .security-panel td { padding: var(--space-3); border-bottom: var(--border-width) solid var(--color-border); text-align: left; vertical-align: top; }
+.security-panel td small { display: block; color: var(--color-text-secondary); }
+.security-panel td button { margin: 0 var(--space-2) var(--space-2) 0; }
+.security-panel details { padding: var(--space-3) 0; border-bottom: var(--border-width) solid var(--color-border); }
+
+@media (max-width: 52rem) {
+    .security-stage { padding: var(--space-4); }
+    .security-card { padding: var(--space-5); }
+    .security-admin__grid { grid-template-columns: 1fr; }
+    .security-recovery ul { grid-template-columns: 1fr; }
+}

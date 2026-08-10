@@ -81,7 +81,7 @@ public sealed class AppShellTests
     }
 
     [Fact]
-    public void NineBusinessNavigationEntries_AreDeclared()
+    public void TenBusinessNavigationEntries_AreDeclared()
     {
         var expectedIds = new[]
         {
@@ -93,11 +93,12 @@ public sealed class AppShellTests
             "cash",
             "customers",
             "reporting",
-            "administration"
+            "administration",
+            "audit"
         };
         var entries = GetCatalogEntries();
 
-        Assert.Equal(11, entries.Length);
+        Assert.Equal(12, entries.Length);
         Assert.All(expectedIds, id => Assert.Contains(entries, entry => entry.Id == id));
     }
 
@@ -169,14 +170,15 @@ public sealed class AppShellTests
     }
 
     [Fact]
-    public void Topbar_StatesLocalDemoAndAuthenticationLimit()
+    public void Topbar_StatesAuthenticatedLocalSession()
     {
         var source = DesktopText("Components", "Layout", "AppTopBar.razor");
 
         Assert.Contains("Mode local", source, StringComparison.Ordinal);
-        Assert.Contains("Session de démonstration", source, StringComparison.Ordinal);
-        Assert.Contains("Compte local de démonstration", source, StringComparison.Ordinal);
-        Assert.Contains("Authentification non implémentée", source, StringComparison.Ordinal);
+        Assert.Contains("Mode local sécurisé", source, StringComparison.Ordinal);
+        Assert.Contains("Session.User?.DisplayName", source, StringComparison.Ordinal);
+        Assert.Contains("Verrouiller", source, StringComparison.Ordinal);
+        Assert.Contains("Déconnexion", source, StringComparison.Ordinal);
     }
 
     [Fact]

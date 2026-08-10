@@ -3,6 +3,8 @@
 @using Microsoft.AspNetCore.Components.Routing
 @using Pharmacy.Desktop.Components.Navigation
 @inject NavigationManager NavigationManager
+@inject ICurrentSecuritySession SecuritySession
+@inject IPermissionAuthorizer PermissionAuthorizer
 
 <div class="app-shell @(isSidebarCollapsed ? "app-shell--collapsed" : null)">
     <a class="skip-link" href="#main-content">Aller au contenu principal</a>
@@ -11,16 +13,10 @@
                 AccessProfile="@selectedProfile"
                 CurrentPath="@currentPath"
                 IsCollapsed="@isSidebarCollapsed"
-                OnToggleCollapsed="ToggleSidebar" />
+                OnToggleCollapsed="ToggleSidebar"
+                Allowed="CanAccess" />
 
-    <AppTopBar PageTitle="@CurrentPageTitle" PageDescription="@CurrentPageDescription">
-        @if (IsDevelopmentBuild)
-        {
-            <DevelopmentAccessPreview Profiles="@DevelopmentAccessCatalog.Profiles"
-                                      SelectedProfile="@selectedProfile"
-                                      SelectedProfileChanged="SelectProfile" />
-        }
-    </AppTopBar>
+    <AppTopBar PageTitle="@CurrentPageTitle" PageDescription="@CurrentPageDescription" />
 
     <main id="main-content" class="app-main" tabindex="-1">
         @Body
@@ -84,6 +80,12 @@
     private void SelectProfile(DevelopmentAccessProfile profile)
     {
         selectedProfile = profile;
+    }
+
+    private bool CanAccess(AppNavigationItem item)
+    {
+        return string.IsNullOrWhiteSpace(item.RequiredPermission)
+            || PermissionAuthorizer.Authorize(item.RequiredPermission).IsSuccess;
     }
 
     private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)

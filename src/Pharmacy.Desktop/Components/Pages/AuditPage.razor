@@ -1,0 +1,26 @@
+@page "/module/audit"
+@inject SecurityCoordinator Security
+@inject IPermissionAuthorizer Authorizer
+
+<PageTitle>Journal d’audit</PageTitle>
+<div class="page-content security-admin">
+    <header class="page-header"><div><p class="eyebrow">Traçabilité</p><h1>Journal d’audit métier et sécurité</h1><p class="page-subtitle">Consultation en lecture seule ; aucun secret ni mot de passe n’est journalisé.</p></div><UiBadge Text="Append-only applicatif" Variant="UiBadgeVariant.Information" /></header>
+    @if (denied) { <UiAlert Title="Accès refusé" Variant="UiAlertVariant.Danger"><p>La permission <code>audit.view</code> est requise.</p></UiAlert> }
+    else
+    {
+        @if (!string.IsNullOrWhiteSpace(Security.Message)) { <div class="security-feedback" role="status">@Security.Message</div> }
+        <section class="security-panel"><div class="security-table-wrap"><table><thead><tr><th>Date UTC</th><th>Module</th><th>Action</th><th>Acteur</th><th>Résultat</th><th>Corrélation</th></tr></thead><tbody>
+        @foreach (var item in Security.AuditEvents)
+        { <tr><td>@item.OccurredAtUtc.ToString("u")</td><td>@item.Module</td><td>@item.Action</td><td>@(item.ActorDisplayName ?? "Système")</td><td>@item.Result</td><td><code>@item.CorrelationId.ToString("N")[..8]</code></td></tr> }
+        </tbody></table></div></section>
+    }
+</div>
+
+@code {
+    private bool denied;
+    protected override async Task OnInitializedAsync()
+    {
+        denied = Authorizer.Authorize(SecurityPermissions.AuditView).IsFailure;
+        if (!denied) await Security.LoadAuditAsync();
+    }
+}

@@ -53,6 +53,16 @@ Date de mise à jour : 2026-08-10
 
 Effectuer les revues manuelles Sprints 12 et 13 dans SSMS et Desktop, notamment FEFO multi-lots, paiements, historique, double clic, prix changé, panne SQL et impression post-commit. Recontrôler Catalogue/Stock/Purchasing. Traiter la confiance TLS et valider SQL Server 2025 Express avant toute certification pilote.
 
+## Mise à jour après le Sprint 15
+
+- Statut : `IMPLEMENTED — SQL SECURITY/RBAC/AUDIT VALIDATION PASS — MANUAL SECURITY REVIEW REQUIRED` après validation automatisée finale ; la revue humaine reste obligatoire.
+- Sécurité : authentification locale, Owner bootstrap sans secret seedé, PasswordHasher Identity V3, lockout 5 échecs/5 minutes, session mémoire verrouillée après 10 minutes et recovery codes hashés à usage unique.
+- Autorisation : 20 permissions granulaires, deny-by-default dans Application, réauthentification technique de 5 minutes sur actions sensibles, navigation Desktop filtrée et pages Administration/Audit protégées.
+- SQL : migration additive `SecurityRbacAuditPersistenceV01`, sept tables `security`, deux tables `audit`, aucun compte ni mot de passe dans migration/scripts.
+- Audit : authentification, administration et principaux workflows métier instrumentés ; secrets, codes, cartes et notes client interdits.
+- Limite pilote : le compte propriétaire partagé ne permet pas d’attribution individuelle entre les deux exploitants.
+- Git : changements Sprint 15 laissés hors index pour revue ; aucun commit, push, remote ou changement de branche.
+
 ## Interdictions actuelles
 
 - Ne pas implémenter de fonctionnalité métier hors d’un sprint explicitement autorisé.

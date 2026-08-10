@@ -31,7 +31,9 @@
                 <ul>
                     @foreach (var item in group)
                     {
-                        var state = DevelopmentAccessCatalog.ResolveState(item, AccessProfile);
+                        var state = Allowed(item)
+                            ? DevelopmentAccessCatalog.ResolveState(item, AccessProfile)
+                            : AppNavigationAccessState.Locked;
                         <li>
                             @if (state == AppNavigationAccessState.Locked)
                             {
@@ -93,6 +95,9 @@
 
     [Parameter]
     public EventCallback OnToggleCollapsed { get; set; }
+
+    [Parameter]
+    public Func<AppNavigationItem, bool> Allowed { get; set; } = _ => true;
 
     private IEnumerable<IGrouping<AppNavigationGroup, AppNavigationItem>> GroupedItems => Items
         .GroupBy(item => item.Group)

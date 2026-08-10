@@ -1,0 +1,80 @@
+@inject SecurityCoordinator Security
+
+<main class="security-stage">
+    <section class="security-card" aria-labelledby="security-title">
+        <p class="security-card__kicker">Sécurité locale</p>
+        <h1 id="security-title">@(Security.RequiresBootstrap ? "Initialiser le propriétaire" : "Connexion")</h1>
+        <p class="security-card__intro">
+            @(Security.RequiresBootstrap
+                ? "Aucun compte n’existe. Créez l’unique propriétaire initial ; aucun mot de passe par défaut n’est fourni."
+                : "Utilisez votre compte local. Les erreurs d’identifiant et de mot de passe restent volontairement neutres.")
+        </p>
+
+        @if (!string.IsNullOrWhiteSpace(Security.Message))
+        {
+            <div class="security-feedback" role="status">@Security.Message</div>
+        }
+
+        @if (Security.RecoveryCodes.Count > 0)
+        {
+            <div class="security-recovery" role="alert">
+                <strong>Codes à conserver hors ligne</strong>
+                <p>Ils ne seront plus affichés après fermeture de cet écran.</p>
+                <ul>@foreach (var recoveryItem in Security.RecoveryCodes) { <li><code>@recoveryItem</code></li> }</ul>
+            </div>
+        }
+
+        @if (Security.RequiresBootstrap)
+        {
+            <form @onsubmit="BootstrapAsync" @onsubmit:preventDefault>
+                <label>Identifiant<input autocomplete="username" @bind="login" /></label>
+                <label>Nom affiché<input autocomplete="name" @bind="displayName" /></label>
+                <label>Mot de passe initial<input type="password" autocomplete="new-password" @bind="password" /></label>
+                <small>15 à 128 caractères ; les mots de passe courants sont refusés.</small>
+                <button class="security-primary" disabled="@Security.IsBusy">Créer le propriétaire</button>
+            </form>
+        }
+        else
+        {
+            <form @onsubmit="LoginAsync" @onsubmit:preventDefault>
+                <label>Identifiant<input autocomplete="username" autofocus @bind="login" /></label>
+                <label>Mot de passe<input type="password" autocomplete="current-password" @bind="password" /></label>
+                <button class="security-primary" disabled="@Security.IsBusy">Se connecter</button>
+            </form>
+            <details class="security-recovery-form">
+                <summary>Récupérer l’accès</summary>
+                <form @onsubmit="RecoverAsync" @onsubmit:preventDefault>
+                    <label>Code de récupération<input autocomplete="one-time-code" @bind="recoveryCode" /></label>
+                    <label>Nouveau mot de passe<input type="password" autocomplete="new-password" @bind="newPassword" /></label>
+                    <button disabled="@Security.IsBusy">Renouveler le mot de passe</button>
+                </form>
+            </details>
+        }
+    </section>
+</main>
+
+@code {
+    private string login = string.Empty;
+    private string displayName = string.Empty;
+    private string password = string.Empty;
+    private string recoveryCode = string.Empty;
+    private string newPassword = string.Empty;
+
+    private async Task BootstrapAsync()
+    {
+        await Security.BootstrapAsync(login, displayName, password);
+        password = string.Empty;
+    }
+
+    private async Task LoginAsync()
+    {
+        await Security.LoginAsync(login, password);
+        password = string.Empty;
+    }
+
+    private async Task RecoverAsync()
+    {
+        await Security.RecoverAsync(login, recoveryCode, newPassword);
+        recoveryCode = newPassword = string.Empty;
+    }
+}

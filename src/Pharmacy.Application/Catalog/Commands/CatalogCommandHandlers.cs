@@ -2,6 +2,9 @@ using Pharmacy.Application.Catalog.Contracts;
 using Pharmacy.Application.Catalog.Errors;
 using Pharmacy.Application.Catalog.Models;
 using Pharmacy.Domain.Common;
+using Pharmacy.Application.Security;
+using Pharmacy.Application.Security.Contracts;
+using Pharmacy.Application.Security.Services;
 
 namespace Pharmacy.Application.Catalog.Commands;
 
@@ -118,24 +121,38 @@ public sealed class UpdateCatalogBarcodeHandler
 public sealed class ChangeCatalogProductPriceHandler
 {
     private readonly ICatalogProductStore store;
+    private readonly IPermissionAuthorizer? authorizer;
+    private readonly IBusinessAuditRecorder? audit;
 
     public ChangeCatalogProductPriceHandler(ICatalogProductStore store) =>
         this.store = store ?? throw new ArgumentNullException(nameof(store));
 
-    public Task<Result<CatalogProductDetails>> HandleAsync(
+    public ChangeCatalogProductPriceHandler(ICatalogProductStore store, IPermissionAuthorizer authorizer)
+        : this(store, authorizer, null) { }
+
+    public ChangeCatalogProductPriceHandler(ICatalogProductStore store, IPermissionAuthorizer authorizer, IBusinessAuditRecorder? audit)
+    { this.store = store ?? throw new ArgumentNullException(nameof(store)); this.authorizer = authorizer; this.audit = audit; }
+
+    public async Task<Result<CatalogProductDetails>> HandleAsync(
         ChangeCatalogProductPriceCommand command,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        var denied = SecurityCommandGuard.Denied<CatalogProductDetails>(authorizer, SecurityPermissions.CatalogChangePrice, true);
+        if (denied is not null) return denied;
 
         if (command.NewPrice < 0m)
         {
-            return Task.FromResult(Result<CatalogProductDetails>.Failure(CatalogApplicationErrors.InvalidPrice));
+            return Result<CatalogProductDetails>.Failure(CatalogApplicationErrors.InvalidPrice);
         }
 
-        return command.ProductId <= 0 || !CatalogCommandValidation.ValidToken(command.LocalSettingsRowVersion)
-            ? Task.FromResult(Result<CatalogProductDetails>.Failure(CatalogCommandValidation.InvalidInput))
-            : store.ChangePriceAsync(command, cancellationToken);
+        if (command.ProductId <= 0 || !CatalogCommandValidation.ValidToken(command.LocalSettingsRowVersion))
+            return Result<CatalogProductDetails>.Failure(CatalogCommandValidation.InvalidInput);
+        var changed = await store.ChangePriceAsync(command, cancellationToken);
+        if (changed.IsSuccess && audit is not null)
+            await audit.RecordSuccessAsync("catalog", "Product", changed.Value.ProductId.ToString(),
+                "price.change", null, cancellationToken);
+        return changed;
     }
 }
 

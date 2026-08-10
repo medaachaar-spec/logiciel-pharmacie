@@ -1,4 +1,5 @@
 using Pharmacy.Desktop.Components.Ui;
+using Pharmacy.Application.Security;
 
 namespace Pharmacy.Desktop.Components.Navigation;
 
@@ -80,7 +81,8 @@ public static class AppNavigationCatalog
                 false,
                 AppNavigationKind.Business,
                 "sales",
-                new[] { "Nouvelle vente et recherche", "Suspension et reprise", "Paiement et résultat de l’opération" }),
+                new[] { "Nouvelle vente et recherche", "Suspension et reprise", "Paiement et résultat de l’opération" },
+                SecurityPermissions.SalesCreate),
             new(
                 "catalog",
                 "Catalogue",
@@ -93,7 +95,8 @@ public static class AppNavigationCatalog
                 false,
                 AppNavigationKind.Business,
                 "catalog",
-                new[] { "Recherche de références", "Fiche produit", "Prix et codes-barres" }),
+                new[] { "Recherche de références", "Fiche produit", "Prix et codes-barres" },
+                SecurityPermissions.CatalogView),
             new(
                 "inventory",
                 "Stock",
@@ -106,7 +109,8 @@ public static class AppNavigationCatalog
                 false,
                 AppNavigationKind.Business,
                 "inventory",
-                new[] { "Vue des quantités", "Lots et péremptions", "Inventaires et mouvements" }),
+                new[] { "Vue des quantités", "Lots et péremptions", "Inventaires et mouvements" },
+                SecurityPermissions.InventoryView),
             new(
                 "purchasing",
                 "Achats et réceptions",
@@ -119,7 +123,8 @@ public static class AppNavigationCatalog
                 false,
                 AppNavigationKind.Business,
                 "purchasing",
-                new[] { "Fournisseurs", "Commandes d’achat", "Réceptions partielles et directes" }),
+                new[] { "Fournisseurs", "Commandes d’achat", "Réceptions partielles et directes" },
+                SecurityPermissions.PurchasingView),
             new(
                 "cash",
                 "Caisse",
@@ -132,7 +137,8 @@ public static class AppNavigationCatalog
                 false,
                 AppNavigationKind.Business,
                 "cash",
-                new[] { "Ventes espèces", "Règlements de crédit", "Remboursements" }),
+                new[] { "Ventes espèces", "Règlements de crédit", "Remboursements" },
+                SecurityPermissions.CashView),
             new(
                 "customers",
                 "Clients et crédit",
@@ -145,7 +151,8 @@ public static class AppNavigationCatalog
                 false,
                 AppNavigationKind.Business,
                 "customers",
-                new[] { "Recherche de clients", "Écritures de crédit", "Soldes et règlements" }),
+                new[] { "Recherche de clients", "Écritures de crédit", "Soldes et règlements" },
+                SecurityPermissions.CustomersView),
             new(
                 "reporting",
                 "Rapports",
@@ -158,7 +165,8 @@ public static class AppNavigationCatalog
                 false,
                 AppNavigationKind.Business,
                 "reporting",
-                new[] { "Rapports de ventes", "Rapports de stock et lots", "Alertes descriptives" }),
+                new[] { "Rapports de ventes", "Rapports de stock et lots", "Alertes descriptives" },
+                SecurityPermissions.ReportsView),
             new(
                 "administration",
                 "Administration",
@@ -167,11 +175,26 @@ public static class AppNavigationCatalog
                 AppNavigationGroup.Configuration,
                 UiIconName.Administration,
                 0,
-                AppNavigationAccessState.Soon,
+                AppNavigationAccessState.Available,
                 false,
                 AppNavigationKind.Business,
                 "administration",
-                new[] { "Configuration locale", "Périphériques et continuité", "Audit et support contrôlé" })
+                new[] { "Comptes locaux", "Rôles et permissions", "Réauthentification sensible" },
+                SecurityPermissions.SecurityManageUsers),
+            new(
+                "audit",
+                "Journal d’audit",
+                "/module/audit",
+                "Événements métier et sécurité consultables en lecture seule.",
+                AppNavigationGroup.Configuration,
+                UiIconName.Administration,
+                1,
+                AppNavigationAccessState.Available,
+                false,
+                AppNavigationKind.Business,
+                "audit",
+                new[] { "Filtres temporels", "Acteur et action", "Résultat immuable" },
+                SecurityPermissions.AuditView)
         };
 
 #if DEBUG

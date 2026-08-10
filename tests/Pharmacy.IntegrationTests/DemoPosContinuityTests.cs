@@ -459,11 +459,12 @@ public sealed class DemoPosContinuityTests
             .Where(value => value is not null)
             .ToArray();
 
-        Assert.Equal(5, packageReferences.Length);
+        Assert.Equal(7, packageReferences.Length);
         Assert.Equal(2, packageReferences.Count(name => name == "xunit.v3.mtp-v2"));
         Assert.Single(packageReferences, name => name == "Microsoft.AspNetCore.Components.WebView.Wpf");
         Assert.Single(packageReferences, name => name == "Microsoft.EntityFrameworkCore.SqlServer");
         Assert.Single(packageReferences, name => name == "Microsoft.EntityFrameworkCore.Design");
+        Assert.Equal(2, packageReferences.Count(name => name == "Microsoft.Extensions.Identity.Core"));
     }
 
     [Fact]

@@ -22,6 +22,129 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Audit.AuditEventDetailEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AuditEventId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("FieldName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("NewValueRedacted")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<string>("OldValueRedacted")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_audit_AuditEventDetails");
+
+                    b.HasIndex("AuditEventId")
+                        .HasDatabaseName("IX_audit_AuditEventDetails_AuditEventId");
+
+                    b.ToTable("AuditEventDetails", "audit");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Audit.AuditEventEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("ActorDisplayName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<long?>("ActorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("CorrelationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EntityId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Module")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<Guid?>("OperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ReasonCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("WorkstationId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_audit_AuditEvents");
+
+                    b.HasIndex("ActorUserId")
+                        .HasDatabaseName("IX_audit_AuditEvents_ActorUserId");
+
+                    b.HasIndex("CorrelationId")
+                        .HasDatabaseName("IX_audit_AuditEvents_CorrelationId");
+
+                    b.HasIndex("OperationId")
+                        .HasDatabaseName("IX_audit_AuditEvents_OperationId");
+
+                    b.HasIndex("EntityType", "EntityId")
+                        .HasDatabaseName("IX_audit_AuditEvents_Entity");
+
+                    b.HasIndex("OccurredAtUtc", "Id")
+                        .HasDatabaseName("IX_audit_AuditEvents_Timeline");
+
+                    b.ToTable("AuditEvents", "audit", t =>
+                        {
+                            t.HasCheckConstraint("CK_audit_AuditEvents_Action_NotBlank", "LEN(LTRIM(RTRIM([Action]))) > 0");
+
+                            t.HasCheckConstraint("CK_audit_AuditEvents_Module_NotBlank", "LEN(LTRIM(RTRIM([Module]))) > 0");
+
+                            t.HasCheckConstraint("CK_audit_AuditEvents_Result", "[Result] IN (N'Success', N'Failure', N'Denied')");
+                        });
+                });
+
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Cash.CashLedgerEntryEntity", b =>
                 {
                     b.Property<long>("Id")
@@ -1895,6 +2018,667 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Security.AuthenticationEventEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("CorrelationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("FailureReasonCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<long?>("UserAccountId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("UsernameAttemptHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<bool>("WasSuccessful")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("WorkstationId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_security_AuthenticationEvents");
+
+                    b.HasIndex("CorrelationId")
+                        .HasDatabaseName("IX_security_AuthenticationEvents_CorrelationId");
+
+                    b.HasIndex("OccurredAtUtc", "Id")
+                        .HasDatabaseName("IX_security_AuthenticationEvents_Timeline");
+
+                    b.ToTable("AuthenticationEvents", "security", t =>
+                        {
+                            t.HasCheckConstraint("CK_security_AuthenticationEvents_EventType", "[EventType] IN (N'Login', N'Logout', N'Lock', N'Unlock', N'Reauthentication', N'PasswordChange', N'Recovery')");
+                        });
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Security.PermissionEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<bool>("IsSensitive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Module")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Id")
+                        .HasName("PK_security_Permissions");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("UX_security_Permissions_Code");
+
+                    b.ToTable("Permissions", "security", t =>
+                        {
+                            t.HasCheckConstraint("CK_security_Permissions_Code_NotBlank", "LEN(LTRIM(RTRIM([Code]))) > 0");
+
+                            t.HasCheckConstraint("CK_security_Permissions_Module_NotBlank", "LEN(LTRIM(RTRIM([Module]))) > 0");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1L,
+                            Code = "sales.create",
+                            Description = "Permission explicite sales.create.",
+                            IsSensitive = false,
+                            Module = "sales",
+                            Name = "sales.create"
+                        },
+                        new
+                        {
+                            Id = 2L,
+                            Code = "sales.view_history",
+                            Description = "Permission explicite sales.view_history.",
+                            IsSensitive = false,
+                            Module = "sales",
+                            Name = "sales.view_history"
+                        },
+                        new
+                        {
+                            Id = 3L,
+                            Code = "sales.return",
+                            Description = "Permission explicite sales.return.",
+                            IsSensitive = true,
+                            Module = "sales",
+                            Name = "sales.return"
+                        },
+                        new
+                        {
+                            Id = 4L,
+                            Code = "sales.refund",
+                            Description = "Permission explicite sales.refund.",
+                            IsSensitive = true,
+                            Module = "sales",
+                            Name = "sales.refund"
+                        },
+                        new
+                        {
+                            Id = 5L,
+                            Code = "inventory.view",
+                            Description = "Permission explicite inventory.view.",
+                            IsSensitive = false,
+                            Module = "inventory",
+                            Name = "inventory.view"
+                        },
+                        new
+                        {
+                            Id = 6L,
+                            Code = "inventory.adjust",
+                            Description = "Permission explicite inventory.adjust.",
+                            IsSensitive = true,
+                            Module = "inventory",
+                            Name = "inventory.adjust"
+                        },
+                        new
+                        {
+                            Id = 7L,
+                            Code = "inventory.finalize_count",
+                            Description = "Permission explicite inventory.finalize_count.",
+                            IsSensitive = true,
+                            Module = "inventory",
+                            Name = "inventory.finalize_count"
+                        },
+                        new
+                        {
+                            Id = 8L,
+                            Code = "purchasing.view",
+                            Description = "Permission explicite purchasing.view.",
+                            IsSensitive = false,
+                            Module = "purchasing",
+                            Name = "purchasing.view"
+                        },
+                        new
+                        {
+                            Id = 9L,
+                            Code = "purchasing.receive",
+                            Description = "Permission explicite purchasing.receive.",
+                            IsSensitive = true,
+                            Module = "purchasing",
+                            Name = "purchasing.receive"
+                        },
+                        new
+                        {
+                            Id = 10L,
+                            Code = "catalog.view",
+                            Description = "Permission explicite catalog.view.",
+                            IsSensitive = false,
+                            Module = "catalog",
+                            Name = "catalog.view"
+                        },
+                        new
+                        {
+                            Id = 11L,
+                            Code = "catalog.manage",
+                            Description = "Permission explicite catalog.manage.",
+                            IsSensitive = false,
+                            Module = "catalog",
+                            Name = "catalog.manage"
+                        },
+                        new
+                        {
+                            Id = 12L,
+                            Code = "catalog.change_price",
+                            Description = "Permission explicite catalog.change_price.",
+                            IsSensitive = true,
+                            Module = "catalog",
+                            Name = "catalog.change_price"
+                        },
+                        new
+                        {
+                            Id = 13L,
+                            Code = "customers.view",
+                            Description = "Permission explicite customers.view.",
+                            IsSensitive = false,
+                            Module = "customers",
+                            Name = "customers.view"
+                        },
+                        new
+                        {
+                            Id = 14L,
+                            Code = "customers.manage",
+                            Description = "Permission explicite customers.manage.",
+                            IsSensitive = false,
+                            Module = "customers",
+                            Name = "customers.manage"
+                        },
+                        new
+                        {
+                            Id = 15L,
+                            Code = "customers.manage_credit",
+                            Description = "Permission explicite customers.manage_credit.",
+                            IsSensitive = true,
+                            Module = "customers",
+                            Name = "customers.manage_credit"
+                        },
+                        new
+                        {
+                            Id = 16L,
+                            Code = "cash.view",
+                            Description = "Permission explicite cash.view.",
+                            IsSensitive = false,
+                            Module = "cash",
+                            Name = "cash.view"
+                        },
+                        new
+                        {
+                            Id = 17L,
+                            Code = "security.manage_users",
+                            Description = "Permission explicite security.manage_users.",
+                            IsSensitive = true,
+                            Module = "security",
+                            Name = "security.manage_users"
+                        },
+                        new
+                        {
+                            Id = 18L,
+                            Code = "security.manage_roles",
+                            Description = "Permission explicite security.manage_roles.",
+                            IsSensitive = true,
+                            Module = "security",
+                            Name = "security.manage_roles"
+                        },
+                        new
+                        {
+                            Id = 19L,
+                            Code = "audit.view",
+                            Description = "Permission explicite audit.view.",
+                            IsSensitive = false,
+                            Module = "audit",
+                            Name = "audit.view"
+                        },
+                        new
+                        {
+                            Id = 20L,
+                            Code = "reports.view",
+                            Description = "Permission explicite reports.view.",
+                            IsSensitive = false,
+                            Module = "reports",
+                            Name = "reports.view"
+                        });
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Security.RecoveryCodeEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<DateTime?>("UsedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<long>("UserAccountId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id")
+                        .HasName("PK_security_RecoveryCodes");
+
+                    b.HasIndex("CodeHash")
+                        .IsUnique()
+                        .HasDatabaseName("UX_security_RecoveryCodes_CodeHash");
+
+                    b.HasIndex("UserAccountId", "ExpiresAtUtc")
+                        .HasDatabaseName("IX_security_RecoveryCodes_User_Expiry");
+
+                    b.ToTable("RecoveryCodes", "security");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Security.RoleEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsSystemRole")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Id")
+                        .HasName("PK_security_Roles");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("UX_security_Roles_Code");
+
+                    b.ToTable("Roles", "security", t =>
+                        {
+                            t.HasCheckConstraint("CK_security_Roles_Code_NotBlank", "LEN(LTRIM(RTRIM([Code]))) > 0");
+
+                            t.HasCheckConstraint("CK_security_Roles_Name_NotBlank", "LEN(LTRIM(RTRIM([Name]))) > 0");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1L,
+                            Code = "OWNER",
+                            Description = "Compte propriétaire partagé du pilote ; attribution individuelle limitée.",
+                            IsActive = true,
+                            IsSystemRole = true,
+                            Name = "Propriétaire"
+                        });
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Security.RolePermissionEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("PermissionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("RoleId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id")
+                        .HasName("PK_security_RolePermissions");
+
+                    b.HasIndex("PermissionId");
+
+                    b.HasIndex("RoleId", "PermissionId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_security_RolePermissions_Role_Permission");
+
+                    b.ToTable("RolePermissions", "security");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1L,
+                            PermissionId = 1L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 2L,
+                            PermissionId = 2L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 3L,
+                            PermissionId = 3L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 4L,
+                            PermissionId = 4L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 5L,
+                            PermissionId = 5L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 6L,
+                            PermissionId = 6L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 7L,
+                            PermissionId = 7L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 8L,
+                            PermissionId = 8L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 9L,
+                            PermissionId = 9L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 10L,
+                            PermissionId = 10L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 11L,
+                            PermissionId = 11L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 12L,
+                            PermissionId = 12L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 13L,
+                            PermissionId = 13L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 14L,
+                            PermissionId = 14L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 15L,
+                            PermissionId = 15L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 16L,
+                            PermissionId = 16L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 17L,
+                            PermissionId = 17L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 18L,
+                            PermissionId = 18L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 19L,
+                            PermissionId = 19L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 20L,
+                            PermissionId = 20L,
+                            RoleId = 1L
+                        });
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Security.UserAccountEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<DateTime?>("DisabledAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<long?>("DisabledByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<int>("FailedLoginCount")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastLoginAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<DateTime?>("LockedUntilUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<string>("Login")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<bool>("MustChangePassword")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("NormalizedLogin")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("SecurityStamp")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_security_UserAccounts");
+
+                    b.HasIndex("NormalizedLogin")
+                        .IsUnique()
+                        .HasDatabaseName("UX_security_UserAccounts_NormalizedLogin");
+
+                    b.ToTable("UserAccounts", "security", t =>
+                        {
+                            t.HasCheckConstraint("CK_security_UserAccounts_DisplayName_NotBlank", "LEN(LTRIM(RTRIM([DisplayName]))) > 0");
+
+                            t.HasCheckConstraint("CK_security_UserAccounts_FailedLoginCount", "[FailedLoginCount] >= 0 AND [FailedLoginCount] <= 5");
+
+                            t.HasCheckConstraint("CK_security_UserAccounts_Login_NotBlank", "LEN(LTRIM(RTRIM([Login]))) > 0");
+
+                            t.HasCheckConstraint("CK_security_UserAccounts_NormalizedLogin_NotBlank", "LEN(LTRIM(RTRIM([NormalizedLogin]))) > 0");
+
+                            t.HasCheckConstraint("CK_security_UserAccounts_PasswordHash_NotBlank", "LEN([PasswordHash]) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Security.UserRoleEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("AssignedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<long?>("AssignedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("RoleId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("UserAccountId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id")
+                        .HasName("PK_security_UserRoles");
+
+                    b.HasIndex("RoleId");
+
+                    b.HasIndex("UserAccountId", "RoleId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_security_UserRoles_User_Role");
+
+                    b.ToTable("UserRoles", "security");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Audit.AuditEventDetailEntity", b =>
+                {
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Audit.AuditEventEntity", "AuditEvent")
+                        .WithMany("Details")
+                        .HasForeignKey("AuditEventId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_audit_AuditEventDetails_AuditEvents_AuditEventId");
+
+                    b.Navigation("AuditEvent");
+                });
+
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Catalog.ProductBarcodeEntity", b =>
                 {
                     b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Catalog.ProductEntity", "Product")
@@ -2279,6 +3063,65 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                     b.Navigation("SuspendedSale");
                 });
 
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Security.RecoveryCodeEntity", b =>
+                {
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Security.UserAccountEntity", "UserAccount")
+                        .WithMany("RecoveryCodes")
+                        .HasForeignKey("UserAccountId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_security_RecoveryCodes_UserAccounts_UserAccountId");
+
+                    b.Navigation("UserAccount");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Security.RolePermissionEntity", b =>
+                {
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Security.PermissionEntity", "Permission")
+                        .WithMany("RolePermissions")
+                        .HasForeignKey("PermissionId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_security_RolePermissions_Permissions_PermissionId");
+
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Security.RoleEntity", "Role")
+                        .WithMany("RolePermissions")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_security_RolePermissions_Roles_RoleId");
+
+                    b.Navigation("Permission");
+
+                    b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Security.UserRoleEntity", b =>
+                {
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Security.RoleEntity", "Role")
+                        .WithMany("UserRoles")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_security_UserRoles_Roles_RoleId");
+
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Security.UserAccountEntity", "UserAccount")
+                        .WithMany("UserRoles")
+                        .HasForeignKey("UserAccountId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_security_UserRoles_UserAccounts_UserAccountId");
+
+                    b.Navigation("Role");
+
+                    b.Navigation("UserAccount");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Audit.AuditEventEntity", b =>
+                {
+                    b.Navigation("Details");
+                });
+
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Catalog.ProductCategoryEntity", b =>
                 {
                     b.Navigation("ProductSettings");
@@ -2373,6 +3216,25 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Sales.SuspendedSaleEntity", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Security.PermissionEntity", b =>
+                {
+                    b.Navigation("RolePermissions");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Security.RoleEntity", b =>
+                {
+                    b.Navigation("RolePermissions");
+
+                    b.Navigation("UserRoles");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Security.UserAccountEntity", b =>
+                {
+                    b.Navigation("RecoveryCodes");
+
+                    b.Navigation("UserRoles");
                 });
 #pragma warning restore 612, 618
         }

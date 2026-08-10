@@ -1,0 +1,26 @@
+@inject SecurityCoordinator Security
+@inject ICurrentSecuritySession Session
+
+<main class="security-stage">
+    <section class="security-card" aria-labelledby="lock-title">
+        <p class="security-card__kicker">Session verrouillée</p>
+        <h1 id="lock-title">@Session.User?.DisplayName</h1>
+        <p class="security-card__intro">L’activité a été masquée. Saisissez votre mot de passe pour reprendre cette session locale.</p>
+        @if (!string.IsNullOrWhiteSpace(Security.Message)) { <div class="security-feedback" role="alert">@Security.Message</div> }
+        <form @onsubmit="UnlockAsync" @onsubmit:preventDefault>
+            <label>Mot de passe<input type="password" autocomplete="current-password" autofocus @bind="password" /></label>
+            <button class="security-primary" disabled="@Security.IsBusy">Déverrouiller</button>
+            <button type="button" @onclick="LogoutAsync">Changer de compte</button>
+        </form>
+    </section>
+</main>
+
+@code {
+    private string password = string.Empty;
+    private async Task UnlockAsync()
+    {
+        await Security.UnlockAsync(password);
+        password = string.Empty;
+    }
+    private Task LogoutAsync() => Security.LogoutAsync();
+}

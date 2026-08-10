@@ -63,6 +63,8 @@ Le Sprint 12 ajoute le schéma Purchasing SQL V0.1 avec fournisseurs, commandes,
 
 Le Sprint 13 ajoute le schéma `sales` et la migration `SalesPersistenceV01`. `SqlSaleFinalizer` revalide produits, prix et stock, répartit les quantités par FEFO, exclut les lots expirés et commite en une transaction vente, lignes, allocations, paiement, mouvements `Sale`, balances et registre idempotent. Le POS affiche la référence persistée et un historique SQL minimal ; une panne SQL, un prix changé ou un conflit conserve le panier. L’impression demeure une simulation post-commit.
 
+Le Sprint 15 ajoute l’authentification locale, le RBAC deny-by-default et l’audit SQL sécurisé. Aucun compte ou mot de passe n’est seedé : le premier propriétaire est créé depuis un bootstrap Desktop contrôlé et reçoit des codes de récupération affichés une seule fois. La session se verrouille après dix minutes ; cinq échecs verrouillent le compte cinq minutes ; les opérations sensibles exigent une réauthentification récente. Les procédures sont décrites dans `docs/security/OWNER_BOOTSTRAP_AND_RECOVERY_V0.1.md` et la revue manuelle dans `docs/reports/sprint-15/manual-validation.md`.
+
 ### Commandes de persistance contrôlées
 
 La connexion n’est jamais stockée dans le dépôt. Elle doit être fournie temporairement par `PHARMACY_SQLSERVER_CONNECTION` pour les commandes EF ou `PHARMACY_TEST_SQLSERVER_CONNECTION` pour les tests SQL réels.
@@ -130,6 +132,19 @@ sqlcmd -S <instance-explicite> -d Pharmacy_Development -E -C -b -f 65001 `
 ```
 
 La migration ne crée aucune vente. La vérification est en lecture seule et contrôle schéma, contraintes, cohérence des ventes présentes, mouvements `Sale` et balances.
+
+Migration et vérification Sprint 15 :
+
+```powershell
+$env:PHARMACY_SQLSERVER_CONNECTION = '<connexion locale contrôlée>'
+dotnet tool run dotnet-ef database update `
+  --project .\src\Pharmacy.Infrastructure `
+  --startup-project .\src\Pharmacy.Infrastructure
+sqlcmd -S <instance-explicite> -d <base-développement> -E -C -b -f 65001 `
+  -i .\database\verification\verify_sprint15_security_rbac_audit.sql
+```
+
+Le script de vérification Sprint 15 est en lecture seule. Ne jamais placer le mot de passe propriétaire ou les codes de récupération dans une commande, un fichier `.env`, un script SQL ou le dépôt.
 
 En configuration Debug, le groupe `Développement` donne également accès à :
 

@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using Pharmacy.Infrastructure.Persistence.Entities.Audit;
 using Pharmacy.Infrastructure.Persistence.Entities.Cash;
 using Pharmacy.Infrastructure.Persistence.Entities.Catalog;
 using Pharmacy.Infrastructure.Persistence.Entities.Customers;
 using Pharmacy.Infrastructure.Persistence.Entities.Inventory;
 using Pharmacy.Infrastructure.Persistence.Entities.Purchasing;
 using Pharmacy.Infrastructure.Persistence.Entities.Sales;
+using Pharmacy.Infrastructure.Persistence.Entities.Security;
 
 namespace Pharmacy.Infrastructure.Persistence;
 
@@ -55,6 +57,15 @@ public sealed class PharmacyDbContext : DbContext
     internal DbSet<SuspendedSaleLineEntity> SuspendedSaleLines => Set<SuspendedSaleLineEntity>();
     internal DbSet<SaleReturnEntity> SaleReturns => Set<SaleReturnEntity>();
     internal DbSet<SaleReturnLineEntity> SaleReturnLines => Set<SaleReturnLineEntity>();
+    internal DbSet<UserAccountEntity> UserAccounts => Set<UserAccountEntity>();
+    internal DbSet<RoleEntity> Roles => Set<RoleEntity>();
+    internal DbSet<PermissionEntity> Permissions => Set<PermissionEntity>();
+    internal DbSet<UserRoleEntity> UserRoles => Set<UserRoleEntity>();
+    internal DbSet<RolePermissionEntity> RolePermissions => Set<RolePermissionEntity>();
+    internal DbSet<RecoveryCodeEntity> RecoveryCodes => Set<RecoveryCodeEntity>();
+    internal DbSet<AuthenticationEventEntity> AuthenticationEvents => Set<AuthenticationEventEntity>();
+    internal DbSet<AuditEventEntity> AuditEvents => Set<AuditEventEntity>();
+    internal DbSet<AuditEventDetailEntity> AuditEventDetails => Set<AuditEventDetailEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -139,7 +139,7 @@ public sealed class PersistenceArchitectureTests
     }
 
     [Fact]
-    public void ModelContainsOnlyTheConfirmedCatalogInventoryPurchasingSalesCashAndCustomersTables()
+    public void ModelContainsConfirmedBusinessSecurityAndAuditTables()
     {
         using var context = CreateModelContext();
         var tables = context.Model.GetEntityTypes()
@@ -150,6 +150,8 @@ public sealed class PersistenceArchitectureTests
         Assert.Equal(
             new[]
             {
+                "audit.AuditEventDetails",
+                "audit.AuditEvents",
                 "cash.CashLedgerEntries",
                 "catalog.ProductBarcodes",
                 "catalog.ProductCategories",
@@ -177,7 +179,14 @@ public sealed class PersistenceArchitectureTests
                 "sales.SaleReturns",
                 "sales.Sales",
                 "sales.SuspendedSaleLines",
-                "sales.SuspendedSales"
+                "sales.SuspendedSales",
+                "security.AuthenticationEvents",
+                "security.Permissions",
+                "security.RecoveryCodes",
+                "security.RolePermissions",
+                "security.Roles",
+                "security.UserAccounts",
+                "security.UserRoles"
             },
             tables);
         Assert.All(context.Model.GetEntityTypes(), entity => Assert.False(entity.ClrType.IsPublic));
@@ -227,7 +236,7 @@ public sealed class PersistenceArchitectureTests
             .Where(property => property.GetColumnType() == "rowversion")
             .ToArray();
 
-        Assert.Equal(15, rowVersions.Length);
+        Assert.Equal(18, rowVersions.Length);
         Assert.All(rowVersions, property =>
         {
             Assert.True(property.IsConcurrencyToken);
@@ -252,7 +261,8 @@ public sealed class PersistenceArchitectureTests
         var migrationSource = AllText(
             PathAt("src", "Pharmacy.Infrastructure", "Persistence", "Migrations"),
             "*.cs");
-        Assert.DoesNotContain("InsertData", migrationSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("InsertData(\r\n                schema: \"security\",\r\n                table: \"UserAccounts\"", migrationSource, StringComparison.Ordinal);
+        Assert.Contains("InsertData", migrationSource, StringComparison.Ordinal);
         Assert.Contains("protected override void Down", migrationSource, StringComparison.Ordinal);
 
         var script = File.ReadAllText(PathAt(

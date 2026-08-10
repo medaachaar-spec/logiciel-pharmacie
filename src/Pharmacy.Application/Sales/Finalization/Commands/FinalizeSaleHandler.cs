@@ -3,6 +3,9 @@ using Pharmacy.Application.Sales.Errors;
 using Pharmacy.Application.Sales.Models;
 using Pharmacy.Domain.Common;
 using Pharmacy.Domain.Sales;
+using Pharmacy.Application.Security;
+using Pharmacy.Application.Security.Contracts;
+using Pharmacy.Application.Security.Services;
 
 namespace Pharmacy.Application.Sales.Finalization.Commands;
 
@@ -20,14 +23,31 @@ public sealed class FinalizeSaleHandler
 {
     private readonly PrepareSaleFinalizationHandler preparationHandler;
     private readonly ISaleFinalizer finalizer;
+    private readonly IPermissionAuthorizer? authorizer;
+    private readonly IBusinessAuditRecorder? audit;
 
     public FinalizeSaleHandler(
         PrepareSaleFinalizationHandler preparationHandler,
         ISaleFinalizer finalizer)
+        : this(preparationHandler, finalizer, null) { }
+
+    public FinalizeSaleHandler(
+        PrepareSaleFinalizationHandler preparationHandler,
+        ISaleFinalizer finalizer,
+        IPermissionAuthorizer? authorizer)
+        : this(preparationHandler, finalizer, authorizer, null) { }
+
+    public FinalizeSaleHandler(
+        PrepareSaleFinalizationHandler preparationHandler,
+        ISaleFinalizer finalizer,
+        IPermissionAuthorizer? authorizer,
+        IBusinessAuditRecorder? audit)
     {
         this.preparationHandler = preparationHandler
             ?? throw new ArgumentNullException(nameof(preparationHandler));
         this.finalizer = finalizer ?? throw new ArgumentNullException(nameof(finalizer));
+        this.authorizer = authorizer;
+        this.audit = audit;
     }
 
     public async Task<Result<FinalizedSaleView>> HandleAsync(
@@ -36,6 +56,9 @@ public sealed class FinalizeSaleHandler
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(command.DraftId);
+
+        var denied = SecurityCommandGuard.Denied<FinalizedSaleView>(authorizer, SecurityPermissions.SalesCreate);
+        if (denied is not null) return denied;
 
         if (command.OperationId == Guid.Empty)
         {
@@ -71,9 +94,13 @@ public sealed class FinalizeSaleHandler
         var credit = command.CreditAmount == 0m
             ? null
             : new SaleCreditRequest(command.CustomerId!.Value, command.CreditAmount);
-        return await finalizer.FinalizeAsync(
+        var finalized = await finalizer.FinalizeAsync(
             new FinalizeSaleRequest(preparation.Value, payment.Value, credit),
             cancellationToken);
+        if (finalized.IsSuccess && audit is not null)
+            await audit.RecordSuccessAsync("sales", "Sale", finalized.Value.SaleId.ToString(),
+                "sale.finalize", command.OperationId, cancellationToken);
+        return finalized;
     }
 
     private static Result<SalePaymentRequest> ValidatePayment(

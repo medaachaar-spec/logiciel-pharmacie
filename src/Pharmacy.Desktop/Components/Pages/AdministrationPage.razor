@@ -1,0 +1,98 @@
+@page "/module/administration"
+@inject SecurityCoordinator Security
+@inject IPermissionAuthorizer Authorizer
+
+<PageTitle>Administration de la sécurité</PageTitle>
+<div class="page-content security-admin">
+    <header class="page-header">
+        <div><p class="eyebrow">Sécurité locale</p><h1>Comptes, rôles et récupération</h1><p class="page-subtitle">Désactivation sans suppression et contrôle par permissions, avec réauthentification pour les opérations sensibles.</p></div>
+        <UiBadge Text="SQL local" Variant="UiBadgeVariant.Success" />
+    </header>
+
+    @if (denied)
+    {
+        <UiAlert Title="Accès refusé" Variant="UiAlertVariant.Danger"><p>La permission <code>security.manage_users</code> est requise.</p></UiAlert>
+    }
+    else
+    {
+        @if (!string.IsNullOrWhiteSpace(Security.Message)) { <div class="security-feedback" role="status">@Security.Message</div> }
+        <section class="security-admin__grid">
+            <div class="security-panel">
+                <h2>Réauthentification</h2>
+                <p>Confirme les opérations sensibles pendant cinq minutes.</p>
+                <form @onsubmit="ReauthenticateAsync" @onsubmit:preventDefault>
+                    <label>Mot de passe actuel<input type="password" autocomplete="current-password" @bind="reauthPassword" /></label>
+                    <button class="security-primary">Confirmer</button>
+                </form>
+            </div>
+            <div class="security-panel">
+                <h2>Créer un compte</h2>
+                <form @onsubmit="CreateUserAsync" @onsubmit:preventDefault>
+                    <label>Identifiant<input autocomplete="off" @bind="login" /></label>
+                    <label>Nom affiché<input autocomplete="off" @bind="displayName" /></label>
+                    <label>Mot de passe initial<input type="password" autocomplete="new-password" @bind="initialPassword" /></label>
+                    <label>Rôle
+                        <select @bind="selectedRoleId"><option value="0">Sélectionner</option>@foreach (var role in Security.Roles) { <option value="@role.RoleId">@role.Name</option> }</select>
+                    </label>
+                    <button class="security-primary" disabled="@(selectedRoleId == 0)">Créer</button>
+                </form>
+            </div>
+            <div class="security-panel">
+                <h2>Changer mon mot de passe</h2>
+                <form @onsubmit="ChangePasswordAsync" @onsubmit:preventDefault>
+                    <label>Mot de passe actuel<input type="password" autocomplete="current-password" @bind="currentPassword" /></label>
+                    <label>Nouveau mot de passe<input type="password" autocomplete="new-password" @bind="newPassword" /></label>
+                    <button class="security-primary">Changer</button>
+                </form>
+            </div>
+        </section>
+
+        <section class="security-panel">
+            <h2>Comptes locaux</h2>
+            <div class="security-table-wrap"><table><thead><tr><th>Compte</th><th>Rôles</th><th>État</th><th>Actions sensibles</th></tr></thead><tbody>
+            @foreach (var user in Security.Users)
+            {
+                <tr><td><strong>@user.DisplayName</strong><small>@user.Login</small></td><td>@string.Join(", ", user.Roles)</td><td>@(user.IsActive ? "Actif" : "Désactivé")</td><td>
+                    <button @onclick="() => Security.SetUserActiveAsync(user, !user.IsActive)">@(user.IsActive ? "Désactiver" : "Réactiver")</button>
+                    <button @onclick="() => Security.GenerateRecoveryCodesAsync(user)">Régénérer les codes</button>
+                    <select aria-label="Rôle à affecter" @bind="roleAssignmentId"><option value="0">Rôle…</option>@foreach (var role in Security.Roles) { <option value="@role.RoleId">@role.Name</option> }</select>
+                    <button disabled="@(roleAssignmentId == 0)" @onclick="() => Security.SetUserRoleAsync(user, roleAssignmentId)">Affecter</button>
+                </td></tr>
+            }
+            </tbody></table></div>
+        </section>
+
+        @if (Security.RecoveryCodes.Count > 0)
+        {
+            <section class="security-recovery" role="alert"><h2>Codes de récupération à transmettre hors ligne</h2><ul>@foreach (var recoveryItem in Security.RecoveryCodes) { <li><code>@recoveryItem</code></li> }</ul></section>
+        }
+
+        <section class="security-panel">
+            <h2>Matrice rôles / permissions</h2>
+            @foreach (var role in Security.Roles) { <details><summary><strong>@role.Name</strong> — @role.Permissions.Count permission(s)</summary><ul>@foreach (var permission in role.Permissions) { <li><code>@permission.Code</code> — @permission.Name</li> }</ul></details> }
+        </section>
+    }
+</div>
+
+@code {
+    private bool denied;
+    private string reauthPassword = string.Empty, login = string.Empty, displayName = string.Empty, initialPassword = string.Empty;
+    private string currentPassword = string.Empty, newPassword = string.Empty;
+    private long selectedRoleId, roleAssignmentId;
+    protected override async Task OnInitializedAsync()
+    {
+        denied = Authorizer.Authorize(SecurityPermissions.SecurityManageUsers).IsFailure;
+        if (!denied) await Security.LoadAdministrationAsync();
+    }
+    private async Task ReauthenticateAsync() { await Security.ReauthenticateAsync(reauthPassword); reauthPassword = string.Empty; }
+    private async Task CreateUserAsync()
+    {
+        await Security.CreateUserAsync(login, displayName, initialPassword, new[] { selectedRoleId });
+        initialPassword = string.Empty;
+    }
+    private async Task ChangePasswordAsync()
+    {
+        await Security.ChangePasswordAsync(currentPassword, newPassword);
+        currentPassword = newPassword = string.Empty;
+    }
+}

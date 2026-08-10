@@ -2,13 +2,22 @@ using Pharmacy.Application.Purchasing.Contracts;
 using Pharmacy.Application.Purchasing.Models;
 using Pharmacy.Domain.Common;
 using Pharmacy.Domain.Purchasing;
+using Pharmacy.Application.Security;
+using Pharmacy.Application.Security.Contracts;
+using Pharmacy.Application.Security.Services;
 
 namespace Pharmacy.Application.Purchasing.Commands;
 
 public sealed class PurchasingCommandHandlers
 {
     private readonly IPurchasingStore store;
-    public PurchasingCommandHandlers(IPurchasingStore store) => this.store = store ?? throw new ArgumentNullException(nameof(store));
+    private readonly IPermissionAuthorizer? authorizer;
+    private readonly IBusinessAuditRecorder? audit;
+    public PurchasingCommandHandlers(IPurchasingStore store) : this(store, null) { }
+    public PurchasingCommandHandlers(IPurchasingStore store, IPermissionAuthorizer? authorizer)
+        : this(store, authorizer, null) { }
+    public PurchasingCommandHandlers(IPurchasingStore store, IPermissionAuthorizer? authorizer, IBusinessAuditRecorder? audit)
+    { this.store = store ?? throw new ArgumentNullException(nameof(store)); this.authorizer = authorizer; this.audit = audit; }
 
     public Task<Result<SupplierView>> CreateSupplierAsync(CreateSupplierCommand command, CancellationToken token = default) =>
         ValidSupplier(command.Code, command.Name) ? store.CreateSupplierAsync(command, token) : Failure<SupplierView>();
@@ -29,14 +38,20 @@ public sealed class PurchasingCommandHandlers
     public Task<Result<PurchaseOrderView>> CancelOrderAsync(CancelPurchaseOrderCommand command, CancellationToken token = default) =>
         command.OrderId > 0 && !string.IsNullOrWhiteSpace(command.Reason) && ValidToken(command.OrderRowVersion) ? store.CancelOrderAsync(command, token) : Failure<PurchaseOrderView>();
 
-    public Task<Result<GoodsReceiptView>> FinalizeReceiptAsync(FinalizeGoodsReceiptCommand command, CancellationToken token = default)
+    public async Task<Result<GoodsReceiptView>> FinalizeReceiptAsync(FinalizeGoodsReceiptCommand command, CancellationToken token = default)
     {
+        var denied = SecurityCommandGuard.Denied<GoodsReceiptView>(authorizer, SecurityPermissions.PurchasingReceive);
+        if (denied is not null) return denied;
         if (command.OperationId == Guid.Empty || command.SupplierId <= 0 || command.StockLocationId <= 0 || string.IsNullOrWhiteSpace(command.DeliveryNoteNumber) || command.Lines is null || command.Lines.Count == 0 ||
             command.Lines.Any(line => line.ProductId <= 0 || line.Quantity <= 0 || line.UnitPurchasePrice < 0m || (line.ExistingBatchId is not null && !string.IsNullOrWhiteSpace(line.LotNumber))))
         {
-            return Failure<GoodsReceiptView>();
+            return await Failure<GoodsReceiptView>();
         }
-        return store.FinalizeReceiptAsync(command, token);
+        var receipt = await store.FinalizeReceiptAsync(command, token);
+        if (receipt.IsSuccess && audit is not null)
+            await audit.RecordSuccessAsync("purchasing", "GoodsReceipt", receipt.Value.ReceiptId.ToString(),
+                "receipt.finalize", command.OperationId, token);
+        return receipt;
     }
 
     private static bool ValidSupplier(string code, string name) => !string.IsNullOrWhiteSpace(code) && code.Trim().Length <= 32 && !string.IsNullOrWhiteSpace(name) && name.Trim().Length <= 200;

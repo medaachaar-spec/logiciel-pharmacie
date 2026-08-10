@@ -2,6 +2,9 @@ using Pharmacy.Application.Inventory.Contracts;
 using Pharmacy.Application.Inventory.Models;
 using Pharmacy.Domain.Common;
 using Pharmacy.Domain.Inventory;
+using Pharmacy.Application.Security;
+using Pharmacy.Application.Security.Contracts;
+using Pharmacy.Application.Security.Services;
 
 namespace Pharmacy.Application.Inventory.Commands;
 
@@ -9,11 +12,21 @@ public sealed class InventoryCommandHandlers
 {
     private readonly IInventoryStore store;
     private readonly IInventoryDateProvider dateProvider;
+    private readonly IPermissionAuthorizer? authorizer;
+    private readonly IBusinessAuditRecorder? audit;
 
     public InventoryCommandHandlers(IInventoryStore store, IInventoryDateProvider dateProvider)
+        : this(store, dateProvider, null) { }
+
+    public InventoryCommandHandlers(IInventoryStore store, IInventoryDateProvider dateProvider, IPermissionAuthorizer? authorizer)
+        : this(store, dateProvider, authorizer, null) { }
+
+    public InventoryCommandHandlers(IInventoryStore store, IInventoryDateProvider dateProvider, IPermissionAuthorizer? authorizer, IBusinessAuditRecorder? audit)
     {
         this.store = store ?? throw new ArgumentNullException(nameof(store));
         this.dateProvider = dateProvider ?? throw new ArgumentNullException(nameof(dateProvider));
+        this.authorizer = authorizer;
+        this.audit = audit;
     }
 
     public Task<Result<StockLocationView>> CreateLocationAsync(
@@ -21,6 +34,8 @@ public sealed class InventoryCommandHandlers
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        var denied = SecurityCommandGuard.Denied<StockLocationView>(authorizer, SecurityPermissions.InventoryAdjust);
+        if (denied is not null) return Task.FromResult(denied);
         return !ValidOperation(command.OperationId)
             || !ValidText(command.Code, 64)
             || !ValidText(command.Name, 160)
@@ -35,6 +50,8 @@ public sealed class InventoryCommandHandlers
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        var denied = SecurityCommandGuard.Denied<StockLocationView>(authorizer, SecurityPermissions.InventoryAdjust);
+        if (denied is not null) return Task.FromResult(denied);
         return !ValidOperation(command.OperationId) || command.LocationId <= 0 || !ValidToken(command.RowVersion)
             ? Task.FromResult(Result<StockLocationView>.Failure(InventoryErrors.InvalidOperation))
             : store.SetLocationActivationAsync(command, cancellationToken);
@@ -45,6 +62,8 @@ public sealed class InventoryCommandHandlers
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        var denied = SecurityCommandGuard.Denied<StockBatchView>(authorizer, SecurityPermissions.InventoryAdjust);
+        if (denied is not null) return Task.FromResult(denied);
         return !ValidOperation(command.OperationId) || command.ProductId <= 0
             || (command.LotNumber is not null && !ValidText(command.LotNumber, LotNumber.MaxLength))
             ? Task.FromResult(Result<StockBatchView>.Failure(InventoryErrors.InvalidOperation))
@@ -74,6 +93,8 @@ public sealed class InventoryCommandHandlers
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        var denied = SecurityCommandGuard.Denied<StockMovementView>(authorizer, SecurityPermissions.InventoryAdjust, true);
+        if (denied is not null) return Task.FromResult(denied);
         var quantity = StockMovementQuantity.Create(command.Quantity);
         var supported = command.MovementType is StockMovementType.Opening
             or StockMovementType.ManualIncrease
@@ -101,6 +122,8 @@ public sealed class InventoryCommandHandlers
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        var denied = SecurityCommandGuard.Denied<InventorySessionView>(authorizer, SecurityPermissions.InventoryAdjust);
+        if (denied is not null) return Task.FromResult(denied);
         return !ValidOperation(command.OperationId) || !ValidText(command.Reference, 64)
             || command.LocationId <= 0 || command.Notes?.Trim().Length > 512
             ? Task.FromResult(Result<InventorySessionView>.Failure(InventoryErrors.InvalidOperation))
@@ -114,6 +137,8 @@ public sealed class InventoryCommandHandlers
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        var denied = SecurityCommandGuard.Denied<InventorySessionView>(authorizer, SecurityPermissions.InventoryAdjust);
+        if (denied is not null) return Task.FromResult(denied);
         return !ValidSessionMutation(command.OperationId, command.SessionId, command.SessionRowVersion)
             ? Task.FromResult(Result<InventorySessionView>.Failure(InventoryErrors.InvalidOperation))
             : store.StartSessionAsync(command, cancellationToken);
@@ -124,20 +149,28 @@ public sealed class InventoryCommandHandlers
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        var denied = SecurityCommandGuard.Denied<InventorySessionView>(authorizer, SecurityPermissions.InventoryAdjust);
+        if (denied is not null) return Task.FromResult(denied);
         return !ValidSessionMutation(command.OperationId, command.SessionId, command.SessionRowVersion)
             || command.CountLineId <= 0 || command.CountedQuantity < 0 || !ValidToken(command.LineRowVersion)
             ? Task.FromResult(Result<InventorySessionView>.Failure(InventoryErrors.InvalidQuantity))
             : store.SaveCountLineAsync(command, cancellationToken);
     }
 
-    public Task<Result<InventorySessionView>> FinalizeSessionAsync(
+    public async Task<Result<InventorySessionView>> FinalizeSessionAsync(
         FinalizeInventorySessionCommand command,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
-        return !ValidSessionMutation(command.OperationId, command.SessionId, command.SessionRowVersion)
-            ? Task.FromResult(Result<InventorySessionView>.Failure(InventoryErrors.InvalidOperation))
-            : store.FinalizeSessionAsync(command, cancellationToken);
+        var denied = SecurityCommandGuard.Denied<InventorySessionView>(authorizer, SecurityPermissions.InventoryFinalizeCount, true);
+        if (denied is not null) return denied;
+        if (!ValidSessionMutation(command.OperationId, command.SessionId, command.SessionRowVersion))
+            return Result<InventorySessionView>.Failure(InventoryErrors.InvalidOperation);
+        var finalized = await store.FinalizeSessionAsync(command, cancellationToken);
+        if (finalized.IsSuccess && audit is not null)
+            await audit.RecordSuccessAsync("inventory", "InventorySession", finalized.Value.SessionId.ToString(),
+                "inventory.finalize", command.OperationId, cancellationToken);
+        return finalized;
     }
 
     public Task<Result<InventorySessionView>> CancelSessionAsync(
@@ -145,6 +178,8 @@ public sealed class InventoryCommandHandlers
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        var denied = SecurityCommandGuard.Denied<InventorySessionView>(authorizer, SecurityPermissions.InventoryAdjust);
+        if (denied is not null) return Task.FromResult(denied);
         return !ValidSessionMutation(command.OperationId, command.SessionId, command.SessionRowVersion)
             ? Task.FromResult(Result<InventorySessionView>.Failure(InventoryErrors.InvalidOperation))
             : store.CancelSessionAsync(command, cancellationToken);

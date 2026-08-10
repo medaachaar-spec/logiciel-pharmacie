@@ -36,4 +36,5 @@ public sealed record AppNavigationItem(
     bool DevelopmentOnly,
     AppNavigationKind Kind,
     string? ModuleId = null,
-    IReadOnlyList<string>? FutureCapabilities = null);
+    IReadOnlyList<string>? FutureCapabilities = null,
+    string? RequiredPermission = null);

@@ -18,11 +18,13 @@ using Pharmacy.Desktop.Components.Catalog;
 using Pharmacy.Desktop.Components.Customers;
 using Pharmacy.Desktop.Components.Inventory;
 using Pharmacy.Desktop.Components.Purchasing;
+using Pharmacy.Desktop.Components.Security;
 using Pharmacy.Infrastructure.Catalog;
 using Pharmacy.Infrastructure.Inventory;
 using Pharmacy.Infrastructure.Purchasing;
 using Pharmacy.Infrastructure.Sales.InMemory;
 using Pharmacy.Infrastructure.Sales;
+using Pharmacy.Infrastructure.Security;
 
 namespace Pharmacy.Desktop;
 
@@ -36,6 +38,7 @@ public static class SalesServiceCollectionExtensions
         services.AddSqlInventoryAdapters();
         services.AddSqlPurchasingAdapters();
         services.AddSqlSalesAdapters();
+        services.AddLocalSqlSecurity();
         services.AddSingleton<ISaleDraftStore, InMemorySaleDraftStore>();
         services.AddSingleton<ISaleDraftIdGenerator, InMemorySaleDraftIdGenerator>();
         services.AddSingleton<ISaleFinalizationPreparationStore, InMemorySaleFinalizationPreparationStore>();
@@ -53,6 +56,7 @@ public static class SalesServiceCollectionExtensions
         services.AddTransient<FinalizeSaleHandler>();
         services.AddTransient<GetSaleByIdHandler>();
         services.AddTransient<GetRecentSalesHandler>();
+        services.AddTransient<ReturnSaleHandler>();
 
         services.AddTransient<SearchCatalogProductsHandler>();
         services.AddTransient<GetCatalogProductByIdHandler>();
@@ -81,6 +85,7 @@ public static class SalesServiceCollectionExtensions
         services.AddScoped<InventoryCoordinator>();
         services.AddScoped<PurchasingCoordinator>();
         services.AddScoped<CustomersCoordinator>();
+        services.AddScoped<SecurityCoordinator>();
         return services;
     }
 }
