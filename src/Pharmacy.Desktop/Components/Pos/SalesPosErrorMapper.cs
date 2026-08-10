@@ -50,6 +50,22 @@ public static class SalesPosErrorMapper
                 "Le Stock SQL est indisponible. Aucun stock synthétique de secours n’a été utilisé.",
             "inventory.stock.insufficient" =>
                 "Le Stock SQL disponible est insuffisant. Le panier existant est conservé.",
+            "sales.stock.insufficient" =>
+                "Stock vendable insuffisant au moment du commit. La vente n’a pas été enregistrée et le panier est conservé.",
+            "sales.stock.concurrency_conflict" =>
+                "Le stock a changé pendant la finalisation. Vérifiez le panier avant de réessayer.",
+            "sales.price.changed" =>
+                "Un prix Catalogue a changé. La vente est bloquée ; actualisez le panier avant de réessayer.",
+            "sales.payment.invalid" =>
+                "Le paiement ne couvre pas la vente. Corrigez le montant avant de réessayer.",
+            "sales.payment.card_unconfirmed" =>
+                "Confirmez explicitement le résultat sur le TPE externe avant de finaliser.",
+            "sales.operation.conflict" =>
+                "Cette tentative correspond à une autre vente. Le panier est conservé pour contrôle.",
+            "sales.database.unavailable" =>
+                "SQL Server est indisponible. Aucune vente ni sortie de stock n’a été créée ; le panier est conservé.",
+            "sales.finalization.empty_draft" =>
+                "Le panier est vide et ne peut pas être finalisé.",
             "sales.quantity.invalid" => "La quantité doit être un entier strictement positif. Utilisez Supprimer pour retirer la ligne.",
             "sales.line.not_found" => "La ligne demandée n’existe plus dans le brouillon.",
             _ => "L’opération Sales n’a pas pu être réalisée. Le panier existant est conservé."

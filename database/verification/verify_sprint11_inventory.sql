@@ -27,12 +27,17 @@ IF (SELECT COUNT(*) FROM inventory.StockMovements
     THROW 51135, 'Les douze mouvements Opening Demo sont absents ou dupliqués.', 1;
 
 IF (SELECT COUNT(*) FROM inventory.StockBalances AS balance
-    JOIN inventory.StockLocations AS location ON location.Id = balance.StockLocationId
-    JOIN catalog.ProductLocalSettings AS settings ON settings.ProductId = balance.ProductId
-    WHERE location.Code = N'DEMO-LOCATION-MAIN'
-      AND settings.InternalCode IN
-      (N'DEMO-000001', N'DEMO-000002', N'DEMO-000003', N'DEMO-000004', N'DEMO-000005',
-       N'DEMO-000006', N'DEMO-000007', N'DEMO-000008', N'DEMO-000009', N'DEMO-000010')) <> 12
+    WHERE EXISTS
+    (
+        SELECT 1
+        FROM inventory.StockMovements AS movement
+        WHERE movement.SourceType = N'SyntheticSeed'
+          AND movement.SourceReference = N'DEMO-S11-SEED'
+          AND movement.StockLocationId = balance.StockLocationId
+          AND movement.ProductId = balance.ProductId
+          AND (movement.StockBatchId = balance.StockBatchId
+               OR (movement.StockBatchId IS NULL AND balance.StockBatchId IS NULL))
+    )) <> 12
     THROW 51136, 'Les douze balances Demo sont absentes ou dupliquées.', 1;
 
 IF EXISTS (SELECT 1 FROM inventory.StockBalances WHERE AvailableQuantity < 0)
@@ -48,7 +53,7 @@ IF EXISTS
     OUTER APPLY
     (
         SELECT SUM(CASE
-            WHEN movement.MovementType IN (N'Opening', N'ManualIncrease', N'InventoryIncrease') THEN movement.Quantity
+            WHEN movement.MovementType IN (N'Opening', N'ManualIncrease', N'InventoryIncrease', N'PurchaseReceipt') THEN movement.Quantity
             ELSE -movement.Quantity END) AS ReconciledQuantity
         FROM inventory.StockMovements AS movement
         WHERE movement.StockLocationId = balance.StockLocationId

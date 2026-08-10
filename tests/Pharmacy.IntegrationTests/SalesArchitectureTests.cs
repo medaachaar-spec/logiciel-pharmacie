@@ -62,7 +62,9 @@ public sealed class SalesArchitectureTests
             typeof(IStockAvailabilityReader),
             typeof(ISaleDraftStore),
             typeof(ISaleDraftIdGenerator),
-            typeof(ISaleFinalizationPreparationStore)
+            typeof(ISaleFinalizationPreparationStore),
+            typeof(ISaleFinalizer),
+            typeof(ISalesReader)
         };
         var infrastructureTypes = typeof(Pharmacy.Infrastructure.AssemblyMarker).Assembly.GetTypes();
         var implementations = infrastructureTypes
@@ -74,8 +76,10 @@ public sealed class SalesArchitectureTests
             implementation.FullName == "Pharmacy.Infrastructure.Catalog.SqlProductCatalogReader");
         Assert.Contains(implementations, implementation =>
             implementation.FullName == "Pharmacy.Infrastructure.Inventory.SqlInventoryStockAvailabilityReader");
-        Assert.DoesNotContain(infrastructureTypes, type =>
-            !type.IsAbstract && typeof(ISaleFinalizer).IsAssignableFrom(type));
+        Assert.Contains(implementations, implementation =>
+            implementation.FullName == "Pharmacy.Infrastructure.Sales.SqlSaleFinalizer");
+        Assert.Contains(implementations, implementation =>
+            implementation.FullName == "Pharmacy.Infrastructure.Sales.SqlSalesReader");
     }
 
     [Fact]
@@ -119,7 +123,7 @@ public sealed class SalesArchitectureTests
     }
 
     [Fact]
-    public void Check63_RepositoryContainsOnlyApprovedSqlFilesThroughSprint12()
+    public void Check63_RepositoryContainsOnlyApprovedSqlFilesThroughSprint13()
     {
         var sqlFiles = Directory
             .EnumerateFiles(RepositoryRoot, "*.sql", SearchOption.AllDirectories)
@@ -141,10 +145,12 @@ public sealed class SalesArchitectureTests
                 "database/scripts/001_initial_catalog_foundation_idempotent.sql",
                 "database/scripts/003_inventory_persistence_v01_idempotent.sql",
                 "database/scripts/004_purchasing_persistence_v01_idempotent.sql",
+                "database/scripts/005_sales_persistence_v01_idempotent.sql",
                 "database/verification/verify_sprint09_schema.sql",
                 "database/verification/verify_sprint10_catalog.sql",
                 "database/verification/verify_sprint11_inventory.sql",
                 "database/verification/verify_sprint12_purchasing.sql",
+                "database/verification/verify_sprint13_sales.sql",
             },
             sqlFiles);
     }

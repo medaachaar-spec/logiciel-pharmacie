@@ -1,0 +1,66 @@
+erDiagram
+    SaleOperations ||--|| Sales : "résultat idempotent"
+    Sales ||--|{ SaleLines : contient
+    Sales ||--|| Payments : règle
+    Products ||--o{ SaleLines : "snapshot de"
+    SaleLines ||--|{ SaleLineAllocations : ventile
+    StockBalances ||--o{ SaleLineAllocations : consomme
+    StockBatches o|--o{ SaleLineAllocations : lot
+    StockLocations ||--o{ StockMovements : journalise
+    Products ||--o{ StockMovements : concerne
+    StockBatches o|--o{ StockMovements : lot
+
+    SaleOperations {
+        bigint Id PK
+        uniqueidentifier OperationId UK
+        nvarchar OperationFingerprint
+        nvarchar Status
+        bigint ResultSaleId FK
+        datetime2 CreatedAtUtc
+        datetime2 CompletedAtUtc
+    }
+    Sales {
+        bigint Id PK
+        nvarchar Reference UK
+        uniqueidentifier OperationId UK
+        nvarchar Status
+        datetime2 CompletedAtUtc
+        decimal GrandTotal
+        decimal PaidTotal
+        decimal ChangeGiven
+        bigint TotalQuantity
+        int LineCount
+        nvarchar PaymentMethod
+    }
+    SaleLines {
+        bigint Id PK
+        bigint SaleId FK
+        bigint ProductId FK
+        nvarchar ProductReferenceSnapshot
+        nvarchar ProductNameSnapshot
+        nvarchar PresentationSnapshot
+        decimal UnitPrice
+        int Quantity
+        decimal LineTotal
+    }
+    SaleLineAllocations {
+        bigint Id PK
+        bigint SaleLineId FK
+        bigint StockBalanceId FK
+        bigint StockBatchId FK
+        int Quantity
+        nvarchar BatchNumberSnapshot
+        date ExpiryDateSnapshot
+    }
+    Payments {
+        bigint Id PK
+        bigint SaleId FK
+        uniqueidentifier OperationId UK
+        nvarchar PaymentMethod
+        nvarchar Status
+        decimal Amount
+        decimal TenderedAmount
+        decimal ChangeGiven
+        bit ExternalCardConfirmed
+        datetime2 ConfirmedAtUtc
+    }

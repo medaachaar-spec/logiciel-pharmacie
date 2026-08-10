@@ -7,7 +7,8 @@ public enum StockMovementType
     ManualDecrease,
     InventoryIncrease,
     InventoryDecrease,
-    PurchaseReceipt
+    PurchaseReceipt,
+    Sale
 }
 
 public static class StockMovementTypeExtensions
@@ -16,5 +17,5 @@ public static class StockMovementTypeExtensions
         StockMovementType.Opening or StockMovementType.ManualIncrease or StockMovementType.InventoryIncrease or StockMovementType.PurchaseReceipt;
 
     public static bool IsDecrease(this StockMovementType type) => type is
-        StockMovementType.ManualDecrease or StockMovementType.InventoryDecrease;
+        StockMovementType.ManualDecrease or StockMovementType.InventoryDecrease or StockMovementType.Sale;
 }

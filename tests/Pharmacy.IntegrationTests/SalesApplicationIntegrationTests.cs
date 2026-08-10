@@ -476,7 +476,7 @@ public sealed class SalesApplicationIntegrationTests
             TestCancellation);
 
         Assert.True(result.IsFailure);
-        Assert.Equal("sales.draft.empty", result.Error.Code);
+        Assert.Equal("sales.finalization.empty_draft", result.Error.Code);
     }
 
     [Fact]
@@ -490,7 +490,7 @@ public sealed class SalesApplicationIntegrationTests
             TestCancellation);
 
         Assert.True(result.IsFailure);
-        Assert.Equal("sales.finalization.operation_id.invalid", result.Error.Code);
+        Assert.Equal("sales.operation.invalid", result.Error.Code);
     }
 
     [Fact]
@@ -537,7 +537,7 @@ public sealed class SalesApplicationIntegrationTests
 
         Assert.True(first.IsSuccess);
         Assert.True(reused.IsFailure);
-        Assert.Equal("sales.finalization.operation_conflict", reused.Error.Code);
+        Assert.Equal("sales.operation.conflict", reused.Error.Code);
     }
 
     [Fact]
@@ -564,7 +564,7 @@ public sealed class SalesApplicationIntegrationTests
             TestCancellation);
 
         Assert.True(result.IsFailure);
-        Assert.Equal("sales.finalization.operation_conflict", result.Error.Code);
+        Assert.Equal("sales.operation.conflict", result.Error.Code);
     }
 
     [Fact]

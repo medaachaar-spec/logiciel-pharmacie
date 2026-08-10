@@ -100,8 +100,9 @@ public sealed class InventoryCoreTests
         Assert.True(StockMovementType.PurchaseReceipt.IsIncrease());
         Assert.True(StockMovementType.ManualDecrease.IsDecrease());
         Assert.True(StockMovementType.InventoryDecrease.IsDecrease());
+        Assert.True(StockMovementType.Sale.IsDecrease());
         Assert.False(StockMovementType.ManualIncrease.IsDecrease());
-        Assert.Equal(6, Enum.GetValues<StockMovementType>().Length);
+        Assert.Equal(7, Enum.GetValues<StockMovementType>().Length);
     }
 
     [Fact]

@@ -2,7 +2,7 @@
 
 Date : 2026-08-03
 
-Statut : `IMPLEMENTED — AUTOMATED CHECKS PASS — MANUAL REGRESSION REVIEW REQUIRED`
+Statut historique Sprint 7 : `SUPERSEDED FOR FINALIZATION BY SALES_FINALIZATION_V0.1`
 
 ## 1. Objectif
 
@@ -86,9 +86,9 @@ L’empreinte structurelle inclut `SaleDraftId`, version, produits triés, quant
 - `sales.product.not_sellable` ;
 - `sales.product_code.invalid` ;
 - `sales.stock.insufficient_availability` ;
-- `sales.draft.empty` ;
-- `sales.finalization.operation_id.invalid` ;
-- `sales.finalization.operation_conflict`.
+- `sales.finalization.empty_draft` ;
+- `sales.operation.invalid` ;
+- `sales.operation.conflict`.
 
 Les erreurs Domain sont propagées sans perdre leur code.
 
@@ -98,4 +98,4 @@ Tous les handlers et contrats susceptibles d’atteindre une frontière techniqu
 
 ## 13. Limites et suite
 
-Cette version ne traite ni persistance, transaction SQL, réservation, lot, FEFO, paiement, caisse, client, audit, impression ou finalisation réelle. Le prochain sprint pourra connecter progressivement le POS aux handlers, après validation dédiée, sans lui donner accès aux classes Infrastructure.
+Ces limites décrivent la livraison Sprint 7. La finalisation, la transaction SQL, FEFO, les paiements et les lectures de ventes sont désormais définis dans `SALES_FINALIZATION_V0.1.md`. Caisse, client, audit métier, retour/annulation et impression réelle restent hors périmètre.

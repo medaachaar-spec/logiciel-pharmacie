@@ -139,7 +139,7 @@ public sealed class PersistenceArchitectureTests
     }
 
     [Fact]
-    public void ModelContainsOnlyTheConfirmedCatalogInventoryAndPurchasingTables()
+    public void ModelContainsOnlyTheConfirmedCatalogInventoryPurchasingAndSalesTables()
     {
         using var context = CreateModelContext();
         var tables = context.Model.GetEntityTypes()
@@ -165,7 +165,12 @@ public sealed class PersistenceArchitectureTests
                 "purchasing.GoodsReceipts",
                 "purchasing.PurchaseOrderLines",
                 "purchasing.PurchaseOrders",
-                "purchasing.Suppliers"
+                "purchasing.Suppliers",
+                "sales.Payments",
+                "sales.SaleLineAllocations",
+                "sales.SaleLines",
+                "sales.SaleOperations",
+                "sales.Sales"
             },
             tables);
         Assert.All(context.Model.GetEntityTypes(), entity => Assert.False(entity.ClrType.IsPublic));
@@ -263,7 +268,8 @@ public sealed class PersistenceArchitectureTests
             typeof(ISaleDraftStore),
             typeof(ISaleDraftIdGenerator),
             typeof(ISaleFinalizationPreparationStore),
-            typeof(ISaleFinalizer)
+            typeof(ISaleFinalizer),
+            typeof(ISalesReader)
         };
         var implementations = typeof(Pharmacy.Infrastructure.AssemblyMarker).Assembly
             .GetTypes()
@@ -274,6 +280,10 @@ public sealed class PersistenceArchitectureTests
             implementation.FullName == "Pharmacy.Infrastructure.Catalog.SqlProductCatalogReader");
         Assert.Contains(implementations, implementation =>
             implementation.FullName == "Pharmacy.Infrastructure.Inventory.SqlInventoryStockAvailabilityReader");
+        Assert.Contains(implementations, implementation =>
+            implementation.FullName == "Pharmacy.Infrastructure.Sales.SqlSaleFinalizer");
+        Assert.Contains(implementations, implementation =>
+            implementation.FullName == "Pharmacy.Infrastructure.Sales.SqlSalesReader");
 
         var composition = File.ReadAllText(PathAt(
             "src",
@@ -284,8 +294,15 @@ public sealed class PersistenceArchitectureTests
         Assert.DoesNotContain("SyntheticCatalogStockAvailabilityReader", composition, StringComparison.Ordinal);
         Assert.DoesNotContain("InMemoryProductCatalogReader", composition, StringComparison.Ordinal);
         Assert.DoesNotContain("InMemoryStockAvailabilityReader", composition, StringComparison.Ordinal);
-        Assert.DoesNotContain(implementations, implementation =>
-            !implementation.IsAbstract && typeof(ISaleFinalizer).IsAssignableFrom(implementation));
+        Assert.Contains("AddSqlSalesAdapters", composition, StringComparison.Ordinal);
+
+        var finalizer = File.ReadAllText(PathAt(
+            "src", "Pharmacy.Infrastructure", "Sales", "SqlSaleFinalizer.cs"));
+        var failures = File.ReadAllText(PathAt(
+            "src", "Pharmacy.Infrastructure", "Sales", "SalesSqlFailure.cs"));
+        Assert.Contains("IsolationLevel.Serializable", finalizer, StringComparison.Ordinal);
+        Assert.Contains("StockConcurrencyConflict", finalizer, StringComparison.Ordinal);
+        Assert.Contains("1205 or 1222 or 3960", failures, StringComparison.Ordinal);
     }
 
     private static PharmacyDbContext CreateModelContext()

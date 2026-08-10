@@ -130,3 +130,12 @@ Figma n’est pas obligatoire. Le prototype frontend sera construit directement 
 - La finalisation Purchasing étend le journal Inventory avec `PurchaseReceipt` et réalise réception, lot, mouvement, balance et commande dans une transaction Serializable. Les commandes confirmées seules n’ont aucun effet stock.
 - L’idempotence repose sur `OperationId` et une empreinte SHA-256 normalisée ; les identifiants techniques dérivés des lots/mouvements sont déterministes. Les conflits métier ou `rowversion` ne sont pas rejoués aveuglément.
 - Le seed/clear Purchasing est ciblé sur `DEMO-S12-*`, inverse uniquement son propre mouvement Stock et ne supprime aucun produit Catalogue ou stock extérieur au seed.
+
+## Décisions techniques locales — Sprint 13
+
+- Une différence entre le prix snapshot du brouillon et le prix Catalogue courant bloque la finalisation avec `sales.price.changed` ; le finalizer ne reprix pas silencieusement le panier.
+- Les ventes finalisées sont immuables en V0.1 et n’exposent donc pas de `rowversion`. Toute correction future passera par une opération inverse, jamais par une modification de l’historique.
+- Une ligne Sales peut consommer plusieurs balances/lots. FEFO classe les dates croissantes, puis les lots sans date et enfin les identifiants techniques ; un lot expiré reste visible mais n’est jamais alloué.
+- L’idempotence persiste une empreinte SHA-256 couvrant brouillon, snapshots et paiement. Même opération équivalente recharge la vente ; un sens différent est un conflit explicite.
+- Les espèces persistent montant reçu et monnaie ; la carte ne conserve qu’un paiement externe confirmé. Paiement mixte, PAN, CVV/CVC et autres données carte restent hors périmètre.
+- Le rollback technique de `SalesPersistenceV01` restitue les quantités des mouvements `Sale` avant de retirer ces mouvements et le schéma Sales, afin de revenir à un état Sprint 12 réconcilié.

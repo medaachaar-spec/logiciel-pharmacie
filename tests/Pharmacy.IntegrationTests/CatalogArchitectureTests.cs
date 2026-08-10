@@ -115,7 +115,7 @@ public sealed class CatalogArchitectureTests
         Assert.Contains("Catalog.IsBusy", page, StringComparison.Ordinal);
         Assert.Contains("Aucun fallback", diagnostic, StringComparison.Ordinal);
         Assert.Contains("Catalogue SQL", pos, StringComparison.Ordinal);
-        Assert.Contains("vente n’est pas persistée", pos, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Ventes SQL V0.1", pos, StringComparison.Ordinal);
     }
 
     [Fact]

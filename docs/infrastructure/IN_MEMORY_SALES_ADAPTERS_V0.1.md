@@ -2,7 +2,7 @@
 
 Date : 2026-08-03
 
-Statut : `TEMPORARY IN-MEMORY ADAPTERS — AUTOMATED CHECKS PASS`
+Statut : `PARTIALLY SUPERSEDED — DRAFT/PREPARATION STATE ONLY`
 
 ## 1. Objectif
 
@@ -45,7 +45,7 @@ Le générateur crée un `Guid` avec `Guid.NewGuid()` puis le valide comme `Sale
 
 ## 7. InMemorySaleFinalizationPreparationStore
 
-Le store associe un `OperationId` à un snapshot de préparation immuable sous verrou. Une empreinte équivalente retourne l’instance déjà enregistrée. Une empreinte différente sous le même identifiant retourne `sales.finalization.operation_conflict`.
+Le store associe un `OperationId` à un snapshot de préparation immuable sous verrou. Une empreinte équivalente retourne l’instance déjà enregistrée. Une empreinte différente sous le même identifiant retourne `sales.operation.conflict`.
 
 Aucune référence au brouillon mutable n’est stockée et aucune vente n’est finalisée.
 
@@ -59,4 +59,4 @@ Aucun EF Core, `DbContext`, SQL, migration, chaîne de connexion, API HTTP, serv
 
 ## 10. Remplacement futur
 
-Ces adaptateurs seront remplacés derrière les mêmes contrats par des implémentations autorisées lors d’un sprint de persistance. Leur contenu ne doit jamais être utilisé comme migration, seed de production ou source de données réelle.
+Le Desktop compose désormais le Catalogue, la disponibilité, la finalisation et la lecture des ventes avec les adaptateurs SQL. Seuls le store/générateur de brouillons et le store de préparations restent en mémoire ; les anciens lecteurs synthétiques sont conservés pour les tests et ne doivent jamais servir de fallback. Leur contenu ne doit jamais être utilisé comme migration, seed de production ou source de données réelle.

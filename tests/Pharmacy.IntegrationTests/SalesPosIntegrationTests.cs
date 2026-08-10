@@ -5,6 +5,8 @@ using Pharmacy.Application.Sales.Catalog.Queries;
 using Pharmacy.Application.Sales.Contracts;
 using Pharmacy.Application.Sales.Drafts.Commands;
 using Pharmacy.Application.Sales.Drafts.Queries;
+using Pharmacy.Application.Sales.Finalization.Commands;
+using Pharmacy.Application.Sales.Finalization.Queries;
 using Pharmacy.Application.Sales.Models;
 using Pharmacy.Desktop.Components.Pos;
 using Pharmacy.Domain.Common;
@@ -359,13 +361,15 @@ public sealed class SalesPosIntegrationTests
         fixture.Coordinator.SelectPaymentMethod(DemoPaymentMethod.Cash);
         fixture.Coordinator.SetReceivedAmount(fixture.Coordinator.Total + 5m);
         Assert.True(fixture.Coordinator.TryBeginCompletion());
-        var completed = fixture.Coordinator.CompleteSale();
+        Assert.True(await fixture.Coordinator.FinalizeSaleAsync(TestCancellation));
+        var completed = Assert.IsType<SalesPosCompletedSale>(fixture.Coordinator.Result);
 
         Assert.Equal(view!.Total, completed.Total);
         Assert.Equal(view.TotalQuantity, completed.ItemCount);
         Assert.Equal(view.LineCount, completed.LineCount);
-        Assert.Equal(view.Lines, completed.Lines);
+        Assert.Equal(view.Lines.Select(line => line.ProductId), completed.Lines.Select(line => line.ProductId));
         Assert.Equal(5m, completed.Change);
+        Assert.StartsWith("VTE-", completed.Reference, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -377,15 +381,17 @@ public sealed class SalesPosIntegrationTests
         fixture.Coordinator.BeginPayment();
         fixture.Coordinator.SelectPaymentMethod(DemoPaymentMethod.Cash);
         fixture.Coordinator.SetReceivedAmount(fixture.Coordinator.Total);
-        fixture.Coordinator.TryBeginCompletion();
-        fixture.Coordinator.CompleteSale();
         var oldDraftId = fixture.Coordinator.CurrentDraft!.Id;
+        fixture.Coordinator.TryBeginCompletion();
+        Assert.True(await fixture.Coordinator.FinalizeSaleAsync(TestCancellation));
+        var preparedDraftId = fixture.Coordinator.CurrentDraft!.Id;
+        Assert.NotEqual(oldDraftId, preparedDraftId);
         Assert.True(fixture.Coordinator.TryBeginTicketPrint());
         Assert.True(fixture.Coordinator.CompleteTicketPrint(DemoPrintSimulationOutcome.Failure));
 
         Assert.True(await fixture.Coordinator.StartNewDraftAsync(TestCancellation));
 
-        Assert.NotEqual(oldDraftId, fixture.Coordinator.CurrentDraft!.Id);
+        Assert.Equal(preparedDraftId, fixture.Coordinator.CurrentDraft!.Id);
         Assert.True(fixture.Coordinator.CurrentDraft.IsEmpty);
         Assert.Null(fixture.Coordinator.Result);
         Assert.Equal(DemoPaymentMethod.None, fixture.Coordinator.PaymentMethod);
@@ -393,7 +399,7 @@ public sealed class SalesPosIntegrationTests
     }
 
     [Fact]
-    public void CoordinatorHasNoSaleFinalizerOrPreparationDependency()
+    public void CoordinatorUsesApplicationFinalizationHandlerWithoutInfrastructureContractAccess()
     {
         var dependencies = typeof(SalesPosCoordinator)
             .GetConstructors(BindingFlags.Public | BindingFlags.Instance)
@@ -403,6 +409,7 @@ public sealed class SalesPosIntegrationTests
 
         Assert.DoesNotContain(typeof(ISaleFinalizer), dependencies);
         Assert.DoesNotContain(typeof(Pharmacy.Application.Sales.Finalization.Commands.PrepareSaleFinalizationHandler), dependencies);
+        Assert.Contains(typeof(FinalizeSaleHandler), dependencies);
     }
 
     [Fact]
@@ -416,6 +423,9 @@ public sealed class SalesPosIntegrationTests
         Assert.Contains("AddTransient<SearchSellableProductsHandler>", source, StringComparison.Ordinal);
         Assert.Contains("AddTransient<SearchCatalogProductsHandler>", source, StringComparison.Ordinal);
         Assert.Contains("AddTransient<PrepareSaleFinalizationHandler>", source, StringComparison.Ordinal);
+        Assert.Contains("AddSqlSalesAdapters", source, StringComparison.Ordinal);
+        Assert.Contains("AddTransient<FinalizeSaleHandler>", source, StringComparison.Ordinal);
+        Assert.Contains("AddTransient<GetRecentSalesHandler>", source, StringComparison.Ordinal);
         Assert.Contains("AddScoped<SalesPosCoordinator>", source, StringComparison.Ordinal);
         Assert.DoesNotContain("AddSingleton<ISaleFinalizer", source, StringComparison.Ordinal);
     }
@@ -430,7 +440,7 @@ public sealed class SalesPosIntegrationTests
         var page = DesktopText("Components", "Pages", "DemoPosPage.razor");
 
         Assert.Contains("@inject SalesPosCoordinator", page, StringComparison.Ordinal);
-        Assert.Contains("Mode démonstration — Catalogue et Stock SQL", page, StringComparison.Ordinal);
+        Assert.Contains("Ventes SQL V0.1 — suspensions encore locales", page, StringComparison.Ordinal);
         Assert.All(razorSources, source =>
         {
             Assert.DoesNotContain("new InMemory", source, StringComparison.Ordinal);
@@ -555,6 +565,11 @@ public sealed class SalesPosIntegrationTests
             var store = new InMemorySaleDraftStore();
             var catalog = new InMemoryProductCatalogReader();
             var availability = stock ?? new InMemoryStockAvailabilityReader();
+            var persistence = new StubSalesPersistence();
+            var preparation = new PrepareSaleFinalizationHandler(
+                store,
+                availability,
+                new InMemorySaleFinalizationPreparationStore());
             var coordinator = new SalesPosCoordinator(
                 new CreateSaleDraftHandler(new InMemorySaleDraftIdGenerator(), store),
                 new SearchSellableProductsHandler(catalog, availability),
@@ -564,8 +579,100 @@ public sealed class SalesPosIntegrationTests
                 new RemoveSaleItemHandler(store),
                 new ClearSaleDraftHandler(store),
                 new GetSaleDraftHandler(store),
+                new FinalizeSaleHandler(preparation, persistence),
+                new GetRecentSalesHandler(persistence),
                 new DemoTicketPrintService());
             return new Fixture(store, catalog, availability, coordinator);
+        }
+    }
+
+    private sealed class StubSalesPersistence : ISaleFinalizer, ISalesReader
+    {
+        private readonly Dictionary<Guid, FinalizedSaleView> salesByOperation = new();
+        private long nextSaleId;
+
+        public Task<Result<FinalizedSaleView>> FinalizeAsync(
+            FinalizeSaleRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            if (salesByOperation.TryGetValue(request.Preparation.OperationId, out var replay))
+            {
+                return Task.FromResult(Result<FinalizedSaleView>.Success(replay));
+            }
+
+            var saleId = Interlocked.Increment(ref nextSaleId);
+            var completedAt = new DateTime(2026, 8, 10, 12, 0, 0, DateTimeKind.Utc).AddSeconds(saleId);
+            var lines = request.Preparation.Lines.Select((line, lineIndex) =>
+                new FinalizedSaleLineView(
+                    lineIndex + 1,
+                    line.ProductId,
+                    line.Reference,
+                    line.DisplayName,
+                    line.Presentation,
+                    line.UnitPrice,
+                    line.Quantity,
+                    line.Subtotal,
+                    new[]
+                    {
+                        new SaleAllocationView(
+                            lineIndex + 1,
+                            lineIndex + 1,
+                            null,
+                            null,
+                            null,
+                            line.Quantity.Value)
+                    }));
+            var payment = new SalePaymentView(
+                saleId,
+                request.Payment.Method,
+                Money.Create(request.Payment.Amount).Value,
+                request.Payment.TenderedAmount,
+                request.Payment.ChangeGiven,
+                request.Payment.ExternalCardConfirmed,
+                completedAt);
+            var sale = new FinalizedSaleView(
+                saleId,
+                $"VTE-TEST-{saleId:0000}",
+                request.Preparation.OperationId,
+                completedAt,
+                request.Preparation.Total,
+                request.Preparation.TotalQuantity,
+                lines,
+                payment);
+            salesByOperation.Add(request.Preparation.OperationId, sale);
+            return Task.FromResult(Result<FinalizedSaleView>.Success(sale));
+        }
+
+        public Task<Result<FinalizedSaleView>> GetByIdAsync(
+            long saleId,
+            CancellationToken cancellationToken = default)
+        {
+            var sale = salesByOperation.Values.SingleOrDefault(candidate => candidate.SaleId == saleId);
+            return Task.FromResult(sale is null
+                ? Result<FinalizedSaleView>.Failure(
+                    new Error("sales.sale.not_found", "Vente introuvable."))
+                : Result<FinalizedSaleView>.Success(sale));
+        }
+
+        public Task<Result<IReadOnlyList<FinalizedSaleSummaryView>>> GetRecentAsync(
+            int limit,
+            CancellationToken cancellationToken = default)
+        {
+            var rows = salesByOperation.Values
+                .OrderByDescending(sale => sale.CompletedAtUtc)
+                .Take(limit)
+                .Select(sale => new FinalizedSaleSummaryView(
+                    sale.SaleId,
+                    sale.Reference,
+                    sale.CompletedAtUtc,
+                    sale.LineCount,
+                    sale.TotalQuantity,
+                    sale.Total,
+                    sale.Payment.Method,
+                    sale.Status))
+                .ToArray();
+            return Task.FromResult(Result<IReadOnlyList<FinalizedSaleSummaryView>>.Success(
+                Array.AsReadOnly(rows)));
         }
     }
 

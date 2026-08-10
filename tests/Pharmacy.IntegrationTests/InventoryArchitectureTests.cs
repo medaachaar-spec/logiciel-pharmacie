@@ -127,7 +127,7 @@ public sealed class InventoryArchitectureTests
     }
 
     [Fact]
-    public void PosUsesSqlAvailabilityAndExplicitlyDoesNotConsumeStock()
+    public void PosUsesSqlAvailabilityAndSaleFinalizationConsumesStockThroughInfrastructure()
     {
         var composition = File.ReadAllText(PathAt("src", "Pharmacy.Infrastructure", "Inventory", "InventoryServiceCollectionExtensions.cs"));
         var adapter = File.ReadAllText(PathAt("src", "Pharmacy.Infrastructure", "Inventory", "SqlInventoryStockAvailabilityReader.cs"));
@@ -135,7 +135,7 @@ public sealed class InventoryArchitectureTests
 
         Assert.Contains("IStockAvailabilityReader, SqlInventoryStockAvailabilityReader", composition, StringComparison.Ordinal);
         Assert.Contains("balance.StockBatch.ExpiryDate >= currentDate", adapter, StringComparison.Ordinal);
-        Assert.Contains("stock n’est pas consommé", pos, StringComparison.Ordinal);
+        Assert.Contains("allocations FEFO", pos, StringComparison.Ordinal);
         Assert.DoesNotContain("RecordMovement", pos, StringComparison.Ordinal);
     }
 

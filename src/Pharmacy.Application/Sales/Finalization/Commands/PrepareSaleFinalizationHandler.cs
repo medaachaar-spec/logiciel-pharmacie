@@ -71,16 +71,16 @@ public sealed class PrepareSaleFinalizationHandler
 
             if (availabilityResult.IsFailure)
             {
-                return Result<SaleFinalizationPreparation>.Failure(availabilityResult.Error);
+                return Result<SaleFinalizationPreparation>.Failure(
+                    availabilityResult.Error.Code.EndsWith("database.unavailable", StringComparison.Ordinal)
+                        ? SalesApplicationErrors.DatabaseUnavailable
+                        : availabilityResult.Error);
             }
 
             if (!availabilityResult.Value.IsAvailable)
             {
                 return Result<SaleFinalizationPreparation>.Failure(
-                    SalesApplicationErrors.InsufficientAvailability(
-                        line.ProductId,
-                        line.Quantity.Value,
-                        availabilityResult.Value.AvailableQuantity));
+                    SalesApplicationErrors.StockInsufficient);
             }
         }
 

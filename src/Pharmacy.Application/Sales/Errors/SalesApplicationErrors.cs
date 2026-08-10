@@ -56,14 +56,46 @@ public static class SalesApplicationErrors
     }
 
     public static Error DraftEmpty { get; } = new(
-        "sales.draft.empty",
+        "sales.finalization.empty_draft",
         "Un brouillon vide ne peut pas être préparé pour finalisation.");
 
     public static Error InvalidOperationId { get; } = new(
-        "sales.finalization.operation_id.invalid",
+        "sales.operation.invalid",
         "L’identifiant d’opération de finalisation ne peut pas être vide.");
 
     public static Error OperationConflict { get; } = new(
-        "sales.finalization.operation_conflict",
+        "sales.operation.conflict",
         "Cet identifiant d’opération est déjà associé à une préparation différente.");
+
+    public static Error StockInsufficient { get; } = new(
+        "sales.stock.insufficient",
+        "Le stock vendable est insuffisant pour finaliser cette vente.");
+
+    public static Error StockConcurrencyConflict { get; } = new(
+        "sales.stock.concurrency_conflict",
+        "Le stock a changé pendant la finalisation. La vente n’a pas été enregistrée.");
+
+    public static Error PriceChanged { get; } = new(
+        "sales.price.changed",
+        "Un prix a changé depuis l’ajout au panier. Actualisez le panier avant de réessayer.");
+
+    public static Error PaymentInvalid { get; } = new(
+        "sales.payment.invalid",
+        "Le paiement ne couvre pas exactement les règles de cette vente.");
+
+    public static Error CardUnconfirmed { get; } = new(
+        "sales.payment.card_unconfirmed",
+        "Le paiement carte doit être confirmé sur le TPE externe avant la finalisation.");
+
+    public static Error DatabaseUnavailable { get; } = new(
+        "sales.database.unavailable",
+        "Le service de données local est indisponible. Le panier a été conservé.");
+
+    public static Error SaleNotFound { get; } = new(
+        "sales.sale.not_found",
+        "La vente finalisée demandée est introuvable.");
+
+    public static Error InvalidSaleQuery { get; } = new(
+        "sales.sale.query.invalid",
+        "La demande de consultation des ventes est invalide.");
 }

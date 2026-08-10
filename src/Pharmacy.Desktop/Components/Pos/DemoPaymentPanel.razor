@@ -4,7 +4,7 @@
     <header class="pos-panel__header">
         <div>
             <p class="pos-kicker">Étape de règlement</p>
-            <h2 id="demo-payment-title">Paiement de démonstration</h2>
+            <h2 id="demo-payment-title">Paiement de la vente</h2>
         </div>
         <strong class="pos-payment__total">@DemoMoney.Format(Session.Total)</strong>
     </header>
@@ -29,7 +29,7 @@
                    checked="@(Session.PaymentMethod == DemoPaymentMethod.ExternalCard)"
                    @onchange="SelectCard" />
             <span>
-                <strong>Carte — TPE externe simulé</strong>
+                <strong>Carte — TPE externe</strong>
                 <small>Vérification opérateur sans saisie bancaire</small>
             </span>
         </label>
@@ -74,7 +74,7 @@
         <div class="pos-payment-detail pos-terminal-state">
             <UiAlert Title="TPE externe — aucune donnée de carte n’est saisie dans le logiciel"
                      Variant="UiAlertVariant.Information">
-                Le terminal est simulé et reste entièrement hors du logiciel. Aucun résultat n’est déduit automatiquement.
+                Le terminal reste entièrement hors du logiciel. Le résultat est confirmé manuellement par l’opérateur et aucune donnée bancaire n’est collectée.
             </UiAlert>
 
             <div class="pos-terminal-state__header">
@@ -85,7 +85,7 @@
             @if (Session.CardPaymentStatus == DemoCardPaymentStatus.NotStarted)
             {
                 <UiButton OnClick="StartCardVerificationAsync">
-                    Lancer la vérification TPE simulée
+                    Déclarer la vérification du TPE
                 </UiButton>
             }
             else if (Session.CardPaymentStatus == DemoCardPaymentStatus.AwaitingConfirmation)
@@ -137,12 +137,12 @@
                 </UiAlert>
             }
 
-            <small>Vérifications TPE simulées lancées : @Session.CardVerificationCount</small>
+            <small>Vérifications TPE déclarées : @Session.CardVerificationCount</small>
         </div>
     }
     else
     {
-        <p class="pos-payment-placeholder">Sélectionnez Espèces ou Carte — TPE externe simulé.</p>
+        <p class="pos-payment-placeholder">Sélectionnez Espèces ou Carte — TPE externe.</p>
     }
 
     <footer class="pos-payment__actions">
@@ -154,9 +154,9 @@
         <UiButton Size="UiButtonSize.Large"
                   Disabled="@(!Session.CanComplete || IsCompleting)"
                   IsLoading="@IsCompleting"
-                  LoadingText="Validation locale en cours"
+                  LoadingText="Commit SQL en cours"
                   OnClick="ConfirmAsync">
-            Confirmer la vente de démonstration
+            Confirmer et enregistrer la vente
         </UiButton>
     </footer>
 </section>

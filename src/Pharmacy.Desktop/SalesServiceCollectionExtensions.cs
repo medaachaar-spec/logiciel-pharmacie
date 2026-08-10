@@ -10,6 +10,7 @@ using Pharmacy.Application.Sales.Contracts;
 using Pharmacy.Application.Sales.Drafts.Commands;
 using Pharmacy.Application.Sales.Drafts.Queries;
 using Pharmacy.Application.Sales.Finalization.Commands;
+using Pharmacy.Application.Sales.Finalization.Queries;
 using Pharmacy.Desktop.Components.Pos;
 using Pharmacy.Desktop.Components.Catalog;
 using Pharmacy.Desktop.Components.Inventory;
@@ -18,6 +19,7 @@ using Pharmacy.Infrastructure.Catalog;
 using Pharmacy.Infrastructure.Inventory;
 using Pharmacy.Infrastructure.Purchasing;
 using Pharmacy.Infrastructure.Sales.InMemory;
+using Pharmacy.Infrastructure.Sales;
 
 namespace Pharmacy.Desktop;
 
@@ -30,6 +32,7 @@ public static class SalesServiceCollectionExtensions
         services.AddSqlCatalogAdaptersFromEnvironment();
         services.AddSqlInventoryAdapters();
         services.AddSqlPurchasingAdapters();
+        services.AddSqlSalesAdapters();
         services.AddSingleton<ISaleDraftStore, InMemorySaleDraftStore>();
         services.AddSingleton<ISaleDraftIdGenerator, InMemorySaleDraftIdGenerator>();
         services.AddSingleton<ISaleFinalizationPreparationStore, InMemorySaleFinalizationPreparationStore>();
@@ -44,6 +47,9 @@ public static class SalesServiceCollectionExtensions
         services.AddTransient<RemoveSaleItemHandler>();
         services.AddTransient<ClearSaleDraftHandler>();
         services.AddTransient<PrepareSaleFinalizationHandler>();
+        services.AddTransient<FinalizeSaleHandler>();
+        services.AddTransient<GetSaleByIdHandler>();
+        services.AddTransient<GetRecentSalesHandler>();
 
         services.AddTransient<SearchCatalogProductsHandler>();
         services.AddTransient<GetCatalogProductByIdHandler>();

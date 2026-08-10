@@ -1,8 +1,8 @@
 <section class="pos-success" aria-labelledby="demo-success-title">
     <div class="pos-success__mark" aria-hidden="true">✓</div>
-    <p class="pos-kicker">Parcours local terminé</p>
-    <h2 id="demo-success-title">Vente terminée</h2>
-    <p class="pos-success__reference">Référence en mémoire : <strong>@Result.Reference</strong></p>
+    <p class="pos-kicker">Commit SQL terminé</p>
+    <h2 id="demo-success-title">Vente enregistrée</h2>
+    <p class="pos-success__reference">Référence persistante : <strong>@Result.Reference</strong></p>
 
     <dl class="pos-success__summary">
         <div>
@@ -66,7 +66,7 @@
         {
             <UiAlert Title="Ticket imprimé dans le simulateur"
                      Variant="UiAlertVariant.Success">
-                Aucun périphérique, fichier ou document réel n’a été utilisé.
+                L’impression reste simulée ; la vente SQL n’a pas été recréée.
             </UiAlert>
         }
         else if (Session.PrintStatus == DemoPrintStatus.Failed && !Session.ContinuedWithoutTicket)
@@ -105,10 +105,10 @@
         </dl>
     </section>
 
-    <ul class="pos-success__reminders" aria-label="Limites de cette démonstration">
-        <li>Aucune donnée enregistrée</li>
-        <li>Stock SQL consulté mais non décrémenté</li>
-        <li>Aucun ticket physique produit</li>
+    <ul class="pos-success__reminders" aria-label="Preuves de finalisation et limite d’impression">
+        <li>Vente et paiement SQL enregistrés</li>
+        <li>Stock décrémenté par allocations FEFO</li>
+        <li>Ticket physique non intégré</li>
     </ul>
 
     <div class="pos-success__actions">
@@ -142,7 +142,7 @@
     private string PaymentLabel => Result.PaymentMethod switch
     {
         DemoPaymentMethod.Cash => "Espèces",
-        DemoPaymentMethod.ExternalCard => "Carte — TPE externe simulé",
+        DemoPaymentMethod.ExternalCard => "Carte — TPE externe confirmé",
         _ => "Non défini"
     };
 

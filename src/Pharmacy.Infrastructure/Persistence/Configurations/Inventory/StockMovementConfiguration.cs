@@ -18,7 +18,7 @@ internal sealed class StockMovementConfiguration : IEntityTypeConfiguration<Stoc
             table.HasCheckConstraint(
                 "CK_inventory_StockMovements_Direction",
                 "(([MovementType] IN (N'Opening', N'ManualIncrease', N'InventoryIncrease', N'PurchaseReceipt') AND [QuantityAfter] = [QuantityBefore] + [Quantity]) OR " +
-                "([MovementType] IN (N'ManualDecrease', N'InventoryDecrease') AND [QuantityAfter] = [QuantityBefore] - [Quantity]))");
+                "([MovementType] IN (N'ManualDecrease', N'InventoryDecrease', N'Sale') AND [QuantityAfter] = [QuantityBefore] - [Quantity]))");
         });
         builder.HasKey(entity => entity.Id).HasName("PK_inventory_StockMovements");
         builder.Property(entity => entity.Id).UseIdentityColumn();

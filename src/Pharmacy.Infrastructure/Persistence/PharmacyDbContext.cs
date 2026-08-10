@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Pharmacy.Infrastructure.Persistence.Entities.Catalog;
 using Pharmacy.Infrastructure.Persistence.Entities.Inventory;
 using Pharmacy.Infrastructure.Persistence.Entities.Purchasing;
+using Pharmacy.Infrastructure.Persistence.Entities.Sales;
 
 namespace Pharmacy.Infrastructure.Persistence;
 
@@ -40,6 +41,11 @@ public sealed class PharmacyDbContext : DbContext
     internal DbSet<GoodsReceiptEntity> GoodsReceipts => Set<GoodsReceiptEntity>();
     internal DbSet<GoodsReceiptLineEntity> GoodsReceiptLines => Set<GoodsReceiptLineEntity>();
 
+    internal DbSet<SaleEntity> Sales => Set<SaleEntity>();
+    internal DbSet<SaleLineEntity> SaleLines => Set<SaleLineEntity>();
+    internal DbSet<SaleLineAllocationEntity> SaleLineAllocations => Set<SaleLineAllocationEntity>();
+    internal DbSet<PaymentEntity> Payments => Set<PaymentEntity>();
+    internal DbSet<SaleOperationEntity> SaleOperations => Set<SaleOperationEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

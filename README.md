@@ -43,9 +43,9 @@ dotnet test .\Pharmacy.slnx -c Debug --no-build
 dotnet run --project .\src\Pharmacy.Desktop\Pharmacy.Desktop.csproj -c Debug
 ```
 
-Après le lancement, l’application ouvre l’accueil du shell V0.1. `Ventes`, `Catalogue`, `Stock` et `Achats et réceptions` sont fonctionnels ; quatre autres domaines restent provisoires. Catalogue, Stock et Purchasing utilisent SQL Server, tandis que la vente, le paiement et l’impression restent non persistés/simulés.
+Après le lancement, l’application ouvre l’accueil du shell V0.1. `Ventes`, `Catalogue`, `Stock` et `Achats et réceptions` sont fonctionnels ; quatre autres domaines restent provisoires. Catalogue, Stock, Purchasing, ventes, paiements et sorties de stock utilisent SQL Server. Les brouillons/suspensions et l’impression restent locaux au Desktop.
 
-Le POS V0.2 conserve le parcours nominal V0.1 et ajoute les incidents de code inconnu/disponibilité, la suspension et la reprise contrôlée de paniers, l’abandon du brouillon, la machine d’états du TPE ambigu et une impression post-vente entièrement simulée. Tous les montants sont calculés avec `decimal` ; aucune donnée bancaire ou réelle n’est collectée, aucune donnée n’est persistée, aucun stock n’est modifié et aucun ticket réel n’est produit. Les spécifications et limites sont documentées dans `docs/ux/POS_V0.1.md` et `docs/ux/POS_V0.2_CONTINUITY.md`.
+Le POS conserve les incidents de code inconnu/disponibilité, la suspension et la reprise contrôlée de paniers, l’abandon du brouillon, la machine d’états du TPE ambigu et l’impression simulée. Depuis le Sprint 13, la validation persiste atomiquement vente, snapshots, paiement, allocations FEFO et mouvements de sortie, puis décrémente les balances. Tous les montants sont `decimal` et aucune donnée bancaire ou réelle n’est collectée. Les brouillons/suspensions et le ticket restent non persistés.
 
 Le Sprint 6 ajoute un noyau Sales V0.1 indépendant dans `Pharmacy.Domain` (`Money`, identifiants typés, quantité entière, snapshot produit, ligne immuable et agrégat `SaleDraft`) ainsi que trois contrats non implémentés dans `Pharmacy.Application`. Ce noyau n’est pas connecté au POS synthétique : il ne persiste rien, ne finalise aucune vente et ne traite ni stock, lot, paiement, caisse, audit ou impression. Sa conception est décrite dans `docs/domain/SALES_CORE_V0.1.md`.
 
@@ -57,10 +57,12 @@ Le Sprint 9 ajoute `Persistence Foundation V0.1` dans Infrastructure avec EF Cor
 
 Le Sprint 10 rend le Catalogue réellement persistant. La migration minimale `CatalogPersistenceEnhancementsV01` ajoute l’activation globale manquante à `catalog.Products`. Les recherches du POS utilisent désormais `SqlProductCatalogReader` pour le nom, la présentation, la référence interne et les barcodes actifs ; les prix viennent de SQL Server. La page `/module/catalog` gère produits, catégories, activation, barcodes, prix et historique avec concurrence `rowversion`.
 
-Le Sprint 11 ajoute le moteur Inventory SQL V0.1 : six tables pour emplacements, lots, balances, mouvements et inventaires, plus les contrats/handlers Domain et Application. La page `/module/inventory` expose recherche, filtres, lots expirés, historique, ajustements et comptages. Le POS lit désormais la disponibilité SQL et exclut les lots expirés ; une vente simulée ne réserve ni ne décrémente le stock. La migration `InventoryPersistenceV01` reste manuelle et aucune connexion n’est versionnée.
-
+Le Sprint 11 ajoute le moteur Inventory SQL V0.1 : six tables pour emplacements, lots, balances, mouvements et inventaires, plus les contrats/handlers Domain et Application. La page `/module/inventory` expose recherche, filtres, lots expirés, historique, ajustements et comptages. Le POS lit la disponibilité SQL et exclut les lots expirés. Depuis le Sprint 13, une vente finalisée décrémente réellement les balances par allocations FEFO.
 
 Le Sprint 12 ajoute le schéma Purchasing SQL V0.1 avec fournisseurs, commandes, lignes, réceptions et lignes de réception. La page `/module/purchasing` gère fournisseurs, brouillons/confirmations et réceptions partielles, complètes ou directes. Seule la finalisation d’une réception crée lots, mouvements `PurchaseReceipt` et augmentations de balances dans une transaction atomique ; elle ne modifie jamais automatiquement le prix de vente et ne calcule aucune marge. La migration `PurchasingPersistenceV01`, les seeds et les scripts restent manuels.
+
+Le Sprint 13 ajoute le schéma `sales` et la migration `SalesPersistenceV01`. `SqlSaleFinalizer` revalide produits, prix et stock, répartit les quantités par FEFO, exclut les lots expirés et commite en une transaction vente, lignes, allocations, paiement, mouvements `Sale`, balances et registre idempotent. Le POS affiche la référence persistée et un historique SQL minimal ; une panne SQL, un prix changé ou un conflit conserve le panier. L’impression demeure une simulation post-commit.
+
 ### Commandes de persistance contrôlées
 
 La connexion n’est jamais stockée dans le dépôt. Elle doit être fournie temporairement par `PHARMACY_SQLSERVER_CONNECTION` pour les commandes EF ou `PHARMACY_TEST_SQLSERVER_CONNECTION` pour les tests SQL réels.
@@ -115,6 +117,19 @@ sqlcmd -S <instance-explicite> -d Pharmacy_Development -E -C -b -f 65001 `
 ```
 
 Le clear Purchasing retire uniquement les fournisseurs/commandes/réception `DEMO-S12-*` et inverse le mouvement de seed associé. Il refuse une base autre que `Pharmacy_Development` et ne supprime aucun produit Catalogue ni stock non créé par ce seed.
+
+Migration et vérification Sprint 13 :
+
+```powershell
+$env:PHARMACY_SQLSERVER_CONNECTION = '<connexion locale Pharmacy_Development>'
+dotnet tool run dotnet-ef database update `
+  --project .\src\Pharmacy.Infrastructure `
+  --startup-project .\src\Pharmacy.Infrastructure
+sqlcmd -S <instance-explicite> -d Pharmacy_Development -E -C -b -f 65001 `
+  -i .\database\verification\verify_sprint13_sales.sql
+```
+
+La migration ne crée aucune vente. La vérification est en lecture seule et contrôle schéma, contraintes, cohérence des ventes présentes, mouvements `Sale` et balances.
 
 En configuration Debug, le groupe `Développement` donne également accès à :
 

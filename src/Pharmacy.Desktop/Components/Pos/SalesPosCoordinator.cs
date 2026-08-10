@@ -5,6 +5,8 @@ using Pharmacy.Application.Sales.Catalog.Queries;
 using Pharmacy.Application.Sales.Drafts.Commands;
 using Pharmacy.Application.Sales.Drafts.Models;
 using Pharmacy.Application.Sales.Drafts.Queries;
+using Pharmacy.Application.Sales.Finalization.Commands;
+using Pharmacy.Application.Sales.Finalization.Queries;
 using Pharmacy.Application.Sales.Models;
 using Pharmacy.Domain.Common;
 using Pharmacy.Domain.Sales;
@@ -44,33 +46,32 @@ public sealed class SalesPosSuspendedDraft
 
 public sealed class SalesPosCompletedSale
 {
-    public SalesPosCompletedSale(
-        string reference,
-        SaleDraftView draft,
-        DemoPaymentMethod paymentMethod,
-        decimal change)
+    public SalesPosCompletedSale(FinalizedSaleView sale)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(reference);
-        ArgumentNullException.ThrowIfNull(draft);
-
-        Reference = reference;
-        DraftId = draft.Id;
-        DraftVersion = draft.Version;
-        Lines = Array.AsReadOnly(draft.Lines.ToArray());
-        Total = draft.Total;
-        PaymentMethod = paymentMethod;
-        Change = change;
-        ItemCount = draft.TotalQuantity;
-        LineCount = draft.LineCount;
+        ArgumentNullException.ThrowIfNull(sale);
+        SaleId = sale.SaleId;
+        OperationId = sale.OperationId;
+        Reference = sale.Reference;
+        CompletedAtUtc = sale.CompletedAtUtc;
+        Lines = sale.Lines;
+        Total = sale.Total;
+        PaymentMethod = sale.Payment.Method == SalePaymentMethod.Cash
+            ? DemoPaymentMethod.Cash
+            : DemoPaymentMethod.ExternalCard;
+        Change = sale.Payment.ChangeGiven;
+        ItemCount = sale.TotalQuantity;
+        LineCount = sale.LineCount;
     }
+
+    public long SaleId { get; }
+
+    public Guid OperationId { get; }
 
     public string Reference { get; }
 
-    public SaleDraftId DraftId { get; }
+    public DateTime CompletedAtUtc { get; }
 
-    public long DraftVersion { get; }
-
-    public IReadOnlyList<SaleDraftLineView> Lines { get; }
+    public IReadOnlyList<FinalizedSaleLineView> Lines { get; }
 
     public Money Total { get; }
 
@@ -97,17 +98,21 @@ public sealed class SalesPosCoordinator
     private readonly RemoveSaleItemHandler removeItemHandler;
     private readonly ClearSaleDraftHandler clearDraftHandler;
     private readonly GetSaleDraftHandler getDraftHandler;
+    private readonly FinalizeSaleHandler finalizeSaleHandler;
+    private readonly GetRecentSalesHandler getRecentSalesHandler;
     private readonly DemoTicketPrintService ticketPrintService;
     private readonly List<SalesPosSuspendedDraft> suspendedDrafts = new();
     private readonly ReadOnlyCollection<SalesPosSuspendedDraft> readOnlySuspendedDrafts;
     private readonly SemaphoreSlim continuityGate = new(1, 1);
     private IReadOnlyList<SellableProductView> searchResults = Array.Empty<SellableProductView>();
+    private IReadOnlyList<FinalizedSaleSummaryView> recentSales = Array.Empty<FinalizedSaleSummaryView>();
     private int cartMutationInProgress;
     private int searchSequence;
     private int suspensionCounter;
-    private int completedSaleCounter;
     private bool initialized;
     private bool completionInProgress;
+    private bool hasPreparedNextDraft;
+    private Guid pendingOperationId;
 
     public SalesPosCoordinator(
         CreateSaleDraftHandler createDraftHandler,
@@ -118,6 +123,8 @@ public sealed class SalesPosCoordinator
         RemoveSaleItemHandler removeItemHandler,
         ClearSaleDraftHandler clearDraftHandler,
         GetSaleDraftHandler getDraftHandler,
+        FinalizeSaleHandler finalizeSaleHandler,
+        GetRecentSalesHandler getRecentSalesHandler,
         DemoTicketPrintService ticketPrintService)
     {
         this.createDraftHandler = createDraftHandler ?? throw new ArgumentNullException(nameof(createDraftHandler));
@@ -128,6 +135,8 @@ public sealed class SalesPosCoordinator
         this.removeItemHandler = removeItemHandler ?? throw new ArgumentNullException(nameof(removeItemHandler));
         this.clearDraftHandler = clearDraftHandler ?? throw new ArgumentNullException(nameof(clearDraftHandler));
         this.getDraftHandler = getDraftHandler ?? throw new ArgumentNullException(nameof(getDraftHandler));
+        this.finalizeSaleHandler = finalizeSaleHandler ?? throw new ArgumentNullException(nameof(finalizeSaleHandler));
+        this.getRecentSalesHandler = getRecentSalesHandler ?? throw new ArgumentNullException(nameof(getRecentSalesHandler));
         this.ticketPrintService = ticketPrintService ?? throw new ArgumentNullException(nameof(ticketPrintService));
         readOnlySuspendedDrafts = suspendedDrafts.AsReadOnly();
     }
@@ -137,6 +146,8 @@ public sealed class SalesPosCoordinator
     public IReadOnlyList<SellableProductView> SearchResults => searchResults;
 
     public IReadOnlyList<SalesPosSuspendedDraft> SuspendedDrafts => readOnlySuspendedDrafts;
+
+    public IReadOnlyList<FinalizedSaleSummaryView> RecentSales => recentSales;
 
     public SalesPosAvailabilityIncident? AvailabilityIncident { get; private set; }
 
@@ -232,8 +243,13 @@ public sealed class SalesPosCoordinator
                 return false;
             }
 
+            if (!await LoadRecentSalesCoreAsync(cancellationToken))
+            {
+                return false;
+            }
+
             initialized = true;
-            Trace.TraceInformation("Sales POS initialized with SQL catalog and an in-memory Application draft.");
+            Trace.TraceInformation("Sales POS initialized with SQL catalog, inventory and persistent sales history.");
             return true;
         }
         catch (OperationCanceledException)
@@ -728,6 +744,7 @@ public sealed class SalesPosCoordinator
         ReceivedAmount = null;
         CardPaymentStatus = DemoCardPaymentStatus.NotStarted;
         CardVerificationCount = 0;
+        pendingOperationId = Guid.Empty;
     }
 
     public bool SetReceivedAmount(decimal? amount)
@@ -802,23 +819,57 @@ public sealed class SalesPosCoordinator
         return true;
     }
 
-    public SalesPosCompletedSale CompleteSale()
+    public async Task<bool> FinalizeSaleAsync(CancellationToken cancellationToken = default)
     {
         if (!completionInProgress || !IsPaymentComplete() || CurrentDraft is null)
         {
-            throw new InvalidOperationException("La vente simulée ne peut pas être terminée dans cet état.");
+            return false;
         }
 
-        completedSaleCounter++;
-        Result = new SalesPosCompletedSale(
-            $"DEMO-SALE-{completedSaleCounter:0000}",
-            CurrentDraft,
-            PaymentMethod,
-            Change);
-        Step = DemoPosStep.Success;
-        completionInProgress = false;
-        ticketPrintService.PrepareForSale(Result.Reference);
-        return Result;
+        pendingOperationId = pendingOperationId == Guid.Empty
+            ? Guid.NewGuid()
+            : pendingOperationId;
+
+        try
+        {
+            var finalized = await finalizeSaleHandler.HandleAsync(
+                new FinalizeSaleCommand(
+                    pendingOperationId,
+                    CurrentDraft.Id,
+                    CurrentDraft.Version,
+                    PaymentMethod == DemoPaymentMethod.Cash
+                        ? SalePaymentMethod.Cash
+                        : SalePaymentMethod.ExternalCard,
+                    ReceivedAmount,
+                    CardPaymentStatus == DemoCardPaymentStatus.Confirmed),
+                cancellationToken);
+
+            if (finalized.IsFailure)
+            {
+                ApplyFailure(finalized.Error);
+                completionInProgress = false;
+                return false;
+            }
+
+            Result = new SalesPosCompletedSale(finalized.Value);
+            Step = DemoPosStep.Success;
+            completionInProgress = false;
+            ticketPrintService.PrepareForSale(Result.Reference);
+            await PrepareNextDraftAsync(cancellationToken);
+            await LoadRecentSalesCoreAsync(cancellationToken, preserveFeedback: true);
+            pendingOperationId = Guid.Empty;
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            completionInProgress = false;
+            throw;
+        }
+        catch (Exception exception)
+        {
+            completionInProgress = false;
+            return HandleUnexpectedFailure("sale-finalization", exception);
+        }
     }
 
     public void CancelCompletion()
@@ -941,8 +992,40 @@ public sealed class SalesPosCoordinator
         return true;
     }
 
+    private async Task<bool> LoadRecentSalesCoreAsync(
+        CancellationToken cancellationToken,
+        bool preserveFeedback = false)
+    {
+        var result = await getRecentSalesHandler.HandleAsync(
+            new GetRecentSalesQuery(10),
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            if (!preserveFeedback)
+            {
+                ApplyFailure(result.Error);
+            }
+
+            return false;
+        }
+
+        recentSales = Array.AsReadOnly(result.Value.ToArray());
+        return true;
+    }
+
     private async Task<bool> StartNewDraftCoreAsync(CancellationToken cancellationToken)
     {
+        if (hasPreparedNextDraft && CurrentDraft is not null)
+        {
+            hasPreparedNextDraft = false;
+            ResetDraftPresentationState();
+            Result = null;
+            ticketPrintService.Reset();
+            Trace.TraceInformation("Sales POS activated the draft prepared after the persistent commit.");
+            return true;
+        }
+
         var created = await createDraftHandler.HandleAsync(cancellationToken);
 
         if (created.IsFailure)
@@ -957,6 +1040,17 @@ public sealed class SalesPosCoordinator
         ticketPrintService.Reset();
         Trace.TraceInformation("Sales POS Application draft created.");
         return true;
+    }
+
+    private async Task PrepareNextDraftAsync(CancellationToken cancellationToken)
+    {
+        var created = await createDraftHandler.HandleAsync(cancellationToken);
+
+        if (created.IsSuccess)
+        {
+            CurrentDraft = created.Value;
+            hasPreparedNextDraft = true;
+        }
     }
 
     private async Task<bool> ReloadDraftCoreAsync(CancellationToken cancellationToken)
@@ -1039,6 +1133,7 @@ public sealed class SalesPosCoordinator
 
         ResetPaymentState();
         completionInProgress = false;
+        pendingOperationId = Guid.Empty;
         UserMessage = message;
         return true;
     }
@@ -1125,5 +1220,6 @@ public sealed class SalesPosCoordinator
         ReceivedAmount = null;
         CardPaymentStatus = DemoCardPaymentStatus.NotStarted;
         CardVerificationCount = 0;
+        pendingOperationId = Guid.Empty;
     }
 }

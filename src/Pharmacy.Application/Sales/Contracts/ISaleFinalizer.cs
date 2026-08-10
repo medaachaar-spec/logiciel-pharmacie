@@ -5,7 +5,7 @@ namespace Pharmacy.Application.Sales.Contracts;
 
 public interface ISaleFinalizer
 {
-    Task<Result<FinalizeSaleResult>> FinalizeAsync(
+    Task<Result<FinalizedSaleView>> FinalizeAsync(
         FinalizeSaleRequest request,
         CancellationToken cancellationToken = default);
 }

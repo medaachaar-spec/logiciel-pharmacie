@@ -87,6 +87,26 @@
     place-items: center;
 }
 
+.pos-recent-sales > summary {
+    cursor: pointer;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-card-title);
+    font-weight: var(--font-weight-bold);
+}
+
+.pos-recent-sales > summary:focus-visible {
+    border-radius: var(--radius-small);
+    box-shadow: var(--shadow-focus);
+    outline: none;
+}
+
+.pos-recent-sales__content {
+    min-width: 0;
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: var(--border-width) solid var(--color-border);
+}
+
 .pos-panel__header,
 .pos-search__heading {
     display: flex;

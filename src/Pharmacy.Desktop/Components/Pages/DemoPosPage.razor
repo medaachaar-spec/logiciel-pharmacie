@@ -10,13 +10,13 @@
         <div>
             <p class="pos-kicker">Ventes</p>
             <h1>Nouvelle vente</h1>
-            <p class="page-subtitle">Catalogue et disponibilité issus de SQL Server, vente toujours simulée.</p>
+            <p class="page-subtitle">Catalogue, disponibilité, ventes et paiements persistés dans SQL Server.</p>
         </div>
     </header>
 
-    <UiAlert Title="Mode démonstration — Catalogue et Stock SQL"
-             Variant="UiAlertVariant.Warning">
-        La recherche, les prix et la disponibilité viennent de SQL Server. Panier, paiements, suspensions et impressions restent en mémoire ; la vente n’est pas persistée et le stock n’est pas consommé.
+    <UiAlert Title="Ventes SQL V0.1 — suspensions encore locales"
+             Variant="UiAlertVariant.Information">
+        Le panier reste en mémoire avant validation. Le commit SQL enregistre ensuite vente, paiement, allocations FEFO et sorties de stock dans une transaction unique. Les suspensions et l’impression restent locales au processus.
     </UiAlert>
 
     @if (Session.IsInitializing)
@@ -38,7 +38,7 @@
         @if (Session.Step != DemoPosStep.Success)
         {
             <section class="pos-session-strip" aria-label="État du brouillon Sales Application">
-                <UiBadge Text="Catalogue SQL — brouillon mémoire" Variant="UiBadgeVariant.Information" />
+                <UiBadge Text="Catalogue + Stock + Ventes SQL — brouillon mémoire" Variant="UiBadgeVariant.Information" />
                 <span><strong>Brouillon</strong> @DraftReference</span>
                 <span><strong>Version</strong> @Session.CurrentDraft.Version</span>
                 <span><strong>Lignes</strong> @Session.CurrentDraft.LineCount</span>
@@ -267,6 +267,50 @@
                 <DemoPosSuccess Session="Session" OnNewSale="StartNewSaleAsync" OnHome="ReturnHomeAsync" />
             </div>
         }
+
+        @if (Session.Step != DemoPosStep.Success)
+        {
+            <details class="pos-panel pos-recent-sales">
+                <summary>Ventes récentes enregistrées (@Session.RecentSales.Count)</summary>
+                <div class="pos-recent-sales__content">
+                    @if (Session.RecentSales.Count == 0)
+                    {
+                        <UiEmptyState Title="Aucune vente finalisée"
+                                      Description="Les ventes persistées apparaîtront ici après leur commit SQL." />
+                    }
+                    else
+                    {
+                        <div class="catalog-table-scroll" tabindex="0" role="region" aria-label="Ventes récentes enregistrées">
+                            <table class="catalog-table catalog-table--compact">
+                                <thead>
+                                    <tr>
+                                        <th>Référence</th>
+                                        <th>Date UTC</th>
+                                        <th>Lignes</th>
+                                        <th>Total</th>
+                                        <th>Paiement</th>
+                                        <th>Statut</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var sale in Session.RecentSales)
+                                    {
+                                        <tr @key="sale.SaleId">
+                                            <td><strong>@sale.Reference</strong></td>
+                                            <td>@sale.CompletedAtUtc.ToString("dd/MM/yyyy HH:mm")</td>
+                                            <td>@sale.LineCount</td>
+                                            <td>@DemoMoney.Format(sale.Total.Amount)</td>
+                                            <td>@PaymentLabel(sale.PaymentMethod)</td>
+                                            <td><UiBadge Text="Finalisée" Variant="UiBadgeVariant.Success" /></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </details>
+        }
     }
 </div>
 
@@ -456,9 +500,14 @@
 
         try
         {
-            await Task.Delay(180, CancellationToken);
-            Session.CompleteSale();
-            requestedFocus = FocusTarget.Success;
+            if (await Session.FinalizeSaleAsync(CancellationToken))
+            {
+                requestedFocus = FocusTarget.Success;
+            }
+            else
+            {
+                requestedFocus = FocusTarget.Payment;
+            }
         }
         catch (OperationCanceledException) when (CancellationToken.IsCancellationRequested)
         {
@@ -467,7 +516,7 @@
         catch (Exception exception)
         {
             Session.CancelCompletion();
-            Session.ReportUnexpectedFailure("payment-simulation", exception);
+            Session.ReportUnexpectedFailure("sale-finalization", exception);
         }
         finally
         {
@@ -673,6 +722,13 @@
         requestedFocus = FocusTarget.Search;
         CloseConfirmation();
     }
+
+    private static string PaymentLabel(SalePaymentMethod method) => method switch
+    {
+        SalePaymentMethod.Cash => "Espèces",
+        SalePaymentMethod.ExternalCard => "Carte — TPE externe",
+        _ => "Non défini"
+    };
 
     private void CloseConfirmation()
     {

@@ -188,12 +188,10 @@ public sealed class SalesApplicationArchitectureTests
     {
         return string.Join(
             Environment.NewLine,
-            new[]
-            {
+            Directory.EnumerateFiles(
                 PathAt("src", "Pharmacy.Application", "Sales"),
-                PathAt("src", "Pharmacy.Infrastructure", "Sales")
-            }
-            .SelectMany(directory => Directory.EnumerateFiles(directory, "*.cs", SearchOption.AllDirectories))
+                "*.cs",
+                SearchOption.AllDirectories)
             .Select(File.ReadAllText));
     }
 

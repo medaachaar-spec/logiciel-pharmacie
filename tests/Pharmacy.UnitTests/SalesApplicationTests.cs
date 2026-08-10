@@ -199,7 +199,7 @@ public sealed class SalesApplicationTests
             TestCancellation);
 
         Assert.True(result.IsFailure);
-        Assert.Equal("sales.finalization.operation_id.invalid", result.Error.Code);
+        Assert.Equal("sales.operation.invalid", result.Error.Code);
         Assert.Equal(0, store.GetCalls);
     }
 
@@ -227,7 +227,7 @@ public sealed class SalesApplicationTests
             TestCancellation);
 
         Assert.True(result.IsFailure);
-        Assert.Equal("sales.stock.insufficient_availability", result.Error.Code);
+        Assert.Equal("sales.stock.insufficient", result.Error.Code);
         Assert.Equal(0, preparations.Calls);
         Assert.Equal(2, store.VersionedDraft.Version);
     }
@@ -245,14 +245,57 @@ public sealed class SalesApplicationTests
         Assert.Contains(typeof(ISaleFinalizationPreparationStore), constructorTypes);
     }
 
+    [Theory]
+    [InlineData(SalePaymentMethod.Cash, 5, false, "sales.payment.invalid")]
+    [InlineData(SalePaymentMethod.ExternalCard, 0, false, "sales.payment.card_unconfirmed")]
+    public async Task InvalidPaymentIsRejectedBeforePersistentFinalizer(
+        SalePaymentMethod paymentMethod,
+        decimal tenderedAmount,
+        bool cardConfirmed,
+        string expectedError)
+    {
+        var draft = SaleDraft.Create(SaleDraftId.New());
+        var product = Product(1);
+        draft.AddItem(
+            SaleProductSnapshot.Create(
+                product.ProductId,
+                product.Reference,
+                product.DisplayName,
+                product.Presentation,
+                product.UnitSalePrice).Value,
+            SaleQuantity.One);
+        var store = new StubDraftStore(new VersionedSaleDraft(draft, 2));
+        var finalizer = new RecordingFinalizer();
+        var handler = new FinalizeSaleHandler(
+            new PrepareSaleFinalizationHandler(
+                store,
+                new StubStock(),
+                new StubPreparationStore()),
+            finalizer);
+
+        var result = await handler.HandleAsync(
+            new FinalizeSaleCommand(
+                Guid.NewGuid(),
+                draft.Id,
+                2,
+                paymentMethod,
+                paymentMethod == SalePaymentMethod.Cash ? tenderedAmount : null,
+                cardConfirmed),
+            TestCancellation);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(expectedError, result.Error.Code);
+        Assert.Equal(0, finalizer.Calls);
+    }
+
     [Fact]
     public void ApplicationErrorsExposeStableExpectedCodes()
     {
         Assert.Equal("sales.draft.version.invalid", SalesApplicationErrors.InvalidExpectedVersion.Code);
         Assert.Equal("sales.product.not_found", SalesApplicationErrors.ProductNotFound.Code);
         Assert.Equal("sales.product.not_sellable", SalesApplicationErrors.ProductNotSellable.Code);
-        Assert.Equal("sales.draft.empty", SalesApplicationErrors.DraftEmpty.Code);
-        Assert.Equal("sales.finalization.operation_conflict", SalesApplicationErrors.OperationConflict.Code);
+        Assert.Equal("sales.finalization.empty_draft", SalesApplicationErrors.DraftEmpty.Code);
+        Assert.Equal("sales.operation.conflict", SalesApplicationErrors.OperationConflict.Code);
     }
 
     private static SellableProductSnapshot Product(int number)
@@ -403,6 +446,20 @@ public sealed class SalesApplicationTests
         {
             Calls++;
             return Task.FromResult(Result<SaleFinalizationPreparation>.Success(preparation));
+        }
+    }
+
+    private sealed class RecordingFinalizer : ISaleFinalizer
+    {
+        public int Calls { get; private set; }
+
+        public Task<Result<FinalizedSaleView>> FinalizeAsync(
+            FinalizeSaleRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            return Task.FromResult(Result<FinalizedSaleView>.Failure(
+                SalesApplicationErrors.OperationConflict));
         }
     }
 }
