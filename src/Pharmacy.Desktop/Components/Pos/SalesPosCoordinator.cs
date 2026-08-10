@@ -909,6 +909,13 @@ public sealed class SalesPosCoordinator
         return Result is not null && ticketPrintService.Complete(Result.Reference, outcome);
     }
 
+    public Task<bool> PrintTicketAsync(bool isReprint, bool simulateFailure, CancellationToken cancellationToken = default)
+    {
+        return Result is null
+            ? Task.FromResult(false)
+            : ticketPrintService.PrintPersistedAsync(Result, isReprint, simulateFailure, cancellationToken);
+    }
+
     public bool ContinueWithoutTicket()
     {
         return Result is not null && ticketPrintService.ContinueWithoutTicket(Result.Reference);

@@ -24,6 +24,12 @@ public static class SecurityPermissions
     public const string ReportsView = "reports.view";
     public const string ReportsExport = "reports.export";
     public const string ReportsManageSettings = "reports.manage_settings";
+    public const string BackupView = "backup.view";
+    public const string BackupCreate = "backup.create";
+    public const string BackupRestore = "backup.restore";
+    public const string ImportView = "import.view";
+    public const string ImportExecute = "import.execute";
+    public const string DevicesConfigure = "devices.configure";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -48,7 +54,13 @@ public static class SecurityPermissions
         AuditView,
         ReportsView,
         ReportsExport,
-        ReportsManageSettings
+        ReportsManageSettings,
+        BackupView,
+        BackupCreate,
+        BackupRestore,
+        ImportView,
+        ImportExecute,
+        DevicesConfigure
     ];
 
     public static IReadOnlySet<string> Sensitive { get; } = new HashSet<string>(StringComparer.Ordinal)
@@ -62,6 +74,9 @@ public static class SecurityPermissions
         CustomersManageCredit,
         SecurityManageUsers,
         SecurityManageRoles,
-        ReportsManageSettings
+        ReportsManageSettings,
+        BackupRestore,
+        ImportExecute,
+        DevicesConfigure
     };
 }

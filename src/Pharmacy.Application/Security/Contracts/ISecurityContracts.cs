@@ -82,4 +82,13 @@ public interface IBusinessAuditRecorder
         string action,
         Guid? operationId,
         CancellationToken cancellationToken = default);
+
+    Task RecordFailureAsync(
+        string module,
+        string entityType,
+        string? entityId,
+        string action,
+        Guid? operationId,
+        string reasonCode,
+        CancellationToken cancellationToken = default) => Task.CompletedTask;
 }

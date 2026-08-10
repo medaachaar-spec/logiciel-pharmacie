@@ -81,7 +81,7 @@ public sealed class AppShellTests
     }
 
     [Fact]
-    public void TenBusinessNavigationEntries_AreDeclared()
+    public void Sprint17BusinessNavigationEntries_AreDeclared()
     {
         var expectedIds = new[]
         {
@@ -94,11 +94,12 @@ public sealed class AppShellTests
             "customers",
             "reporting",
             "administration",
+            "operations",
             "audit"
         };
         var entries = GetCatalogEntries();
 
-        Assert.Equal(12, entries.Length);
+        Assert.Equal(13, entries.Length);
         Assert.All(expectedIds, id => Assert.Contains(entries, entry => entry.Id == id));
     }
 

@@ -6,6 +6,7 @@ using Pharmacy.Infrastructure.Persistence.Entities.Customers;
 using Pharmacy.Infrastructure.Persistence.Entities.Inventory;
 using Pharmacy.Infrastructure.Persistence.Entities.Purchasing;
 using Pharmacy.Infrastructure.Persistence.Entities.Reporting;
+using Pharmacy.Infrastructure.Persistence.Entities.Operations;
 using Pharmacy.Infrastructure.Persistence.Entities.Sales;
 using Pharmacy.Infrastructure.Persistence.Entities.Security;
 
@@ -68,6 +69,8 @@ public sealed class PharmacyDbContext : DbContext
     internal DbSet<AuditEventEntity> AuditEvents => Set<AuditEventEntity>();
     internal DbSet<AuditEventDetailEntity> AuditEventDetails => Set<AuditEventDetailEntity>();
     internal DbSet<ReportSettingsEntity> ReportSettings => Set<ReportSettingsEntity>();
+    internal DbSet<BackupRecordEntity> BackupRecords => Set<BackupRecordEntity>();
+    internal DbSet<ImportJobEntity> ImportJobs => Set<ImportJobEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

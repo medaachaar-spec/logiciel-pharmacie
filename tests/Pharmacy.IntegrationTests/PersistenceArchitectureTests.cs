@@ -166,6 +166,8 @@ public sealed class PersistenceArchitectureTests
                 "inventory.StockBatches",
                 "inventory.StockLocations",
                 "inventory.StockMovements",
+                "operations.BackupRecords",
+                "operations.ImportJobs",
                 "purchasing.GoodsReceiptLines",
                 "purchasing.GoodsReceipts",
                 "purchasing.PurchaseOrderLines",
@@ -237,7 +239,7 @@ public sealed class PersistenceArchitectureTests
             .Where(property => property.GetColumnType() == "rowversion")
             .ToArray();
 
-        Assert.Equal(19, rowVersions.Length);
+        Assert.Equal(21, rowVersions.Length);
         Assert.All(rowVersions, property =>
         {
             Assert.True(property.IsConcurrencyToken);

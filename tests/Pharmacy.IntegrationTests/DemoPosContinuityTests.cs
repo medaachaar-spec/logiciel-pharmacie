@@ -434,9 +434,10 @@ public sealed class DemoPosContinuityTests
     public void TicketSimulation_HasNoFileGenerationApi()
     {
         var source = DesktopText("Components", "Pos", "DemoTicketPrintService.cs");
-        var prohibited = new[] { "System.IO", "File.", "FileStream", "StreamWriter", "Pdf", "Printer" };
+        var prohibited = new[] { "System.IO", "File.", "FileStream", "StreamWriter", "Pdf", "PrintDocument", "winspool", "System.Drawing.Printing" };
 
         Assert.All(prohibited, token => Assert.DoesNotContain(token, source, StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("IReceiptPrinter", source, StringComparison.Ordinal);
     }
 
     [Fact]

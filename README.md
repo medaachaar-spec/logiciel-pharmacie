@@ -65,6 +65,8 @@ Le Sprint 13 ajoute le schéma `sales` et la migration `SalesPersistenceV01`. `S
 
 Le Sprint 15 ajoute l’authentification locale, le RBAC deny-by-default et l’audit SQL sécurisé. Aucun compte ou mot de passe n’est seedé : le premier propriétaire est créé depuis un bootstrap Desktop contrôlé et reçoit des codes de récupération affichés une seule fois. La session se verrouille après dix minutes ; cinq échecs verrouillent le compte cinq minutes ; les opérations sensibles exigent une réauthentification récente. Les procédures sont décrites dans `docs/security/OWNER_BOOTSTRAP_AND_RECOVERY_V0.1.md` et la revue manuelle dans `docs/reports/sprint-15/manual-validation.md`.
 
+Le Sprint 17 ajoute la page `/module/operations` : sauvegardes SQL avec CHECKSUM/VERIFYONLY/SHA-256, copie externe protégée par un gate de chiffrement, restore-test isolé, imports CSV UTF-8 prévisualisés (Catalogue CreateOnly, stock initial, lots) et diagnostic du poste. Le scanner suit le contrat clavier HID ; le ticket passe par `IReceiptPrinter` seulement après le commit de vente ; le TPE reste externe et manuel. Aucun matériel physique n’est certifié par le simulateur. Les procédures se trouvent dans `docs/operations/`, `docs/import/` et `docs/hardware/`.
+
 ### Commandes de persistance contrôlées
 
 La connexion n’est jamais stockée dans le dépôt. Elle doit être fournie temporairement par `PHARMACY_SQLSERVER_CONNECTION` pour les commandes EF ou `PHARMACY_TEST_SQLSERVER_CONNECTION` pour les tests SQL réels.
@@ -78,6 +80,18 @@ dotnet ef migrations list `
 ```
 
 Le script de contrôle en lecture seule se trouve dans `database/verification/verify_sprint09_schema.sql`. Aucune migration n’est exécutée automatiquement au lancement de l’application.
+
+Sauvegarde/restore-test Sprint 17 (dossiers configurés hors Git et droits minimaux pour le compte SQL Server) :
+
+```powershell
+$env:PHARMACY_BACKUP_LOCAL_DIRECTORY = '<dossier-absolu-dédié>'
+pwsh -NoProfile -File .\scripts\Invoke-Sprint17Backup.ps1 `
+  -ServerInstance <instance-explicite> -DatabaseName Pharmacy_Development -Type Full
+pwsh -NoProfile -File .\scripts\Test-Sprint17Restore.ps1 `
+  -ServerInstance <instance-explicite> -BackupFile '<fichier-bak-dans-la-racine-autorisée>'
+```
+
+Pour une copie externe, définir aussi `PHARMACY_BACKUP_EXTERNAL_DIRECTORY` et n’utiliser `PHARMACY_BACKUP_EXTERNAL_ENCRYPTED=true` qu’après vérification effective du chiffrement du volume. Aucun `.bak` ne doit être versionné.
 
 Seed et vérification Sprint 10, exclusivement sur `Pharmacy_Development` :
 

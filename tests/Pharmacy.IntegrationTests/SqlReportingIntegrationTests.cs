@@ -48,7 +48,7 @@ public sealed class SqlReportingIntegrationTests
 
             Assert.Equal(11, await ScalarAsync<int>(database.ConnectionString,
                 "SELECT COUNT(*) FROM sys.views v JOIN sys.schemas s ON s.schema_id=v.schema_id WHERE s.name=N'reporting';"));
-            Assert.Equal(22, await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM security.Permissions;"));
+            Assert.Equal(28, await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM security.Permissions;"));
             Assert.Equal(1, await ScalarAsync<int>(database.ConnectionString,
                 "SELECT COUNT(*) FROM reporting.ReportSettings WHERE Id=1 AND LowStockAlertsEnabled=0 AND ExpiryAlertsEnabled=0 AND ExpiryHorizonDays IS NULL;"));
 

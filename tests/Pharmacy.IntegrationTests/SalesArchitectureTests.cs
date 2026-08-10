@@ -124,7 +124,7 @@ public sealed class SalesArchitectureTests
     }
 
     [Fact]
-    public void Check63_RepositoryContainsOnlyApprovedSqlFilesThroughSprint16()
+    public void Check63_RepositoryContainsOnlyApprovedSqlFilesThroughSprint17()
     {
         var sqlFiles = Directory
             .EnumerateFiles(RepositoryRoot, "*.sql", SearchOption.AllDirectories)
@@ -157,6 +157,7 @@ public sealed class SalesArchitectureTests
                 "database/verification/verify_sprint14_cash_credit_returns.sql",
                 "database/verification/verify_sprint15_security_rbac_audit.sql",
                 "database/verification/verify_sprint16_reporting.sql",
+                "database/verification/verify_sprint17_operations.sql",
             },
             sqlFiles);
     }

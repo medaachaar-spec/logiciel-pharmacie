@@ -68,6 +68,7 @@
                      Variant="UiAlertVariant.Success">
                 L’impression reste simulée ; la vente SQL n’a pas été recréée.
             </UiAlert>
+            <UiButton Variant="UiButtonVariant.Secondary" Disabled="@isPrinting" IsLoading="@isPrinting" LoadingText="Réimpression en cours" OnClick="ReprintAsync">Réimprimer le ticket</UiButton>
         }
         else if (Session.PrintStatus == DemoPrintStatus.Failed && !Session.ContinuedWithoutTicket)
         {
@@ -108,7 +109,7 @@
     <ul class="pos-success__reminders" aria-label="Preuves de finalisation et limite d’impression">
         <li>Vente et paiement SQL enregistrés</li>
         <li>Stock décrémenté par allocations FEFO</li>
-        <li>Ticket physique non intégré</li>
+        <li>Impression abstraite 80 mm — simulateur actif, pilote matériel requis</li>
     </ul>
 
     <div class="pos-success__actions">
@@ -172,25 +173,26 @@
 
     private async Task PrintAsync(MouseEventArgs _)
     {
-        if (isPrinting || !Session.TryBeginTicketPrint())
-        {
-            return;
-        }
-
+        if (isPrinting) return;
         isPrinting = true;
 
         try
         {
-            await Task.Delay(180);
-            var outcome = selectedOutcome == "failure"
-                ? DemoPrintSimulationOutcome.Failure
-                : DemoPrintSimulationOutcome.Success;
-            Session.CompleteTicketPrint(outcome);
+            await Session.PrintTicketAsync(false, selectedOutcome == "failure");
         }
         finally
         {
             isPrinting = false;
         }
+    }
+
+
+    private async Task ReprintAsync(MouseEventArgs _)
+    {
+        if (isPrinting) return;
+        isPrinting = true;
+        try { await Session.PrintTicketAsync(true, selectedOutcome == "failure"); }
+        finally { isPrinting = false; }
     }
 
     private Task ContinueWithoutTicketAsync(MouseEventArgs _)

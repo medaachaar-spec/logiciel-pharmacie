@@ -63,6 +63,16 @@ Effectuer les revues manuelles Sprints 12 et 13 dans SSMS et Desktop, notamment 
 - Limite pilote : le compte propriétaire partagé ne permet pas d’attribution individuelle entre les deux exploitants.
 - Git : changements Sprint 15 laissés hors index pour revue ; aucun commit, push, remote ou changement de branche.
 
+## Mise à jour après le Sprint 17
+
+- Statut : `IMPLEMENTED — BACKUP/IMPORT/HARDWARE VALIDATION PASS — MANUAL OPERATIONS REVIEW REQUIRED — HARDWARE PILOT GATE PENDING` sous réserve de la revue humaine décrite dans le rapport Sprint 17.
+- Continuité : sauvegardes SQL Full/Diff/Log avec CHECKSUM, VERIFYONLY, SHA-256, copie externe sur volume chiffré attesté et restore-test vers base temporaire supprimée.
+- Import : CSV UTF-8 contrôlé, mapping/prévisualisation obligatoires, Catalogue CreateOnly, stock initial/lots atomiques et idempotence par OperationId/fingerprint ; XLSX non annoncé.
+- Matériel : buffer scanner HID, abstraction ticket 80 mm connectée après commit SQL, TPE externe manuel et diagnostic local ; aucun matériel physique certifié.
+- SQL : migration `BackupImportDeviceOperationsV01`, deux tables `operations`, six permissions nouvelles, neuf migrations appliquées à `Pharmacy_Development` et aucun pending model change attendu.
+- Exploitation : SQL Server Express reste sans Agent ; automatisation documentée via Planificateur de tâches Windows. Cible pilote Express et validation matérielle restent obligatoires.
+- Git : modifications Sprint 17 laissées hors index ; aucun add, commit, push, remote ou changement de branche autorisé pendant le sprint.
+
 ## Interdictions actuelles
 
 - Ne pas implémenter de fonctionnalité métier hors d’un sprint explicitement autorisé.

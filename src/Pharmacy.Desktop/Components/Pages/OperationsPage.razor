@@ -1,0 +1,85 @@
+@page "/module/operations"
+@inject OperationsCoordinator Operations
+@implements IDisposable
+
+<PageTitle>Continuité, imports et périphériques</PageTitle>
+
+<div class="page-content catalog-page operations-page">
+    <header class="page-header catalog-page-header" aria-labelledby="operations-title">
+        <div><p class="catalog-kicker">Exploitation locale contrôlée</p><h1 id="operations-title">Continuité, imports et périphériques</h1><p class="page-subtitle">Sauvegardes SQL vérifiables, imports CSV prévisualisés et diagnostic matériel sans faux état prêt.</p></div>
+        <UiBadge Text="SQL local" Variant="UiBadgeVariant.Information" />
+    </header>
+
+    <UiAlert Title="Validation matérielle encore requise" Variant="UiAlertVariant.Warning">
+        Scanner HID, imprimante 80 mm, TPE externe et onduleur restent soumis à un pilote sur le matériel réel. Le mode actuel simule l’impression et ne traite aucune donnée bancaire.
+    </UiAlert>
+    @if (!string.IsNullOrWhiteSpace(Operations.Error)) { <UiAlert Title="Opération refusée ou échouée" Variant="UiAlertVariant.Danger"><p>@Operations.Error</p></UiAlert> }
+    @if (!string.IsNullOrWhiteSpace(Operations.Message)) { <UiAlert Title="Résultat" Variant="UiAlertVariant.Success"><p>@Operations.Message</p></UiAlert> }
+
+    <section class="catalog-panel" aria-labelledby="backup-title">
+        <div class="catalog-section-heading"><div><p class="section-kicker">RPO cible 15 min · RTO cible 2 h</p><h2 id="backup-title">Sauvegardes et restauration isolée</h2></div><UiButton Variant="UiButtonVariant.Secondary" Size="UiButtonSize.Small" Disabled="@Operations.IsBusy" OnClick="ReloadAsync">Actualiser</UiButton></div>
+        @if (Operations.Configuration is { } config)
+        {
+            <dl class="operations-facts"><div><dt>Base</dt><dd>@config.DatabaseName</dd></div><div><dt>Édition</dt><dd>@config.SqlEdition</dd></div><div><dt>Récupération</dt><dd>@config.RecoveryModel</dd></div><div><dt>Automatisation</dt><dd>@config.AutomationMechanism</dd></div><div><dt>Dossier SQL</dt><dd title="@config.LocalDirectory">@config.LocalDirectory</dd></div><div><dt>Copie externe</dt><dd>@(config.ExternalCopyConfigured ? config.EncryptionConfigured ? "Configurée et déclarée chiffrée" : "Configurée, chiffrement non attesté" : "Non configurée")</dd></div></dl>
+            <p class="operations-note">@config.CapabilityNote</p>
+            <div class="operations-actions"><UiButton Disabled="@Operations.IsBusy" OnClick="@(_ => CreateBackupAsync(SqlBackupType.Full))">Sauvegarde complète</UiButton><UiButton Variant="UiButtonVariant.Secondary" Disabled="@Operations.IsBusy" OnClick="@(_ => CreateBackupAsync(SqlBackupType.Differential))">Différentielle</UiButton><UiButton Variant="UiButtonVariant.Secondary" Disabled="@Operations.IsBusy" OnClick="@(_ => CreateBackupAsync(SqlBackupType.TransactionLog))">Journal</UiButton></div>
+        }
+        @if (Operations.BackupFiles.Count == 0) { <UiEmptyState Title="Aucune sauvegarde gérée" Description="Créez une sauvegarde complète ; son checksum SQL et son SHA-256 seront vérifiés." /> }
+        else
+        {
+            <div class="catalog-table-scroll" tabindex="0"><table class="catalog-table catalog-table--compact"><thead><tr><th>Fichier</th><th>Type</th><th>Date UTC</th><th>Taille</th><th>Contrôles</th></tr></thead><tbody>@foreach (var file in Operations.BackupFiles) { <tr><td><code>@file.FileName</code><small class="operations-path">@file.FullPath</small></td><td>@file.Type</td><td>@file.LastWriteAtUtc.ToString("u")</td><td>@FormatBytes(file.SizeBytes)</td><td><div class="operations-row-actions"><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" Disabled="@Operations.IsBusy" OnClick="@(_ => Operations.VerifyBackupAsync(file.FullPath, lifetime.Token))">Vérifier</UiButton>@if (file.Type == SqlBackupType.Full) { <UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Danger" Disabled="@Operations.IsBusy" OnClick="@(_ => Operations.RestoreTestAsync(file.FullPath, lifetime.Token))">Test restaurer</UiButton> }</div></td></tr> }</tbody></table></div>
+        }
+    </section>
+
+    <section class="catalog-panel" aria-labelledby="import-title">
+        <div class="catalog-section-heading"><div><p class="section-kicker">CSV UTF-8 · 25 Mio maximum</p><h2 id="import-title">Import contrôlé</h2></div><UiBadge Text="Prévisualisation obligatoire" Variant="UiBadgeVariant.Warning" /></div>
+        <div class="operations-import-grid">
+            <label class="ui-field"><span class="ui-field__label">Fichier CSV</span><InputFile OnChange="SelectFileAsync" accept=".csv,text/csv" /></label>
+            <label class="ui-field"><span class="ui-field__label">Mode</span><select class="ui-field__control" @bind="importType"><option value="@ControlledImportType.Catalogue">Catalogue — création seulement</option><option value="@ControlledImportType.OpeningStock">Stock initial sans lot</option><option value="@ControlledImportType.Lots">Lots et péremptions</option></select></label>
+            <label class="ui-field"><span class="ui-field__label">Colonne référence</span><input class="ui-field__control" @bind="referenceColumn" /></label>
+            <label class="ui-field"><span class="ui-field__label">Colonne désignation</span><input class="ui-field__control" @bind="designationColumn" /></label>
+            <label class="ui-field"><span class="ui-field__label">Colonne prix vente</span><input class="ui-field__control" @bind="salePriceColumn" /></label>
+            <label class="ui-field"><span class="ui-field__label">Colonne prix achat (aperçu)</span><input class="ui-field__control" @bind="purchasePriceColumn" /></label>
+            <label class="ui-field"><span class="ui-field__label">Colonne code-barres</span><input class="ui-field__control" @bind="barcodeColumn" /></label>
+            <label class="ui-field"><span class="ui-field__label">Colonne catégorie</span><input class="ui-field__control" @bind="categoryColumn" /></label>
+            <label class="ui-field"><span class="ui-field__label">Catégorie par défaut</span><input class="ui-field__control" @bind="defaultCategory" /></label>
+            @if (importType != ControlledImportType.Catalogue) { <label class="ui-field"><span class="ui-field__label">Colonne quantité</span><input class="ui-field__control" @bind="quantityColumn" /></label><label class="ui-field"><span class="ui-field__label">Emplacement stock</span><input class="ui-field__control" @bind="stockLocation" /></label> }
+            @if (importType == ControlledImportType.Lots) { <label class="ui-field"><span class="ui-field__label">Colonne lot</span><input class="ui-field__control" @bind="lotColumn" /></label><label class="ui-field"><span class="ui-field__label">Colonne péremption</span><input class="ui-field__control" @bind="expiryColumn" /></label> }
+        </div>
+        <div class="operations-actions"><UiButton Disabled="@(selectedContent is null || Operations.IsBusy)" OnClick="PreviewAsync">Prévisualiser</UiButton><UiButton Variant="UiButtonVariant.Danger" Disabled="@(Operations.ImportPreview?.CanConfirm != true || selectedContent is null || Operations.IsBusy)" OnClick="ConfirmAsync">Confirmer l’import atomique</UiButton></div>
+        @if (Operations.ImportPreview is { } preview)
+        {
+            <p class="operations-note"><strong>@preview.TotalRows ligne(s)</strong> · SHA-256 <code>@preview.Sha256[..16]…</code> · @(preview.CanConfirm ? "confirmation autorisée" : "erreurs bloquantes")</p>
+            @if (preview.Issues.Count > 0) { <div class="operations-issues" role="status"><h3>Contrôles</h3><ul>@foreach (var issue in preview.Issues.Take(30)) { <li class="operations-issue--@issue.Severity.ToString().ToLowerInvariant()">Ligne @issue.RowNumber · @issue.Code — @issue.Message</li> }</ul></div> }
+            <div class="catalog-table-scroll" tabindex="0"><table class="catalog-table catalog-table--compact"><thead><tr><th>Ligne</th><th>Référence</th><th>Désignation</th><th>Prix</th><th>Qté / lot</th><th>Action</th></tr></thead><tbody>@foreach (var row in preview.Rows) { <tr><td>@row.RowNumber</td><td><code>@row.Reference</code></td><td>@row.Designation</td><td>@row.SalePrice?.ToString("N2")</td><td>@row.Quantity @row.LotNumber</td><td>@row.Action</td></tr> }</tbody></table></div>
+        }
+    </section>
+
+    <section class="catalog-panel" aria-labelledby="devices-title">
+        <div class="catalog-section-heading"><div><p class="section-kicker">Poste local</p><h2 id="devices-title">Diagnostic périphériques</h2></div><UiButton Variant="UiButtonVariant.Secondary" Disabled="@Operations.IsBusy" OnClick="@(_ => Operations.CheckDevicesAsync(lifetime.Token))">Exécuter le diagnostic</UiButton></div>
+        @if (Operations.DeviceDiagnostic is null) { <UiEmptyState Title="Diagnostic non exécuté" Description="Le contrôle distingue explicitement simulateur, manuel, configuré et matériel non certifié." /> }
+        else { <div class="operations-device-grid">@foreach (var item in Operations.DeviceDiagnostic.Items) { <article><UiBadge Text="@item.Status" Variant="@(item.IsReady ? UiBadgeVariant.Success : UiBadgeVariant.Warning)" /><h3>@item.Device</h3><p>@item.Detail</p></article> }</div> }
+        <div class="operations-scanner"><label class="ui-field"><span class="ui-field__label">Test scanner HID / saisie manuelle (suffixe Entrée)</span><input class="ui-field__control" @onkeydown="ScannerKeyDown" @bind="scannerText" placeholder="Scannez ou saisissez un code" /></label><output aria-live="polite">@scannerResult</output></div>
+    </section>
+</div>
+
+@code {
+    private const long MaximumFileBytes = 25 * 1024 * 1024;
+    private readonly CancellationTokenSource lifetime = new();
+    private readonly HidScannerBuffer scanner = new();
+    private byte[]? selectedContent; private string selectedFileName = string.Empty;
+    private ControlledImportType importType = ControlledImportType.Catalogue;
+    private string referenceColumn = "Reference", designationColumn = "Designation", salePriceColumn = "PrixVente", purchasePriceColumn = "PrixAchat", barcodeColumn = "CodeBarres", categoryColumn = "Categorie", defaultCategory = "GEN", quantityColumn = "Quantite", stockLocation = "MAGASIN", lotColumn = "Lot", expiryColumn = "Peremption";
+    private string scannerText = string.Empty, scannerResult = "Aucun code reçu.";
+    protected override Task OnInitializedAsync() => Operations.LoadAsync(lifetime.Token);
+    private Task ReloadAsync(MouseEventArgs _) => Operations.LoadAsync(lifetime.Token);
+    private Task CreateBackupAsync(SqlBackupType type) => Operations.CreateBackupAsync(type, Operations.Configuration?.ExternalCopyConfigured == true, lifetime.Token);
+    private async Task SelectFileAsync(InputFileChangeEventArgs args) { selectedContent = null; selectedFileName = Path.GetFileName(args.File.Name); await using var stream = args.File.OpenReadStream(MaximumFileBytes); using var memory = new MemoryStream(); await stream.CopyToAsync(memory, lifetime.Token); selectedContent = memory.ToArray(); }
+    private CsvImportMapping Mapping() => new(referenceColumn, designationColumn, Null(salePriceColumn), Null(purchasePriceColumn), Null(barcodeColumn), Null(categoryColumn), Null(quantityColumn), Null(lotColumn), Null(expiryColumn), Null(defaultCategory), Null(stockLocation));
+    private Task PreviewAsync(MouseEventArgs _) => Operations.PreviewImportAsync(selectedFileName, selectedContent!, importType, Mapping(), lifetime.Token);
+    private Task ConfirmAsync(MouseEventArgs _) => Operations.ConfirmImportAsync(selectedFileName, selectedContent!, importType, Mapping(), lifetime.Token);
+    private void ScannerKeyDown(KeyboardEventArgs args) { var key = args.Key == "Enter" ? '\n' : args.Key.Length == 1 ? args.Key[0] : '\0'; if (key == '\0') return; var completed = scanner.Push(key, DateTime.UtcNow); if (completed is not null) { scannerResult = $"Code reçu : {completed}. Une référence inconnue ne sera jamais créée automatiquement."; scannerText = string.Empty; } }
+    private static string? Null(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static string FormatBytes(long bytes) => bytes >= 1_048_576 ? $"{bytes / 1_048_576d:N1} Mio" : $"{bytes / 1024d:N1} Kio";
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

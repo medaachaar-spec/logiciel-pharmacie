@@ -1104,6 +1104,174 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Operations.BackupRecordEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("BackupType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("ExternalCopyStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("FileHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
+                    b.Property<long?>("FileSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("VerificationStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_operations_BackupRecords");
+
+                    b.HasIndex("OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_operations_BackupRecords_OperationId");
+
+                    b.HasIndex("CreatedAtUtc", "Id")
+                        .HasDatabaseName("IX_operations_BackupRecords_Timeline");
+
+                    b.ToTable("BackupRecords", "operations", t =>
+                        {
+                            t.HasCheckConstraint("CK_operations_BackupRecords_FileName", "LEN(LTRIM(RTRIM([FileName]))) > 0 AND [FileName] NOT LIKE N'%\\%' AND [FileName] NOT LIKE N'%/%'");
+
+                            t.HasCheckConstraint("CK_operations_BackupRecords_Status", "[Status] IN (N'Running',N'Completed',N'Failed')");
+
+                            t.HasCheckConstraint("CK_operations_BackupRecords_Type", "[BackupType] IN (N'Full',N'Differential',N'TransactionLog')");
+                        });
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Operations.ImportJobEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<int>("CreatedCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<int>("IgnoredCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ImportType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("ReadCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RejectedCount")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("SourceFileHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("SourceFileName")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<int>("UpdatedCount")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id")
+                        .HasName("PK_operations_ImportJobs");
+
+                    b.HasIndex("Fingerprint")
+                        .IsUnique()
+                        .HasDatabaseName("UX_operations_ImportJobs_Fingerprint");
+
+                    b.HasIndex("OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_operations_ImportJobs_OperationId");
+
+                    b.HasIndex("StartedAtUtc", "Id")
+                        .HasDatabaseName("IX_operations_ImportJobs_Timeline");
+
+                    b.ToTable("ImportJobs", "operations", t =>
+                        {
+                            t.HasCheckConstraint("CK_operations_ImportJobs_Counts", "[ReadCount]>=0 AND [CreatedCount]>=0 AND [UpdatedCount]>=0 AND [IgnoredCount]>=0 AND [RejectedCount]>=0");
+
+                            t.HasCheckConstraint("CK_operations_ImportJobs_FileName", "LEN(LTRIM(RTRIM([SourceFileName]))) > 0 AND [SourceFileName] NOT LIKE N'%\\%' AND [SourceFileName] NOT LIKE N'%/%'");
+
+                            t.HasCheckConstraint("CK_operations_ImportJobs_Status", "[Status] IN (N'Completed',N'Failed')");
+
+                            t.HasCheckConstraint("CK_operations_ImportJobs_Type", "[ImportType] IN (N'Catalogue',N'OpeningStock',N'Lots')");
+                        });
+                });
+
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Purchasing.GoodsReceiptEntity", b =>
                 {
                     b.Property<long>("Id")
@@ -2362,6 +2530,60 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                             IsSensitive = true,
                             Module = "reports",
                             Name = "reports.manage_settings"
+                        },
+                        new
+                        {
+                            Id = 23L,
+                            Code = "backup.view",
+                            Description = "Permission explicite backup.view.",
+                            IsSensitive = false,
+                            Module = "backup",
+                            Name = "backup.view"
+                        },
+                        new
+                        {
+                            Id = 24L,
+                            Code = "backup.create",
+                            Description = "Permission explicite backup.create.",
+                            IsSensitive = false,
+                            Module = "backup",
+                            Name = "backup.create"
+                        },
+                        new
+                        {
+                            Id = 25L,
+                            Code = "backup.restore",
+                            Description = "Permission explicite backup.restore.",
+                            IsSensitive = true,
+                            Module = "backup",
+                            Name = "backup.restore"
+                        },
+                        new
+                        {
+                            Id = 26L,
+                            Code = "import.view",
+                            Description = "Permission explicite import.view.",
+                            IsSensitive = false,
+                            Module = "import",
+                            Name = "import.view"
+                        },
+                        new
+                        {
+                            Id = 27L,
+                            Code = "import.execute",
+                            Description = "Permission explicite import.execute.",
+                            IsSensitive = true,
+                            Module = "import",
+                            Name = "import.execute"
+                        },
+                        new
+                        {
+                            Id = 28L,
+                            Code = "devices.configure",
+                            Description = "Permission explicite devices.configure.",
+                            IsSensitive = true,
+                            Module = "devices",
+                            Name = "devices.configure"
                         });
                 });
 
@@ -2619,6 +2841,42 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                         {
                             Id = 22L,
                             PermissionId = 22L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 23L,
+                            PermissionId = 23L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 24L,
+                            PermissionId = 24L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 25L,
+                            PermissionId = 25L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 26L,
+                            PermissionId = 26L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 27L,
+                            PermissionId = 27L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 28L,
+                            PermissionId = 28L,
                             RoleId = 1L
                         });
                 });
