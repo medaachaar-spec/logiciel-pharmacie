@@ -1,0 +1,19 @@
+.reporting-page { gap: var(--space-6); }
+.reporting-filters, .reporting-page .catalog-panel { min-width: 0; }
+.reporting-filter-grid { display: grid; grid-template-columns: repeat(2, minmax(11rem, 1fr)) auto; align-items: end; gap: var(--space-3); }
+.reporting-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+.reporting-metric { display: grid; gap: var(--space-1); min-width: 0; }
+.reporting-metric span, .reporting-metric small, .reporting-note, .reporting-generated { color: var(--color-text-secondary); font-size: var(--font-size-small); }
+.reporting-metric strong { overflow-wrap: anywhere; font-size: var(--font-size-section-title); }
+.reporting-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.reporting-alert-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+.reporting-alert-counts p { display: grid; gap: var(--space-1); margin: 0; padding: var(--space-3); border: var(--border-width) solid var(--color-border); border-radius: var(--radius-medium); background: var(--color-surface-subtle); }
+.reporting-alert-counts strong { font-size: var(--font-size-section-title); }
+.reporting-alert-counts span { color: var(--color-text-secondary); font-size: var(--font-size-metadata); }
+.reporting-settings { display: grid; gap: var(--space-3); }
+.reporting-exports { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
+.reporting-exports p { margin: 0; color: var(--color-text-secondary); }
+.reporting-export-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-2); }
+.reporting-generated { margin: 0; text-align: right; }
+@media (max-width: 72rem) { .reporting-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .reporting-grid { grid-template-columns: 1fr; } }
+@media (max-width: 48rem) { .reporting-filter-grid, .reporting-metrics, .reporting-alert-counts { grid-template-columns: 1fr; } .reporting-exports { flex-direction: column; } .reporting-export-actions { justify-content: flex-start; } }

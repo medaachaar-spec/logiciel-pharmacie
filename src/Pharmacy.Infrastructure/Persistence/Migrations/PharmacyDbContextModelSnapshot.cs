@@ -1479,6 +1479,49 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Reporting.ReportSettingsEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("ExpiryAlertsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("ExpiryHorizonDays")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("LowStockAlertsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_reporting_ReportSettings");
+
+                    b.ToTable("ReportSettings", "reporting", t =>
+                        {
+                            t.HasCheckConstraint("CK_reporting_ReportSettings_ExpiryHorizon", "[ExpiryHorizonDays] IS NULL OR [ExpiryHorizonDays] >= 0");
+
+                            t.HasCheckConstraint("CK_reporting_ReportSettings_Singleton", "[Id] = 1");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1L,
+                            ExpiryAlertsEnabled = false,
+                            LowStockAlertsEnabled = false,
+                            UpdatedAtUtc = new DateTime(2026, 8, 10, 0, 0, 0, 0, DateTimeKind.Utc)
+                        });
+                });
+
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Sales.PaymentEntity", b =>
                 {
                     b.Property<long>("Id")
@@ -2301,6 +2344,24 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                             IsSensitive = false,
                             Module = "reports",
                             Name = "reports.view"
+                        },
+                        new
+                        {
+                            Id = 21L,
+                            Code = "reports.export",
+                            Description = "Permission explicite reports.export.",
+                            IsSensitive = false,
+                            Module = "reports",
+                            Name = "reports.export"
+                        },
+                        new
+                        {
+                            Id = 22L,
+                            Code = "reports.manage_settings",
+                            Description = "Permission explicite reports.manage_settings.",
+                            IsSensitive = true,
+                            Module = "reports",
+                            Name = "reports.manage_settings"
                         });
                 });
 
@@ -2546,6 +2607,18 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                         {
                             Id = 20L,
                             PermissionId = 20L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 21L,
+                            PermissionId = 21L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 22L,
+                            PermissionId = 22L,
                             RoleId = 1L
                         });
                 });

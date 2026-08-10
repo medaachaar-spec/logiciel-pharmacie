@@ -161,11 +161,11 @@ public static class AppNavigationCatalog
                 AppNavigationGroup.Steering,
                 UiIconName.Reporting,
                 0,
-                AppNavigationAccessState.Soon,
+                AppNavigationAccessState.Available,
                 false,
                 AppNavigationKind.Business,
                 "reporting",
-                new[] { "Rapports de ventes", "Rapports de stock et lots", "Alertes descriptives" },
+                new[] { "Tableau de bord descriptif", "Rapports SQL détaillés", "Alertes configurables et exports CSV" },
                 SecurityPermissions.ReportsView),
             new(
                 "administration",

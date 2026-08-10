@@ -51,7 +51,7 @@ public sealed class SqlSecurityIntegrationTests
                 "SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE s.name=N'security';"));
             Assert.Equal(2, await ScalarAsync<int>(database.ConnectionString,
                 "SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE s.name=N'audit';"));
-            Assert.Equal(20, await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM security.Permissions;"));
+            Assert.Equal(22, await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM security.Permissions;"));
             Assert.Equal(0, await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM security.UserAccounts;"));
 
             var clock = new MutableClock(new DateTime(2026, 8, 10, 16, 0, 0, DateTimeKind.Utc));

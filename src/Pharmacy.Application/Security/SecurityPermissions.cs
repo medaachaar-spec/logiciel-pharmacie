@@ -22,6 +22,8 @@ public static class SecurityPermissions
     public const string SecurityManageRoles = "security.manage_roles";
     public const string AuditView = "audit.view";
     public const string ReportsView = "reports.view";
+    public const string ReportsExport = "reports.export";
+    public const string ReportsManageSettings = "reports.manage_settings";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -44,7 +46,9 @@ public static class SecurityPermissions
         SecurityManageUsers,
         SecurityManageRoles,
         AuditView,
-        ReportsView
+        ReportsView,
+        ReportsExport,
+        ReportsManageSettings
     ];
 
     public static IReadOnlySet<string> Sensitive { get; } = new HashSet<string>(StringComparer.Ordinal)
@@ -57,6 +61,7 @@ public static class SecurityPermissions
         CatalogChangePrice,
         CustomersManageCredit,
         SecurityManageUsers,
-        SecurityManageRoles
+        SecurityManageRoles,
+        ReportsManageSettings
     };
 }

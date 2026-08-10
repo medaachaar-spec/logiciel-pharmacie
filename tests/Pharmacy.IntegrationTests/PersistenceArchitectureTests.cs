@@ -171,6 +171,7 @@ public sealed class PersistenceArchitectureTests
                 "purchasing.PurchaseOrderLines",
                 "purchasing.PurchaseOrders",
                 "purchasing.Suppliers",
+                "reporting.ReportSettings",
                 "sales.Payments",
                 "sales.SaleLineAllocations",
                 "sales.SaleLines",
@@ -236,7 +237,7 @@ public sealed class PersistenceArchitectureTests
             .Where(property => property.GetColumnType() == "rowversion")
             .ToArray();
 
-        Assert.Equal(18, rowVersions.Length);
+        Assert.Equal(19, rowVersions.Length);
         Assert.All(rowVersions, property =>
         {
             Assert.True(property.IsConcurrencyToken);

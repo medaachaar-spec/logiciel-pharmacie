@@ -1,0 +1,150 @@
+@page "/module/reporting"
+@inject ReportingCoordinator Reporting
+@implements IDisposable
+
+<PageTitle>Rapports et alertes — Logiciel Pharmacie</PageTitle>
+
+<div class="page-content catalog-page reporting-page">
+    <header class="page-header catalog-page-header" aria-labelledby="reporting-title">
+        <div>
+            <p class="catalog-kicker">Pilotage descriptif</p>
+            <h1 id="reporting-title">Rapports, alertes et exports</h1>
+            <p class="page-subtitle">Indicateurs SQL traçables, filtres temporels explicites et exports CSV sécurisés.</p>
+        </div>
+        <UiBadge Text="SQL — lecture seule" Variant="UiBadgeVariant.Information" />
+    </header>
+
+    <UiAlert Title="Interprétation contrôlée" Variant="UiAlertVariant.Information">
+        Les montants sont exprimés en MAD. Les retours sont séparés du brut et le net documenté est brut moins remboursements.
+        Aucune tendance, recommandation ou prévision n’est calculée.
+    </UiAlert>
+
+    <section class="catalog-toolbar reporting-filters" aria-labelledby="reporting-filters-title">
+        <div><p class="section-kicker">Période UTC</p><h2 id="reporting-filters-title">Filtres actifs</h2></div>
+        <div class="reporting-filter-grid">
+            <label class="ui-field"><span class="ui-field__label">Du (inclus)</span><input class="ui-field__control" type="date" value="@Reporting.FromDate.ToString("yyyy-MM-dd")" @onchange="SetFrom" /></label>
+            <label class="ui-field"><span class="ui-field__label">Au (exclus)</span><input class="ui-field__control" type="date" value="@Reporting.ToDate.ToString("yyyy-MM-dd")" @onchange="SetTo" /></label>
+            <UiButton IsLoading="@Reporting.IsBusy" OnClick="ReloadAsync">Appliquer</UiButton>
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(Reporting.Message))
+    {
+        <UiAlert Title="@(Reporting.ErrorCode is null ? "Information" : "Action non réalisée")"
+                 Variant="@(Reporting.ErrorCode is null ? UiAlertVariant.Success : UiAlertVariant.Warning)">@Reporting.Message</UiAlert>
+    }
+
+    @if (Reporting.IsBusy && Reporting.Snapshot is null)
+    {
+        <section class="catalog-panel"><UiSpinner Label="Calcul des rapports SQL" /></section>
+    }
+    else if (Reporting.Snapshot is { } snapshot)
+    {
+        <section class="reporting-metrics" aria-label="Indicateurs de synthèse">
+            <UiCard Density="UiCardDensity.Compact"><div class="reporting-metric"><span>Ventes brutes</span><strong>@Money(snapshot.Summary.GrossSales)</strong><small>@snapshot.Summary.SaleCount vente(s)</small></div></UiCard>
+            <UiCard Density="UiCardDensity.Compact"><div class="reporting-metric"><span>Remboursements</span><strong>@Money(snapshot.Summary.Refunds)</strong><small>@snapshot.Summary.ReturnCount retour(s)</small></div></UiCard>
+            <UiCard Density="UiCardDensity.Compact"><div class="reporting-metric"><span>Ventes nettes documentées</span><strong>@Money(snapshot.Summary.NetSales)</strong><small>Brut − remboursements</small></div></UiCard>
+            <UiCard Density="UiCardDensity.Compact"><div class="reporting-metric"><span>Crédit ouvert</span><strong>@Money(snapshot.Summary.OpenCredit)</strong><small>Solde actuel des journaux</small></div></UiCard>
+            <UiCard Density="UiCardDensity.Compact"><div class="reporting-metric"><span>Stock vendable actuel</span><strong>@snapshot.Summary.CurrentSellableStock</strong><small>@snapshot.Summary.OutOfStockProducts produit(s) en rupture</small></div></UiCard>
+            <UiCard Density="UiCardDensity.Compact"><div class="reporting-metric"><span>Réceptions</span><strong>@snapshot.Summary.ReceivedQuantity</strong><small>@snapshot.Summary.PurchaseOrders commande(s) créée(s)</small></div></UiCard>
+        </section>
+
+        <section class="reporting-grid">
+            <article class="catalog-panel reporting-alerts" aria-labelledby="alerts-title">
+                <div class="catalog-section-heading"><div><p class="section-kicker">État actuel</p><h2 id="alerts-title">Alertes configurées</h2></div></div>
+                <div class="reporting-alert-counts">
+                    <p><strong>@snapshot.Summary.LowStockProducts</strong><span>Sous seuil minimal configuré</span></p>
+                    <p><strong>@snapshot.Summary.ExpiredBatches</strong><span>Lots périmés avec quantité</span></p>
+                    <p><strong>@snapshot.Summary.NearExpiryBatches</strong><span>Dans l’horizon configuré</span></p>
+                </div>
+                <p class="reporting-note">Stock bas : @(snapshot.Settings.LowStockAlertsEnabled ? "activé" : "désactivé"). Péremption : @(snapshot.Settings.ExpiryAlertsEnabled ? $"activée à {snapshot.Settings.ExpiryHorizonDays} jour(s)" : "désactivée sans horizon implicite").</p>
+            </article>
+            <article class="catalog-panel" aria-labelledby="settings-title">
+                <div class="catalog-section-heading"><div><p class="section-kicker">Configuration auditée</p><h2 id="settings-title">Seuils d’alerte</h2></div></div>
+                <div class="reporting-settings">
+                    <label class="catalog-toggle"><input type="checkbox" checked="@lowStockEnabled" @onchange="args => lowStockEnabled = args.Value is true" /><span>Activer les seuils minimaux des produits</span></label>
+                    <label class="catalog-toggle"><input type="checkbox" checked="@expiryEnabled" @onchange="args => expiryEnabled = args.Value is true" /><span>Activer l’horizon de péremption</span></label>
+                    <label class="ui-field"><span class="ui-field__label">Horizon explicite (jours)</span><input class="ui-field__control" type="number" min="0" value="@horizonText" @oninput="args => horizonText = args.Value?.ToString() ?? string.Empty" /></label>
+                    <UiButton Disabled="@Reporting.IsBusy" OnClick="SaveSettingsAsync">Enregistrer</UiButton>
+                </div>
+            </article>
+        </section>
+
+        <section class="catalog-panel" aria-labelledby="sales-report-title">
+            <div class="catalog-section-heading"><div><p class="section-kicker">Ventes et retours</p><h2 id="sales-report-title">Ventes détaillées</h2></div><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" OnClick="@(_ => ExportAsync(ReportingExportKind.Sales))">Exporter CSV</UiButton></div>
+            @if (snapshot.Sales.Count == 0) { <UiEmptyState Title="Aucune vente" Description="Aucune vente SQL ne correspond à la période UTC." /> }
+            else { <div class="catalog-table-scroll" tabindex="0"><table class="catalog-table catalog-table--compact"><thead><tr><th>Date UTC</th><th>Référence</th><th>Paiement</th><th>Brut</th><th>Remboursé</th><th>Net</th></tr></thead><tbody>@foreach (var row in snapshot.Sales) { <tr><td>@row.CompletedAtUtc.ToString("u")</td><td><code>@row.Reference</code></td><td>@row.PaymentMethod</td><td>@Money(row.GrossAmount)</td><td>@Money(row.RefundAmount)</td><td><strong>@Money(row.NetAmount)</strong></td></tr> }</tbody></table></div> }
+        </section>
+
+        <section class="reporting-grid">
+            <article class="catalog-panel" aria-labelledby="stock-report-title">
+                <div class="catalog-section-heading"><div><p class="section-kicker">Stock actuel</p><h2 id="stock-report-title">Ruptures et seuils</h2></div><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" OnClick="@(_ => ExportAsync(ReportingExportKind.Stock))">CSV</UiButton></div>
+                <div class="catalog-table-scroll" tabindex="0"><table class="catalog-table catalog-table--compact"><thead><tr><th>Référence</th><th>Produit</th><th>Vendable</th><th>Seuil</th><th>État</th></tr></thead><tbody>@foreach (var row in snapshot.Stock.Take(12)) { <tr><td><code>@row.ProductReference</code></td><td>@row.ProductName</td><td>@row.SellableQuantity</td><td>@(row.MinimumStock?.ToString() ?? "Non configuré")</td><td>@row.Status</td></tr> }</tbody></table></div>
+            </article>
+            <article class="catalog-panel" aria-labelledby="expiry-report-title">
+                <div class="catalog-section-heading"><div><p class="section-kicker">Lots</p><h2 id="expiry-report-title">Péremptions</h2></div><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" OnClick="@(_ => ExportAsync(ReportingExportKind.Expiry))">CSV</UiButton></div>
+                <div class="catalog-table-scroll" tabindex="0"><table class="catalog-table catalog-table--compact"><thead><tr><th>Produit</th><th>Lot</th><th>Expiration</th><th>Qté</th><th>État</th></tr></thead><tbody>@foreach (var row in snapshot.Expiry.Take(12)) { <tr><td>@row.ProductName</td><td>@(row.BatchNumber ?? "—")</td><td>@(row.ExpiryDate?.ToString("yyyy-MM-dd") ?? "—")</td><td>@row.Quantity</td><td>@row.Status</td></tr> }</tbody></table></div>
+            </article>
+        </section>
+
+        <section class="reporting-grid">
+            <article class="catalog-panel" aria-labelledby="payments-report-title">
+                <div class="catalog-section-heading"><div><p class="section-kicker">Encaissements</p><h2 id="payments-report-title">Paiements par moyen</h2></div></div>
+                @if (snapshot.Summary.Payments.Count == 0) { <UiEmptyState Title="Aucun paiement" Description="Aucun paiement confirmé sur la période." /> }
+                else { <div class="catalog-table-scroll" tabindex="0"><table class="catalog-table catalog-table--compact"><thead><tr><th>Moyen</th><th>Nombre</th><th>Montant</th></tr></thead><tbody>@foreach (var row in snapshot.Summary.Payments) { <tr><td>@row.Method</td><td>@row.Count</td><td><strong>@Money(row.Amount)</strong></td></tr> }</tbody></table></div> }
+            </article>
+            <article class="catalog-panel" aria-labelledby="purchasing-report-title">
+                <div class="catalog-section-heading"><div><p class="section-kicker">Achats</p><h2 id="purchasing-report-title">Réceptions</h2></div><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" OnClick="@(_ => ExportAsync(ReportingExportKind.Purchasing))">CSV</UiButton></div>
+                @if (snapshot.Purchasing.Count == 0) { <UiEmptyState Title="Aucune réception" Description="Aucune réception SQL sur la période." /> }
+                else { <div class="catalog-table-scroll" tabindex="0"><table class="catalog-table catalog-table--compact"><thead><tr><th>Date UTC</th><th>Réception</th><th>Fournisseur</th><th>Qté</th><th>Coût historique</th></tr></thead><tbody>@foreach (var row in snapshot.Purchasing.Take(12)) { <tr><td>@row.ReceivedAtUtc.ToString("u")</td><td><code>@row.ReceiptNumber</code></td><td>@row.SupplierName</td><td>@row.Quantity</td><td>@Money(row.HistoricalAmount)</td></tr> }</tbody></table></div> }
+            </article>
+        </section>
+
+        <section class="reporting-grid">
+            <article class="catalog-panel" aria-labelledby="credit-report-title">
+                <div class="catalog-section-heading"><div><p class="section-kicker">Clients</p><h2 id="credit-report-title">Crédit actuel</h2></div><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" OnClick="@(_ => ExportAsync(ReportingExportKind.CustomerCredit))">CSV</UiButton></div>
+                @if (snapshot.CustomerCredit.Count == 0) { <UiEmptyState Title="Aucun client" Description="Aucun journal client à présenter." /> }
+                else { <div class="catalog-table-scroll" tabindex="0"><table class="catalog-table catalog-table--compact"><thead><tr><th>Référence</th><th>Client</th><th>Généré</th><th>Payé/réduit</th><th>Solde</th></tr></thead><tbody>@foreach (var row in snapshot.CustomerCredit.Take(12)) { <tr><td><code>@row.CustomerReference</code></td><td>@row.CustomerName</td><td>@Money(row.CreditGenerated)</td><td>@Money(row.CreditPaid)</td><td><strong>@Money(row.OpenBalance)</strong></td></tr> }</tbody></table></div> }
+            </article>
+            <article class="catalog-panel" aria-labelledby="cash-report-title">
+                <div class="catalog-section-heading"><div><p class="section-kicker">Caisse</p><h2 id="cash-report-title">Journal espèces</h2></div><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" OnClick="@(_ => ExportAsync(ReportingExportKind.Cash))">CSV</UiButton></div>
+                @if (snapshot.Cash.Count == 0) { <UiEmptyState Title="Aucune écriture" Description="Aucun mouvement cash sur la période." /> }
+                else { <div class="catalog-table-scroll" tabindex="0"><table class="catalog-table catalog-table--compact"><thead><tr><th>Date UTC</th><th>Type</th><th>Référence</th><th>Montant signé</th></tr></thead><tbody>@foreach (var row in snapshot.Cash.Take(12)) { <tr><td>@row.OccurredAtUtc.ToString("u")</td><td>@row.EntryType</td><td><code>@row.SourceReference</code></td><td><strong>@Money(row.Amount)</strong></td></tr> }</tbody></table></div> }
+            </article>
+        </section>
+
+        <section class="catalog-panel" aria-labelledby="returns-report-title">
+            <div class="catalog-section-heading"><div><p class="section-kicker">Retours</p><h2 id="returns-report-title">Retours et remboursements</h2></div><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" OnClick="@(_ => ExportAsync(ReportingExportKind.Returns))">CSV</UiButton></div>
+            @if (snapshot.Returns.Count == 0) { <UiEmptyState Title="Aucun retour" Description="Aucun retour SQL sur la période." /> }
+            else { <div class="catalog-table-scroll" tabindex="0"><table class="catalog-table catalog-table--compact"><thead><tr><th>Date UTC</th><th>Retour</th><th>Vente</th><th>Remboursement</th><th>Qté</th><th>Remise en stock</th></tr></thead><tbody>@foreach (var row in snapshot.Returns.Take(12)) { <tr><td>@row.CompletedAtUtc.ToString("u")</td><td><code>@row.ReturnReference</code></td><td><code>@row.SaleReference</code></td><td>@Money(row.RefundAmount)</td><td>@row.ReturnedQuantity</td><td>@row.RestockedQuantity</td></tr> }</tbody></table></div> }
+        </section>
+
+        <section class="catalog-panel reporting-exports" aria-labelledby="exports-title">
+            <div><p class="section-kicker">Données détaillées</p><h2 id="exports-title">Exports complémentaires</h2><p>UTF-8, dates ISO 8601, décimaux stables et cellules de formule neutralisées.</p></div>
+            <div class="reporting-export-actions">
+                @foreach (var kind in Enum.GetValues<ReportingExportKind>().Where(kind => kind is ReportingExportKind.ProductSales or ReportingExportKind.InventoryAdjustments))
+                { <UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" OnClick="@(_ => ExportAsync(kind))">@ExportLabel(kind)</UiButton> }
+            </div>
+        </section>
+
+        <p class="reporting-generated">Généré le @snapshot.Summary.GeneratedAtUtc.ToString("u") — du @snapshot.Summary.Period.FromUtc.ToString("u") inclus au @snapshot.Summary.Period.ToUtc.ToString("u") exclu.</p>
+    }
+</div>
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private bool lowStockEnabled;
+    private bool expiryEnabled;
+    private string horizonText = string.Empty;
+
+    protected override async Task OnInitializedAsync() { await Reporting.LoadAsync(lifetime.Token); SyncSettings(); }
+    private void SetFrom(ChangeEventArgs args) { if (DateOnly.TryParse(args.Value?.ToString(), out var value)) Reporting.FromDate = value; }
+    private void SetTo(ChangeEventArgs args) { if (DateOnly.TryParse(args.Value?.ToString(), out var value)) Reporting.ToDate = value; }
+    private async Task ReloadAsync(MouseEventArgs _) { await Reporting.LoadAsync(lifetime.Token); SyncSettings(); }
+    private async Task SaveSettingsAsync(MouseEventArgs _) { int? horizon = int.TryParse(horizonText, out var value) ? value : null; await Reporting.UpdateSettingsAsync(lowStockEnabled, expiryEnabled, horizon, lifetime.Token); SyncSettings(); }
+    private Task ExportAsync(ReportingExportKind kind) => Reporting.ExportAsync(kind, lifetime.Token);
+    private void SyncSettings() { if (Reporting.Snapshot is not { } value) return; lowStockEnabled = value.Settings.LowStockAlertsEnabled; expiryEnabled = value.Settings.ExpiryAlertsEnabled; horizonText = value.Settings.ExpiryHorizonDays?.ToString() ?? string.Empty; }
+    private static string Money(decimal value) => $"{value:N2} MAD";
+    private static string ExportLabel(ReportingExportKind kind) => kind switch { ReportingExportKind.ProductSales => "Ventes par produit", ReportingExportKind.Purchasing => "Achats / réceptions", ReportingExportKind.InventoryAdjustments => "Inventaires / ajustements", ReportingExportKind.CustomerCredit => "Clients / crédit", ReportingExportKind.Returns => "Retours / remboursements", ReportingExportKind.Cash => "Caisse", _ => kind.ToString() };
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}
