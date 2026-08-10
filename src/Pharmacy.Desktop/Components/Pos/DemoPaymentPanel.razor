@@ -35,6 +35,37 @@
         </label>
     </fieldset>
 
+    <section class="pos-payment-detail" aria-labelledby="demo-credit-title">
+        <div class="pos-terminal-state__header">
+            <strong id="demo-credit-title">Crédit client facultatif</strong>
+            <UiBadge Text="@(Session.CreditAmount > 0m ? "Crédit utilisé" : "Aucun crédit")"
+                     Variant="@(Session.CreditAmount > 0m ? UiBadgeVariant.Warning : UiBadgeVariant.Neutral)" />
+        </div>
+        <div class="catalog-form-grid">
+            <label class="ui-field">
+                <span class="ui-field__label">ID client autorisé crédit</span>
+                <input class="ui-field__control"
+                       inputmode="numeric"
+                       value="@creditCustomerInput"
+                       disabled="@IsCompleting"
+                       @oninput="HandleCreditCustomerInput" />
+            </label>
+            <label class="ui-field">
+                <span class="ui-field__label">Montant à crédit</span>
+                <input class="ui-field__control"
+                       inputmode="decimal"
+                       value="@creditAmountInput"
+                       disabled="@IsCompleting"
+                       @oninput="HandleCreditAmountInput" />
+            </label>
+        </div>
+        <p class="ui-field__help">Le client doit exister et avoir l’autorisation crédit active. Montant immédiat dû : @DemoMoney.Format(Session.ImmediatePaymentDue).</p>
+        @if (!string.IsNullOrWhiteSpace(creditError))
+        {
+            <p class="ui-field__error">@creditError</p>
+        }
+    </section>
+
     @if (Session.PaymentMethod == DemoPaymentMethod.Cash)
     {
         <div class="pos-payment-detail">
@@ -60,7 +91,7 @@
                 }
                 else if (Session.ReceivedAmount is not null && Session.ReceivedAmount.Value < Session.Total)
                 {
-                    <p class="ui-field__error">Montant insuffisant. Il manque @DemoMoney.Format(Session.Total - Session.ReceivedAmount.Value).</p>
+                    <p class="ui-field__error">Montant insuffisant. Il manque @DemoMoney.Format(Session.ImmediatePaymentDue - Session.ReceivedAmount.Value).</p>
                 }
                 else if (Session.ReceivedAmount is not null)
                 {
@@ -164,6 +195,9 @@
 @code {
     private string cashInput = string.Empty;
     private string? cashError;
+    private string creditCustomerInput = string.Empty;
+    private string creditAmountInput = string.Empty;
+    private string? creditError;
 
     [Parameter, EditorRequired]
     public SalesPosCoordinator Session { get; set; } = default!;
@@ -187,7 +221,7 @@
     public EventCallback OnReturnAmbiguousToPaymentChoice { get; set; }
 
     private bool HasCashError => !string.IsNullOrWhiteSpace(cashError)
-        || Session.ReceivedAmount is not null && Session.ReceivedAmount.Value < Session.Total;
+        || Session.ReceivedAmount is not null && Session.ReceivedAmount.Value < Session.ImmediatePaymentDue;
 
     private string CardStatusLabel => Session.CardPaymentStatus switch
     {
@@ -246,6 +280,59 @@
         }
 
         Session.SetReceivedAmount(amount);
+    }
+
+    private void HandleCreditCustomerInput(ChangeEventArgs args)
+    {
+        creditCustomerInput = args.Value?.ToString()?.Trim() ?? string.Empty;
+        ApplyCreditInput();
+    }
+
+    private void HandleCreditAmountInput(ChangeEventArgs args)
+    {
+        creditAmountInput = args.Value?.ToString()?.Trim() ?? string.Empty;
+        ApplyCreditInput();
+    }
+
+    private void ApplyCreditInput()
+    {
+        creditError = null;
+
+        if (string.IsNullOrWhiteSpace(creditAmountInput))
+        {
+            Session.SetCredit(null, 0m);
+            return;
+        }
+
+        if (!decimal.TryParse(
+                creditAmountInput.Replace(',', '.'),
+                NumberStyles.AllowDecimalPoint,
+                CultureInfo.InvariantCulture,
+                out var creditAmount)
+            || creditAmount < 0m)
+        {
+            Session.SetCredit(null, 0m);
+            creditError = "Saisissez un montant crédit positif valide.";
+            return;
+        }
+
+        if (creditAmount == 0m)
+        {
+            Session.SetCredit(null, 0m);
+            return;
+        }
+
+        if (!long.TryParse(creditCustomerInput, NumberStyles.Integer, CultureInfo.InvariantCulture, out var customerId))
+        {
+            Session.SetCredit(null, 0m);
+            creditError = "Un ID client est obligatoire pour utiliser le crédit.";
+            return;
+        }
+
+        if (!Session.SetCredit(customerId, creditAmount))
+        {
+            creditError = "Le crédit doit être compris entre 0 et le total de la vente.";
+        }
     }
 
     private Task StartCardVerificationAsync(MouseEventArgs _)

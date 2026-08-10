@@ -10,6 +10,8 @@ using Pharmacy.Application.Sales.Models;
 using Pharmacy.Domain.Common;
 using Pharmacy.Domain.Inventory;
 using Pharmacy.Infrastructure.Persistence;
+using Pharmacy.Infrastructure.Persistence.Entities.Cash;
+using Pharmacy.Infrastructure.Persistence.Entities.Customers;
 using Pharmacy.Infrastructure.Persistence.Entities.Catalog;
 using Pharmacy.Infrastructure.Persistence.Entities.Inventory;
 using Pharmacy.Infrastructure.Persistence.Entities.Sales;
@@ -100,6 +102,14 @@ public sealed class SqlSaleFinalizer : ISaleFinalizer
                     }
 
                     var now = clock.UtcNow;
+                    var customerResult = await ValidateCreditCustomerAsync(context, request, cancellationToken);
+
+                    if (customerResult.IsFailure)
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                        return Result<FinalizedSaleView>.Failure(customerResult.Error);
+                    }
+
                     var operation = new SaleOperationEntity
                     {
                         OperationId = request.Preparation.OperationId,
@@ -113,6 +123,7 @@ public sealed class SqlSaleFinalizer : ISaleFinalizer
                     var sale = CreateSale(request, planResult.Value, now, fingerprint);
                     context.Sales.Add(sale);
                     await context.SaveChangesAsync(cancellationToken);
+                    AddSprint14LedgerEntries(context, request, sale, now);
 
                     operation.Status = "Completed";
                     operation.ResultSaleId = sale.Id;
@@ -186,9 +197,15 @@ public sealed class SqlSaleFinalizer : ISaleFinalizer
                 || line.UnitPrice.Amount < 0m
                 || line.Subtotal.Amount != line.UnitPrice.Amount * line.Quantity.Value)
             || request.Preparation.Total.Amount != request.Preparation.Lines.Sum(line => line.Subtotal.Amount)
-            || request.Payment.Amount != request.Preparation.Total.Amount)
+            || request.Payment.Amount + (request.Credit?.Amount ?? 0m) != request.Preparation.Total.Amount)
         {
             return Result.Failure(SalesApplicationErrors.PaymentInvalid);
+        }
+
+        if (request.Credit is not null
+            && (request.Credit.CustomerId <= 0 || request.Credit.Amount <= 0m))
+        {
+            return Result.Failure(SalesApplicationErrors.CreditCustomerRequired);
         }
 
         if (request.Payment.Method == SalePaymentMethod.ExternalCard)
@@ -207,6 +224,30 @@ public sealed class SqlSaleFinalizer : ISaleFinalizer
             && !request.Payment.ExternalCardConfirmed
                 ? Result.Success()
                 : Result.Failure(SalesApplicationErrors.PaymentInvalid);
+    }
+
+    private static async Task<Result> ValidateCreditCustomerAsync(
+        PharmacyDbContext context,
+        FinalizeSaleRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.Credit is null)
+        {
+            return Result.Success();
+        }
+
+        var customer = await context.Customers.AsNoTracking().SingleOrDefaultAsync(
+            candidate => candidate.Id == request.Credit.CustomerId,
+            cancellationToken);
+
+        if (customer is null)
+        {
+            return Result.Failure(SalesApplicationErrors.CreditCustomerRequired);
+        }
+
+        return customer.IsActive && customer.CreditAllowed
+            ? Result.Success()
+            : Result.Failure(SalesApplicationErrors.CreditNotAllowed);
     }
 
     private async Task<Result<IReadOnlyList<AllocationPlan>>> BuildPlanAsync(
@@ -318,10 +359,12 @@ public sealed class SqlSaleFinalizer : ISaleFinalizer
             CompletedAtUtc = now,
             GrandTotal = request.Preparation.Total.Amount,
             PaidTotal = request.Payment.Amount,
+            CreditTotal = request.Credit?.Amount ?? 0m,
             ChangeGiven = request.Payment.ChangeGiven,
             TotalQuantity = request.Preparation.TotalQuantity,
             LineCount = request.Preparation.Lines.Count,
-            PaymentMethod = request.Payment.Method
+            PaymentMethod = request.Payment.Method,
+            CustomerId = request.Credit?.CustomerId
         };
 
         var lineEntities = new Dictionary<long, SaleLineEntity>();
@@ -390,6 +433,42 @@ public sealed class SqlSaleFinalizer : ISaleFinalizer
         return sale;
     }
 
+    private static void AddSprint14LedgerEntries(
+        PharmacyDbContext context,
+        FinalizeSaleRequest request,
+        SaleEntity sale,
+        DateTime now)
+    {
+        if (request.Payment.Method == SalePaymentMethod.Cash && request.Payment.Amount > 0m)
+        {
+            context.CashLedgerEntries.Add(new CashLedgerEntryEntity
+            {
+                OperationId = DeterministicGuid(request.Preparation.OperationId, "cash-sale", 0),
+                EntryType = "SaleCashIn",
+                Amount = request.Payment.Amount,
+                SourceType = "Sale",
+                SourceReference = sale.Reference,
+                OccurredAtUtc = now,
+                CreatedAtUtc = now
+            });
+        }
+
+        if (request.Credit is not null)
+        {
+            context.CustomerLedgerEntries.Add(new CustomerLedgerEntryEntity
+            {
+                OperationId = DeterministicGuid(request.Preparation.OperationId, "credit-sale", 0),
+                CustomerId = request.Credit.CustomerId,
+                EntryType = "CreditSale",
+                Amount = request.Credit.Amount,
+                SourceType = "Sale",
+                SourceReference = sale.Reference,
+                OccurredAtUtc = now,
+                CreatedAtUtc = now
+            });
+        }
+    }
+
     private async Task<Result<FinalizedSaleView>> ResolveUniqueRaceAsync(
         FinalizeSaleRequest request,
         string fingerprint,
@@ -454,6 +533,11 @@ public sealed class SqlSaleFinalizer : ISaleFinalizer
             request.Payment.TenderedAmount?.ToString("G29", CultureInfo.InvariantCulture) ?? string.Empty,
             request.Payment.ChangeGiven.ToString("G29", CultureInfo.InvariantCulture),
             request.Payment.ExternalCardConfirmed ? "1" : "0");
+        content = string.Join(
+            "|",
+            content,
+            request.Credit?.CustomerId.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+            request.Credit?.Amount.ToString("G29", CultureInfo.InvariantCulture) ?? string.Empty);
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(content)));
     }
 

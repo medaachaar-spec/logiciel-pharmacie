@@ -22,6 +22,61 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Cash.CashLedgerEntryEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<string>("EntryType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SourceReference")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_cash_CashLedgerEntries");
+
+                    b.HasIndex("OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_cash_CashLedgerEntries_OperationId");
+
+                    b.HasIndex("OccurredAtUtc", "Id")
+                        .HasDatabaseName("IX_cash_CashLedgerEntries_Timeline");
+
+                    b.ToTable("CashLedgerEntries", "cash", t =>
+                        {
+                            t.HasCheckConstraint("CK_cash_CashLedgerEntries_Amount_NotZero", "[Amount] <> 0");
+
+                            t.HasCheckConstraint("CK_cash_CashLedgerEntries_EntryType", "[EntryType] IN (N'SaleCashIn', N'CreditPaymentCashIn', N'RefundCashOut')");
+
+                            t.HasCheckConstraint("CK_cash_CashLedgerEntries_Source_NotBlank", "LEN(LTRIM(RTRIM([SourceType]))) > 0 AND LEN(LTRIM(RTRIM([SourceReference]))) > 0");
+                        });
+                });
+
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Catalog.ProductBarcodeEntity", b =>
                 {
                     b.Property<long>("Id")
@@ -344,6 +399,129 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_catalog_ProductPriceHistories_NewPrice_NonNegative", "[NewPrice] >= 0");
 
                             t.HasCheckConstraint("CK_catalog_ProductPriceHistories_OldPrice_NonNegative", "[OldPrice] IS NULL OR [OldPrice] >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Customers.CustomerEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<bool>("CreditAllowed")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_customers_Customers");
+
+                    b.HasIndex("Phone")
+                        .HasDatabaseName("IX_customers_Customers_Phone");
+
+                    b.HasIndex("Reference")
+                        .IsUnique()
+                        .HasDatabaseName("UX_customers_Customers_Reference");
+
+                    b.HasIndex("FullName", "Id")
+                        .HasDatabaseName("IX_customers_Customers_FullName_Id");
+
+                    b.ToTable("Customers", "customers", t =>
+                        {
+                            t.HasCheckConstraint("CK_customers_Customers_FullName_NotBlank", "LEN(LTRIM(RTRIM([FullName]))) > 0");
+
+                            t.HasCheckConstraint("CK_customers_Customers_Reference_NotBlank", "LEN(LTRIM(RTRIM([Reference]))) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Customers.CustomerLedgerEntryEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("EntryType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SourceReference")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_customers_CustomerLedgerEntries");
+
+                    b.HasIndex("OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_customers_CustomerLedgerEntries_OperationId");
+
+                    b.HasIndex("CustomerId", "OccurredAtUtc", "Id")
+                        .HasDatabaseName("IX_customers_CustomerLedgerEntries_Customer_Timeline");
+
+                    b.ToTable("CustomerLedgerEntries", "customers", t =>
+                        {
+                            t.HasCheckConstraint("CK_customers_CustomerLedgerEntries_Amount_NonNegative", "[Amount] >= 0");
+
+                            t.HasCheckConstraint("CK_customers_CustomerLedgerEntries_EntryType", "[EntryType] IN (N'CreditSale', N'CreditPayment', N'CreditAdjustmentIncrease', N'CreditAdjustmentDecrease', N'RefundImpact')");
+
+                            t.HasCheckConstraint("CK_customers_CustomerLedgerEntries_Source_NotBlank", "LEN(LTRIM(RTRIM([SourceType]))) > 0 AND LEN(LTRIM(RTRIM([SourceReference]))) > 0");
                         });
                 });
 
@@ -1255,6 +1433,12 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CompletedAtUtc")
                         .HasColumnType("datetime2(7)");
 
+                    b.Property<decimal>("CreditTotal")
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<long?>("CustomerId")
+                        .HasColumnType("bigint");
+
                     b.Property<decimal>("GrandTotal")
                         .HasColumnType("decimal(19,4)");
 
@@ -1301,9 +1485,11 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
 
                     b.ToTable("Sales", "sales", t =>
                         {
-                            t.HasCheckConstraint("CK_sales_Sales_Amounts_NonNegative", "[GrandTotal] >= 0 AND [PaidTotal] >= 0 AND [ChangeGiven] >= 0");
+                            t.HasCheckConstraint("CK_sales_Sales_Amounts_NonNegative", "[GrandTotal] >= 0 AND [PaidTotal] >= 0 AND [CreditTotal] >= 0 AND [ChangeGiven] >= 0");
 
                             t.HasCheckConstraint("CK_sales_Sales_Counts_Positive", "[TotalQuantity] > 0 AND [LineCount] > 0");
+
+                            t.HasCheckConstraint("CK_sales_Sales_Credit_Customer", "([CreditTotal] = 0 AND [CustomerId] IS NULL) OR ([CreditTotal] > 0 AND [CustomerId] IS NOT NULL)");
 
                             t.HasCheckConstraint("CK_sales_Sales_PaymentMethod", "[PaymentMethod] IN (N'Cash', N'ExternalCard')");
 
@@ -1311,7 +1497,7 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("CK_sales_Sales_Status_Completed", "[Status] = N'Completed'");
 
-                            t.HasCheckConstraint("CK_sales_Sales_Totals_Coherent", "[PaidTotal] = [GrandTotal]");
+                            t.HasCheckConstraint("CK_sales_Sales_Totals_Coherent", "[PaidTotal] + [CreditTotal] = [GrandTotal]");
                         });
                 });
 
@@ -1475,6 +1661,240 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Sales.SaleReturnEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CompletedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("OriginalSaleId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<decimal>("RefundAmount")
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<string>("RefundMethod")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_sales_SaleReturns");
+
+                    b.HasIndex("OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_sales_SaleReturns_OperationId");
+
+                    b.HasIndex("OriginalSaleId")
+                        .HasDatabaseName("IX_sales_SaleReturns_OriginalSaleId");
+
+                    b.HasIndex("Reference")
+                        .IsUnique()
+                        .HasDatabaseName("UX_sales_SaleReturns_Reference");
+
+                    b.ToTable("SaleReturns", "sales", t =>
+                        {
+                            t.HasCheckConstraint("CK_sales_SaleReturns_Reference_NotBlank", "LEN(LTRIM(RTRIM([Reference]))) > 0");
+
+                            t.HasCheckConstraint("CK_sales_SaleReturns_RefundAmount_NonNegative", "[RefundAmount] >= 0");
+
+                            t.HasCheckConstraint("CK_sales_SaleReturns_RefundMethod", "[RefundMethod] IN (N'Cash', N'ExternalCardPending', N'CreditReduction')");
+
+                            t.HasCheckConstraint("CK_sales_SaleReturns_Status", "[Status] = N'Completed'");
+                        });
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Sales.SaleReturnLineEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("LineTotal")
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<long>("ProductId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<long>("SaleLineId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("SaleReturnId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StockDestination")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("decimal(19,4)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_sales_SaleReturnLines");
+
+                    b.HasIndex("SaleLineId")
+                        .HasDatabaseName("IX_sales_SaleReturnLines_SaleLineId");
+
+                    b.HasIndex("SaleReturnId");
+
+                    b.ToTable("SaleReturnLines", "sales", t =>
+                        {
+                            t.HasCheckConstraint("CK_sales_SaleReturnLines_Quantity_Positive", "[Quantity] > 0");
+
+                            t.HasCheckConstraint("CK_sales_SaleReturnLines_StockDestination", "[StockDestination] IN (N'RestockApproved', N'NotRestockable')");
+
+                            t.HasCheckConstraint("CK_sales_SaleReturnLines_Total_Coherent", "[LineTotal] = [UnitPrice] * [Quantity]");
+                        });
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Sales.SuspendedSaleEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("CustomerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("CustomerNameSnapshot")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<decimal>("GrandTotal")
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<int>("LineCount")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTime>("SuspendedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_sales_SuspendedSales");
+
+                    b.HasIndex("OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_sales_SuspendedSales_OperationId");
+
+                    b.HasIndex("Reference")
+                        .IsUnique()
+                        .HasDatabaseName("UX_sales_SuspendedSales_Reference");
+
+                    b.HasIndex("Status", "SuspendedAtUtc", "Id")
+                        .HasDatabaseName("IX_sales_SuspendedSales_Status_Timeline");
+
+                    b.ToTable("SuspendedSales", "sales", t =>
+                        {
+                            t.HasCheckConstraint("CK_sales_SuspendedSales_GrandTotal_NonNegative", "[GrandTotal] >= 0");
+
+                            t.HasCheckConstraint("CK_sales_SuspendedSales_LineCount_Positive", "[LineCount] > 0");
+
+                            t.HasCheckConstraint("CK_sales_SuspendedSales_Reference_NotBlank", "LEN(LTRIM(RTRIM([Reference]))) > 0");
+
+                            t.HasCheckConstraint("CK_sales_SuspendedSales_Status", "[Status] IN (N'Open', N'Resumed', N'Abandoned')");
+                        });
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Sales.SuspendedSaleLineEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("LineTotal")
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<string>("PresentationSnapshot")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<long>("ProductId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ProductNameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("ProductReferenceSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<long>("SuspendedSaleId")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("decimal(19,4)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_sales_SuspendedSaleLines");
+
+                    b.HasIndex("SuspendedSaleId");
+
+                    b.ToTable("SuspendedSaleLines", "sales", t =>
+                        {
+                            t.HasCheckConstraint("CK_sales_SuspendedSaleLines_Quantity_Positive", "[Quantity] > 0");
+
+                            t.HasCheckConstraint("CK_sales_SuspendedSaleLines_Reference_NotBlank", "LEN(LTRIM(RTRIM([ProductReferenceSnapshot]))) > 0");
+
+                            t.HasCheckConstraint("CK_sales_SuspendedSaleLines_Total_Coherent", "[LineTotal] = [UnitPrice] * [Quantity]");
+                        });
+                });
+
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Catalog.ProductBarcodeEntity", b =>
                 {
                     b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Catalog.ProductEntity", "Product")
@@ -1518,6 +1938,18 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                         .HasConstraintName("FK_catalog_ProductPriceHistories_Products_ProductId");
 
                     b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Customers.CustomerLedgerEntryEntity", b =>
+                {
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Customers.CustomerEntity", "Customer")
+                        .WithMany("LedgerEntries")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_customers_CustomerLedgerEntries_Customers_CustomerId");
+
+                    b.Navigation("Customer");
                 });
 
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Inventory.InventoryCountLineEntity", b =>
@@ -1823,6 +2255,30 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                     b.Navigation("ResultSale");
                 });
 
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Sales.SaleReturnLineEntity", b =>
+                {
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Sales.SaleReturnEntity", "SaleReturn")
+                        .WithMany("Lines")
+                        .HasForeignKey("SaleReturnId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_sales_SaleReturnLines_SaleReturns_SaleReturnId");
+
+                    b.Navigation("SaleReturn");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Sales.SuspendedSaleLineEntity", b =>
+                {
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Sales.SuspendedSaleEntity", "SuspendedSale")
+                        .WithMany("Lines")
+                        .HasForeignKey("SuspendedSaleId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_sales_SuspendedSaleLines_SuspendedSales_SuspendedSaleId");
+
+                    b.Navigation("SuspendedSale");
+                });
+
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Catalog.ProductCategoryEntity", b =>
                 {
                     b.Navigation("ProductSettings");
@@ -1843,6 +2299,11 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                     b.Navigation("StockBatches");
 
                     b.Navigation("StockMovements");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Customers.CustomerEntity", b =>
+                {
+                    b.Navigation("LedgerEntries");
                 });
 
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Inventory.InventorySessionEntity", b =>
@@ -1902,6 +2363,16 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Sales.SaleLineEntity", b =>
                 {
                     b.Navigation("Allocations");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Sales.SaleReturnEntity", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Sales.SuspendedSaleEntity", b =>
+                {
+                    b.Navigation("Lines");
                 });
 #pragma warning restore 612, 618
         }

@@ -123,7 +123,7 @@ public sealed class SalesArchitectureTests
     }
 
     [Fact]
-    public void Check63_RepositoryContainsOnlyApprovedSqlFilesThroughSprint13()
+    public void Check63_RepositoryContainsOnlyApprovedSqlFilesThroughSprint14()
     {
         var sqlFiles = Directory
             .EnumerateFiles(RepositoryRoot, "*.sql", SearchOption.AllDirectories)
@@ -146,11 +146,13 @@ public sealed class SalesArchitectureTests
                 "database/scripts/003_inventory_persistence_v01_idempotent.sql",
                 "database/scripts/004_purchasing_persistence_v01_idempotent.sql",
                 "database/scripts/005_sales_persistence_v01_idempotent.sql",
+                "database/scripts/006_cash_customers_credit_returns_v01_idempotent.sql",
                 "database/verification/verify_sprint09_schema.sql",
                 "database/verification/verify_sprint10_catalog.sql",
                 "database/verification/verify_sprint11_inventory.sql",
                 "database/verification/verify_sprint12_purchasing.sql",
                 "database/verification/verify_sprint13_sales.sql",
+                "database/verification/verify_sprint14_cash_credit_returns.sql",
             },
             sqlFiles);
     }

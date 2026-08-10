@@ -1,0 +1,214 @@
+@page "/module/customers"
+@inject Pharmacy.Desktop.Components.Customers.CustomersCoordinator Coordinator
+@implements IDisposable
+
+<PageTitle>Clients et crédit — Logiciel Pharmacie</PageTitle>
+
+<div class="page-content catalog-page">
+    <header class="page-header catalog-page-header">
+        <div>
+            <p class="catalog-kicker">Clients et crédit</p>
+            <h1>Clients fidèles et créances</h1>
+            <p class="page-subtitle">Clients minimaux, autorisation crédit explicite et historique financier SQL.</p>
+        </div>
+    </header>
+
+    <UiAlert Title="Sprint 14 — crédit contrôlé sans plafond automatique"
+             Variant="UiAlertVariant.Information">
+        Le crédit exige un client actif avec autorisation explicite. Les règlements et créances sont append-only.
+    </UiAlert>
+
+    <section class="catalog-search-card" aria-labelledby="customers-search-title">
+        <div>
+            <p class="catalog-kicker">Recherche</p>
+            <h2 id="customers-search-title">Trouver un client</h2>
+        </div>
+        <div class="catalog-search-card__controls">
+            <input class="ui-field__control"
+                   type="search"
+                   placeholder="Nom, téléphone ou référence"
+                   value="@searchTerm"
+                   @oninput="SearchChangedAsync" />
+            <UiButton Variant="UiButtonVariant.Secondary" OnClick="ClearSearchAsync">Effacer</UiButton>
+        </div>
+    </section>
+
+    <section class="catalog-editor-card" aria-labelledby="customers-create-title">
+        <div>
+            <p class="catalog-kicker">Création rapide</p>
+            <h2 id="customers-create-title">Nouveau client</h2>
+        </div>
+        <div class="catalog-form-grid">
+            <label class="ui-field">
+                <span class="ui-field__label">Nom</span>
+                <input class="ui-field__control" value="@newName" @oninput="args => newName = args.Value?.ToString() ?? string.Empty" />
+            </label>
+            <label class="ui-field">
+                <span class="ui-field__label">Téléphone facultatif</span>
+                <input class="ui-field__control" value="@newPhone" @oninput="args => newPhone = args.Value?.ToString() ?? string.Empty" />
+            </label>
+            <label class="catalog-toggle">
+                <input type="checkbox" checked="@newCreditAllowed" @onchange="args => newCreditAllowed = args.Value is true" />
+                <span>Autoriser le crédit</span>
+            </label>
+        </div>
+        <UiButton Disabled="@(Coordinator.IsBusy || string.IsNullOrWhiteSpace(newName))" OnClick="CreateAsync">
+            Créer le client
+        </UiButton>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(Coordinator.UserMessage))
+    {
+        <UiAlert Title="Information" Variant="@(Coordinator.LastErrorCode is null ? UiAlertVariant.Success : UiAlertVariant.Warning)">
+            @Coordinator.UserMessage
+        </UiAlert>
+    }
+
+    <div class="catalog-layout">
+        <section class="catalog-results-card" aria-labelledby="customers-list-title">
+            <h2 id="customers-list-title">Clients</h2>
+            @if (Coordinator.IsBusy)
+            {
+                <UiSpinner Label="Chargement des clients" />
+            }
+            else if (Coordinator.Customers.Count == 0)
+            {
+                <UiEmptyState Title="Aucun client" Description="Créez un client minimal ou ajustez la recherche." />
+            }
+            else
+            {
+                <div class="catalog-table-scroll" tabindex="0">
+                    <table class="catalog-table catalog-table--compact">
+                        <thead>
+                            <tr>
+                                <th>Référence</th>
+                                <th>Nom</th>
+                                <th>Crédit</th>
+                                <th>Solde</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var customer in Coordinator.Customers)
+                            {
+                                <tr @key="customer.CustomerId">
+                                    <td><strong>@customer.Reference</strong></td>
+                                    <td>@customer.FullName</td>
+                                    <td><UiBadge Text="@(customer.CreditAllowed ? "Autorisé" : "Non autorisé")"
+                                                 Variant="@(customer.CreditAllowed ? UiBadgeVariant.Success : UiBadgeVariant.Neutral)" /></td>
+                                    <td>@DemoMoney.Format(customer.CreditBalance.Amount)</td>
+                                    <td><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" OnClick="@(() => SelectAsync(customer.CustomerId))">Ouvrir</UiButton></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+
+        <aside class="catalog-detail-card" aria-labelledby="customers-detail-title">
+            <h2 id="customers-detail-title">Fiche client</h2>
+            @if (Coordinator.SelectedCustomer is null)
+            {
+                <UiEmptyState Title="Aucun client sélectionné" Description="Sélectionnez un client pour consulter le solde et l’historique." />
+            }
+            else
+            {
+                var selected = Coordinator.SelectedCustomer;
+                <div class="catalog-detail-stack">
+                    <p><strong>@selected.FullName</strong></p>
+                    <p>@selected.Reference</p>
+                    <p>Solde crédit : <strong>@DemoMoney.Format(selected.CreditBalance.Amount)</strong></p>
+                    <UiBadge Text="@(selected.CreditAllowed ? "Crédit autorisé" : "Crédit non autorisé")"
+                             Variant="@(selected.CreditAllowed ? UiBadgeVariant.Success : UiBadgeVariant.Warning)" />
+                    <label class="ui-field">
+                        <span class="ui-field__label">Règlement espèces</span>
+                        <input class="ui-field__control" inputmode="decimal" value="@paymentAmount" @oninput="args => paymentAmount = args.Value?.ToString() ?? string.Empty" />
+                    </label>
+                    <UiButton Disabled="@(!CanRegisterPayment)" OnClick="RegisterPaymentAsync">Enregistrer le règlement</UiButton>
+                    <h3>Historique</h3>
+                    @if (selected.Ledger.Count == 0)
+                    {
+                        <p>Aucune écriture financière.</p>
+                    }
+                    else
+                    {
+                        <ul class="catalog-detail-list">
+                            @foreach (var entry in selected.Ledger)
+                            {
+                                <li>@entry.OccurredAtUtc.ToString("dd/MM HH:mm") — @entry.EntryType — @DemoMoney.Format(entry.Amount.Amount)</li>
+                            }
+                        </ul>
+                    }
+                </div>
+            }
+        </aside>
+    </div>
+</div>
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private string searchTerm = string.Empty;
+    private string newName = string.Empty;
+    private string newPhone = string.Empty;
+    private bool newCreditAllowed;
+    private string paymentAmount = string.Empty;
+
+    private bool CanRegisterPayment => decimal.TryParse(
+        paymentAmount.Replace(',', '.'),
+        System.Globalization.NumberStyles.AllowDecimalPoint,
+        System.Globalization.CultureInfo.InvariantCulture,
+        out var amount) && amount > 0m && !Coordinator.IsBusy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Coordinator.LoadAsync(lifetime.Token);
+    }
+
+    private async Task SearchChangedAsync(ChangeEventArgs args)
+    {
+        searchTerm = args.Value?.ToString() ?? string.Empty;
+        await Coordinator.SearchAsync(searchTerm, lifetime.Token);
+    }
+
+    private async Task ClearSearchAsync(MouseEventArgs _)
+    {
+        searchTerm = string.Empty;
+        await Coordinator.SearchAsync(null, lifetime.Token);
+    }
+
+    private async Task CreateAsync(MouseEventArgs _)
+    {
+        await Coordinator.CreateAsync(newName, newPhone, newCreditAllowed, lifetime.Token);
+        newName = string.Empty;
+        newPhone = string.Empty;
+        newCreditAllowed = false;
+    }
+
+    private Task SelectAsync(long customerId)
+    {
+        paymentAmount = string.Empty;
+        return Coordinator.SelectAsync(customerId, lifetime.Token);
+    }
+
+    private async Task RegisterPaymentAsync(MouseEventArgs _)
+    {
+        if (!decimal.TryParse(
+                paymentAmount.Replace(',', '.'),
+                System.Globalization.NumberStyles.AllowDecimalPoint,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var amount))
+        {
+            return;
+        }
+
+        await Coordinator.RegisterPaymentAsync(amount, lifetime.Token);
+        paymentAmount = string.Empty;
+    }
+
+    public void Dispose()
+    {
+        lifetime.Cancel();
+        lifetime.Dispose();
+    }
+}

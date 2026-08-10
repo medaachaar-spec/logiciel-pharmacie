@@ -52,8 +52,10 @@ public sealed class SqlSalesReader : ISalesReader
                     sale.CompletedAtUtc,
                     sale.LineCount,
                     sale.TotalQuantity,
-                    sale.GrandTotal,
-                    sale.PaymentMethod,
+                sale.GrandTotal,
+                sale.CreditTotal,
+                sale.CustomerId,
+                sale.PaymentMethod,
                     sale.Status
                 })
                 .ToArrayAsync(cancellationToken);
@@ -133,6 +135,8 @@ public sealed class SqlSalesReader : ISalesReader
                 payment.TenderedAmount,
                 payment.ChangeGiven,
                 payment.ExternalCardConfirmed,
-                payment.ConfirmedAtUtc));
+                payment.ConfirmedAtUtc),
+            sale.CustomerId,
+            Money.Create(sale.CreditTotal).Value);
     }
 }

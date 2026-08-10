@@ -13,10 +13,12 @@ internal sealed class SaleEntity
     public DateTime CompletedAtUtc { get; set; }
     public decimal GrandTotal { get; set; }
     public decimal PaidTotal { get; set; }
+    public decimal CreditTotal { get; set; }
     public decimal ChangeGiven { get; set; }
     public long TotalQuantity { get; set; }
     public int LineCount { get; set; }
     public SalePaymentMethod PaymentMethod { get; set; }
+    public long? CustomerId { get; set; }
     public ICollection<SaleLineEntity> Lines { get; } = new List<SaleLineEntity>();
     public ICollection<PaymentEntity> Payments { get; } = new List<PaymentEntity>();
 }

@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Pharmacy.Infrastructure.Persistence.Entities.Cash;
 using Pharmacy.Infrastructure.Persistence.Entities.Catalog;
+using Pharmacy.Infrastructure.Persistence.Entities.Customers;
 using Pharmacy.Infrastructure.Persistence.Entities.Inventory;
 using Pharmacy.Infrastructure.Persistence.Entities.Purchasing;
 using Pharmacy.Infrastructure.Persistence.Entities.Sales;
@@ -46,6 +48,13 @@ public sealed class PharmacyDbContext : DbContext
     internal DbSet<SaleLineAllocationEntity> SaleLineAllocations => Set<SaleLineAllocationEntity>();
     internal DbSet<PaymentEntity> Payments => Set<PaymentEntity>();
     internal DbSet<SaleOperationEntity> SaleOperations => Set<SaleOperationEntity>();
+    internal DbSet<CustomerEntity> Customers => Set<CustomerEntity>();
+    internal DbSet<CustomerLedgerEntryEntity> CustomerLedgerEntries => Set<CustomerLedgerEntryEntity>();
+    internal DbSet<CashLedgerEntryEntity> CashLedgerEntries => Set<CashLedgerEntryEntity>();
+    internal DbSet<SuspendedSaleEntity> SuspendedSales => Set<SuspendedSaleEntity>();
+    internal DbSet<SuspendedSaleLineEntity> SuspendedSaleLines => Set<SuspendedSaleLineEntity>();
+    internal DbSet<SaleReturnEntity> SaleReturns => Set<SaleReturnEntity>();
+    internal DbSet<SaleReturnLineEntity> SaleReturnLines => Set<SaleReturnLineEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

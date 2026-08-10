@@ -12,7 +12,9 @@ public sealed record FinalizeSaleCommand(
     long ExpectedVersion,
     SalePaymentMethod PaymentMethod,
     decimal? TenderedAmount,
-    bool ExternalCardConfirmed);
+    bool ExternalCardConfirmed,
+    long? CustomerId = null,
+    decimal CreditAmount = 0m);
 
 public sealed class FinalizeSaleHandler
 {
@@ -59,8 +61,18 @@ public sealed class FinalizeSaleHandler
             return Result<FinalizedSaleView>.Failure(payment.Error);
         }
 
+        var creditError = ValidateCredit(command, preparation.Value.Total);
+
+        if (creditError is not null)
+        {
+            return Result<FinalizedSaleView>.Failure(creditError);
+        }
+
+        var credit = command.CreditAmount == 0m
+            ? null
+            : new SaleCreditRequest(command.CustomerId!.Value, command.CreditAmount);
         return await finalizer.FinalizeAsync(
-            new FinalizeSaleRequest(preparation.Value, payment.Value),
+            new FinalizeSaleRequest(preparation.Value, payment.Value, credit),
             cancellationToken);
     }
 
@@ -68,12 +80,19 @@ public sealed class FinalizeSaleHandler
         FinalizeSaleCommand command,
         Money total)
     {
+        var immediateAmount = total.Amount - command.CreditAmount;
+
+        if (immediateAmount < 0m || command.CreditAmount < 0m)
+        {
+            return Result<SalePaymentRequest>.Failure(SalesApplicationErrors.PaymentInvalid);
+        }
+
         if (command.PaymentMethod == SalePaymentMethod.ExternalCard)
         {
             return command.ExternalCardConfirmed
                 ? Result<SalePaymentRequest>.Success(new SalePaymentRequest(
                     SalePaymentMethod.ExternalCard,
-                    total.Amount,
+                    immediateAmount,
                     null,
                     0m,
                     true))
@@ -82,7 +101,7 @@ public sealed class FinalizeSaleHandler
 
         if (command.PaymentMethod != SalePaymentMethod.Cash
             || command.TenderedAmount is null
-            || command.TenderedAmount.Value < total.Amount
+            || command.TenderedAmount.Value < immediateAmount
             || command.TenderedAmount.Value < 0m)
         {
             return Result<SalePaymentRequest>.Failure(SalesApplicationErrors.PaymentInvalid);
@@ -90,9 +109,29 @@ public sealed class FinalizeSaleHandler
 
         return Result<SalePaymentRequest>.Success(new SalePaymentRequest(
             SalePaymentMethod.Cash,
-            total.Amount,
+            immediateAmount,
             command.TenderedAmount,
-            command.TenderedAmount.Value - total.Amount,
+            command.TenderedAmount.Value - immediateAmount,
             false));
+    }
+
+    private static Error? ValidateCredit(
+        FinalizeSaleCommand command,
+        Money total)
+    {
+        if (command.CreditAmount == 0m)
+        {
+            return null;
+        }
+
+        if (command.CreditAmount < 0m
+            || command.CreditAmount > total.Amount
+            || command.CustomerId is null
+            || command.CustomerId.Value <= 0)
+        {
+            return SalesApplicationErrors.PaymentInvalid;
+        }
+
+        return null;
     }
 }

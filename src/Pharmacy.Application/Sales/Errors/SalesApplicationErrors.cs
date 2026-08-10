@@ -83,6 +83,14 @@ public static class SalesApplicationErrors
         "sales.payment.invalid",
         "Le paiement ne couvre pas exactement les règles de cette vente.");
 
+    public static Error CreditCustomerRequired { get; } = new(
+        "sales.credit.customer_required",
+        "Une vente à crédit exige un client.");
+
+    public static Error CreditNotAllowed { get; } = new(
+        "sales.credit.not_allowed",
+        "Le crédit n’est pas autorisé pour ce client.");
+
     public static Error CardUnconfirmed { get; } = new(
         "sales.payment.card_unconfirmed",
         "Le paiement carte doit être confirmé sur le TPE externe avant la finalisation.");

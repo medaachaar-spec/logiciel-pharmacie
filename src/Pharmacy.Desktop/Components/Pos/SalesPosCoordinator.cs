@@ -175,6 +175,10 @@ public sealed class SalesPosCoordinator
 
     public decimal? ReceivedAmount { get; private set; }
 
+    public long? CreditCustomerId { get; private set; }
+
+    public decimal CreditAmount { get; private set; }
+
     public SalesPosCompletedSale? Result { get; private set; }
 
     public DemoPrintStatus PrintStatus => ticketPrintService.Status;
@@ -191,9 +195,11 @@ public sealed class SalesPosCoordinator
 
     public decimal Change => PaymentMethod == DemoPaymentMethod.Cash
         && ReceivedAmount is not null
-        && ReceivedAmount.Value >= Total
-            ? ReceivedAmount.Value - Total
+        && ReceivedAmount.Value >= ImmediatePaymentDue
+            ? ReceivedAmount.Value - ImmediatePaymentDue
             : 0m;
+
+    public decimal ImmediatePaymentDue => Math.Max(0m, Total - CreditAmount);
 
     public bool IsCompletionInProgress => completionInProgress;
 
@@ -759,6 +765,20 @@ public sealed class SalesPosCoordinator
         return true;
     }
 
+    public bool SetCredit(long? customerId, decimal amount)
+    {
+        if (amount < 0m || amount > Total || customerId is not null && customerId.Value <= 0)
+        {
+            CreditCustomerId = null;
+            CreditAmount = 0m;
+            return false;
+        }
+
+        CreditCustomerId = amount == 0m ? null : customerId;
+        CreditAmount = amount;
+        return true;
+    }
+
     public bool StartExternalCardVerification()
     {
         if (PaymentMethod != DemoPaymentMethod.ExternalCard
@@ -841,7 +861,9 @@ public sealed class SalesPosCoordinator
                         ? SalePaymentMethod.Cash
                         : SalePaymentMethod.ExternalCard,
                     ReceivedAmount,
-                    CardPaymentStatus == DemoCardPaymentStatus.Confirmed),
+                    CardPaymentStatus == DemoCardPaymentStatus.Confirmed,
+                    CreditCustomerId,
+                    CreditAmount),
                 cancellationToken);
 
             if (finalized.IsFailure)
@@ -1201,7 +1223,7 @@ public sealed class SalesPosCoordinator
     {
         return PaymentMethod switch
         {
-            DemoPaymentMethod.Cash => ReceivedAmount is not null && ReceivedAmount.Value >= Total,
+            DemoPaymentMethod.Cash => ReceivedAmount is not null && ReceivedAmount.Value >= ImmediatePaymentDue,
             DemoPaymentMethod.ExternalCard => CardPaymentStatus == DemoCardPaymentStatus.Confirmed,
             _ => false
         };
@@ -1218,6 +1240,8 @@ public sealed class SalesPosCoordinator
     {
         PaymentMethod = DemoPaymentMethod.None;
         ReceivedAmount = null;
+        CreditCustomerId = null;
+        CreditAmount = 0m;
         CardPaymentStatus = DemoCardPaymentStatus.NotStarted;
         CardVerificationCount = 0;
         pendingOperationId = Guid.Empty;

@@ -13,8 +13,9 @@ internal sealed class SaleConfiguration : IEntityTypeConfiguration<SaleEntity>
             table.HasCheckConstraint("CK_sales_Sales_Reference_NotBlank", "LEN(LTRIM(RTRIM([Reference]))) > 0");
             table.HasCheckConstraint("CK_sales_Sales_Status_Completed", "[Status] = N'Completed'");
             table.HasCheckConstraint("CK_sales_Sales_PaymentMethod", "[PaymentMethod] IN (N'Cash', N'ExternalCard')");
-            table.HasCheckConstraint("CK_sales_Sales_Amounts_NonNegative", "[GrandTotal] >= 0 AND [PaidTotal] >= 0 AND [ChangeGiven] >= 0");
-            table.HasCheckConstraint("CK_sales_Sales_Totals_Coherent", "[PaidTotal] = [GrandTotal]");
+            table.HasCheckConstraint("CK_sales_Sales_Amounts_NonNegative", "[GrandTotal] >= 0 AND [PaidTotal] >= 0 AND [CreditTotal] >= 0 AND [ChangeGiven] >= 0");
+            table.HasCheckConstraint("CK_sales_Sales_Totals_Coherent", "[PaidTotal] + [CreditTotal] = [GrandTotal]");
+            table.HasCheckConstraint("CK_sales_Sales_Credit_Customer", "([CreditTotal] = 0 AND [CustomerId] IS NULL) OR ([CreditTotal] > 0 AND [CustomerId] IS NOT NULL)");
             table.HasCheckConstraint("CK_sales_Sales_Counts_Positive", "[TotalQuantity] > 0 AND [LineCount] > 0");
         });
         builder.HasKey(entity => entity.Id).HasName("PK_sales_Sales");
@@ -25,10 +26,12 @@ internal sealed class SaleConfiguration : IEntityTypeConfiguration<SaleEntity>
         builder.Property(entity => entity.CompletedAtUtc).HasColumnType("datetime2(7)").IsRequired();
         builder.Property(entity => entity.GrandTotal).HasColumnType("decimal(19,4)").IsRequired();
         builder.Property(entity => entity.PaidTotal).HasColumnType("decimal(19,4)").IsRequired();
+        builder.Property(entity => entity.CreditTotal).HasColumnType("decimal(19,4)").IsRequired();
         builder.Property(entity => entity.ChangeGiven).HasColumnType("decimal(19,4)").IsRequired();
         builder.Property(entity => entity.TotalQuantity).HasColumnType("bigint").IsRequired();
         builder.Property(entity => entity.LineCount).HasColumnType("int").IsRequired();
         builder.Property(entity => entity.PaymentMethod).HasConversion<string>().HasColumnType("nvarchar(32)").HasMaxLength(32).IsRequired();
+        builder.Property(entity => entity.CustomerId);
         builder.HasIndex(entity => entity.Reference).IsUnique().HasDatabaseName("UX_sales_Sales_Reference");
         builder.HasIndex(entity => entity.OperationId).IsUnique().HasDatabaseName("UX_sales_Sales_OperationId");
         builder.HasIndex(entity => new { entity.CompletedAtUtc, entity.Id }).HasDatabaseName("IX_sales_Sales_CompletedAtUtc_Id");

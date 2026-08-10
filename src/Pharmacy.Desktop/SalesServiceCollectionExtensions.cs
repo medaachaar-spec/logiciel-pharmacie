@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using Pharmacy.Application.Customers.Commands;
+using Pharmacy.Application.Customers.Queries;
 using Pharmacy.Application.Catalog.Commands;
 using Pharmacy.Application.Catalog.Queries;
 using Pharmacy.Application.Inventory.Commands;
@@ -13,6 +15,7 @@ using Pharmacy.Application.Sales.Finalization.Commands;
 using Pharmacy.Application.Sales.Finalization.Queries;
 using Pharmacy.Desktop.Components.Pos;
 using Pharmacy.Desktop.Components.Catalog;
+using Pharmacy.Desktop.Components.Customers;
 using Pharmacy.Desktop.Components.Inventory;
 using Pharmacy.Desktop.Components.Purchasing;
 using Pharmacy.Infrastructure.Catalog;
@@ -69,12 +72,15 @@ public static class SalesServiceCollectionExtensions
         services.AddTransient<InventoryCommandHandlers>();
         services.AddTransient<PurchasingQueryHandlers>();
         services.AddTransient<PurchasingCommandHandlers>();
+        services.AddTransient<CustomerQueryHandlers>();
+        services.AddTransient<CustomerCommandHandlers>();
 
         services.AddScoped<DemoTicketPrintService>();
         services.AddScoped<SalesPosCoordinator>();
         services.AddScoped<CatalogCoordinator>();
         services.AddScoped<InventoryCoordinator>();
         services.AddScoped<PurchasingCoordinator>();
+        services.AddScoped<CustomersCoordinator>();
         return services;
     }
 }

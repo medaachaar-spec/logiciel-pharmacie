@@ -13,11 +13,37 @@ public sealed class FinalizedSaleView
         long totalQuantity,
         IEnumerable<FinalizedSaleLineView> lines,
         SalePaymentView payment)
+        : this(
+            saleId,
+            reference,
+            operationId,
+            completedAtUtc,
+            total,
+            totalQuantity,
+            lines,
+            payment,
+            null,
+            Money.Zero)
+    {
+    }
+
+    public FinalizedSaleView(
+        long saleId,
+        string reference,
+        Guid operationId,
+        DateTime completedAtUtc,
+        Money total,
+        long totalQuantity,
+        IEnumerable<FinalizedSaleLineView> lines,
+        SalePaymentView payment,
+        long? customerId,
+        Money creditAmount)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(reference);
         ArgumentNullException.ThrowIfNull(total);
         ArgumentNullException.ThrowIfNull(lines);
         ArgumentNullException.ThrowIfNull(payment);
+        ArgumentNullException.ThrowIfNull(creditAmount);
 
         SaleId = saleId;
         Reference = reference;
@@ -27,6 +53,8 @@ public sealed class FinalizedSaleView
         TotalQuantity = totalQuantity;
         Lines = Array.AsReadOnly(lines.ToArray());
         Payment = payment;
+        CustomerId = customerId;
+        CreditAmount = creditAmount;
     }
 
     public long SaleId { get; }
@@ -48,6 +76,10 @@ public sealed class FinalizedSaleView
     public IReadOnlyList<FinalizedSaleLineView> Lines { get; }
 
     public SalePaymentView Payment { get; }
+
+    public long? CustomerId { get; }
+
+    public Money CreditAmount { get; }
 }
 
 public sealed class FinalizedSaleLineView

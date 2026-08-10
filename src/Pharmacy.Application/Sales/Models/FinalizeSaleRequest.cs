@@ -4,7 +4,8 @@ namespace Pharmacy.Application.Sales.Models;
 
 public sealed record FinalizeSaleRequest(
     SaleFinalizationPreparation Preparation,
-    SalePaymentRequest Payment);
+    SalePaymentRequest Payment,
+    SaleCreditRequest? Credit = null);
 
 public sealed record SalePaymentRequest(
     SalePaymentMethod Method,
@@ -18,3 +19,7 @@ public enum SalePaymentMethod
     Cash,
     ExternalCard
 }
+
+public sealed record SaleCreditRequest(
+    long CustomerId,
+    decimal Amount);

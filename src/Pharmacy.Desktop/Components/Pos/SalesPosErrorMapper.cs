@@ -58,6 +58,10 @@ public static class SalesPosErrorMapper
                 "Un prix Catalogue a changé. La vente est bloquée ; actualisez le panier avant de réessayer.",
             "sales.payment.invalid" =>
                 "Le paiement ne couvre pas la vente. Corrigez le montant avant de réessayer.",
+            "sales.credit.customer_required" =>
+                "Sélectionnez un client actif avant de laisser une partie de la vente à crédit.",
+            "sales.credit.not_allowed" =>
+                "Le client sélectionné n’a pas l’autorisation crédit active.",
             "sales.payment.card_unconfirmed" =>
                 "Confirmez explicitement le résultat sur le TPE externe avant de finaliser.",
             "sales.operation.conflict" =>

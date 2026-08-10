@@ -289,6 +289,86 @@ public sealed class SalesApplicationTests
     }
 
     [Fact]
+    public async Task PartialCreditBuildsPaymentAndCreditRequestForPersistentFinalizer()
+    {
+        var draft = SaleDraft.Create(SaleDraftId.New());
+        var product = Product(1);
+        draft.AddItem(
+            SaleProductSnapshot.Create(
+                product.ProductId,
+                product.Reference,
+                product.DisplayName,
+                product.Presentation,
+                product.UnitSalePrice).Value,
+            SaleQuantity.One);
+        var store = new StubDraftStore(new VersionedSaleDraft(draft, 2));
+        var finalizer = new RecordingFinalizer();
+        var handler = new FinalizeSaleHandler(
+            new PrepareSaleFinalizationHandler(
+                store,
+                new StubStock(),
+                new StubPreparationStore()),
+            finalizer);
+
+        var result = await handler.HandleAsync(
+            new FinalizeSaleCommand(
+                Guid.NewGuid(),
+                draft.Id,
+                2,
+                SalePaymentMethod.Cash,
+                4m,
+                false,
+                CustomerId: 42,
+                CreditAmount: 6m),
+            TestCancellation);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(1, finalizer.Calls);
+        Assert.NotNull(finalizer.LastRequest);
+        Assert.Equal(4m, finalizer.LastRequest.Payment.Amount);
+        Assert.Equal(6m, finalizer.LastRequest.Credit?.Amount);
+        Assert.Equal(42, finalizer.LastRequest.Credit?.CustomerId);
+    }
+
+    [Fact]
+    public async Task CreditWithoutCustomerIsRejectedBeforePersistentFinalizer()
+    {
+        var draft = SaleDraft.Create(SaleDraftId.New());
+        var product = Product(1);
+        draft.AddItem(
+            SaleProductSnapshot.Create(
+                product.ProductId,
+                product.Reference,
+                product.DisplayName,
+                product.Presentation,
+                product.UnitSalePrice).Value,
+            SaleQuantity.One);
+        var store = new StubDraftStore(new VersionedSaleDraft(draft, 2));
+        var finalizer = new RecordingFinalizer();
+        var handler = new FinalizeSaleHandler(
+            new PrepareSaleFinalizationHandler(
+                store,
+                new StubStock(),
+                new StubPreparationStore()),
+            finalizer);
+
+        var result = await handler.HandleAsync(
+            new FinalizeSaleCommand(
+                Guid.NewGuid(),
+                draft.Id,
+                2,
+                SalePaymentMethod.Cash,
+                5m,
+                false,
+                CreditAmount: 5m),
+            TestCancellation);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("sales.payment.invalid", result.Error.Code);
+        Assert.Equal(0, finalizer.Calls);
+    }
+
+    [Fact]
     public void ApplicationErrorsExposeStableExpectedCodes()
     {
         Assert.Equal("sales.draft.version.invalid", SalesApplicationErrors.InvalidExpectedVersion.Code);
@@ -453,11 +533,14 @@ public sealed class SalesApplicationTests
     {
         public int Calls { get; private set; }
 
+        public FinalizeSaleRequest? LastRequest { get; private set; }
+
         public Task<Result<FinalizedSaleView>> FinalizeAsync(
             FinalizeSaleRequest request,
             CancellationToken cancellationToken = default)
         {
             Calls++;
+            LastRequest = request;
             return Task.FromResult(Result<FinalizedSaleView>.Failure(
                 SalesApplicationErrors.OperationConflict));
         }

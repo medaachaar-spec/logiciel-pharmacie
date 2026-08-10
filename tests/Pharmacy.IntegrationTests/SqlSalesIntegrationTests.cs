@@ -58,7 +58,7 @@ public sealed class SqlSalesIntegrationTests
                     migration.EndsWith("_SalesPersistenceV01", StringComparison.Ordinal));
             }
 
-            Assert.Equal(5, await ScalarAsync<int>(
+            Assert.Equal(9, await ScalarAsync<int>(
                 databaseConnection.ConnectionString,
                 "SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE s.name=N'sales';"));
 
@@ -349,7 +349,7 @@ public sealed class SqlSalesIntegrationTests
                 await reapplyContext.Database.MigrateAsync(cancellationToken);
                 Assert.Empty(await reapplyContext.Database.GetPendingMigrationsAsync(cancellationToken));
             }
-            Assert.Equal(5, await ScalarAsync<int>(
+            Assert.Equal(9, await ScalarAsync<int>(
                 databaseConnection.ConnectionString,
                 "SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE s.name=N'sales';"));
         }
