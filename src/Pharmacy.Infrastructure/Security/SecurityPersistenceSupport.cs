@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
 using Pharmacy.Application.Security.Errors;
 using Pharmacy.Application.Security.Models;
+using Pharmacy.Application.Security.Services;
 using Pharmacy.Domain.Common;
 using Pharmacy.Domain.Security;
 using Pharmacy.Infrastructure.Persistence;
@@ -56,7 +57,9 @@ internal static class SecurityPersistenceSupport
             .Include(user => user.UserRoles)
             .ThenInclude(userRole => userRole.Role)
             .ThenInclude(role => role.RolePermissions)
-            .ThenInclude(rolePermission => rolePermission.Permission);
+            .ThenInclude(rolePermission => rolePermission.Permission)
+            .Include(user => user.PermissionOverrides)
+            .ThenInclude(item => item.Permission);
     }
 
     public static UserSessionView MapSession(UserAccountEntity user, DateTime nowUtc)
@@ -67,13 +70,16 @@ internal static class SecurityPersistenceSupport
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .ToArray();
-        var permissions = user.UserRoles
+        var roleGrants = user.UserRoles
             .Where(userRole => userRole.Role.IsActive)
             .SelectMany(userRole => userRole.Role.RolePermissions)
             .Select(rolePermission => rolePermission.Permission)
             .Where(permission => permission.Code.Length > 0)
-            .Select(permission => permission.Code)
-            .ToHashSet(StringComparer.Ordinal);
+            .Select(permission => permission.Code);
+        var overrides = user.PermissionOverrides.Select(item => new KeyValuePair<string, SecurityPermissionOverrideEffect>(
+            item.Permission.Code,
+            Enum.Parse<SecurityPermissionOverrideEffect>(item.Effect, ignoreCase: false)));
+        var permissions = EffectivePermissionResolver.Resolve(roleGrants, overrides);
         return new UserSessionView(
             user.Id,
             user.Login,

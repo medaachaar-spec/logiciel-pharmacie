@@ -19,6 +19,7 @@ internal sealed class UserAccountEntity
     public Guid SecurityStamp { get; set; }
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
     public ICollection<UserRoleEntity> UserRoles { get; } = new List<UserRoleEntity>();
+    public ICollection<UserPermissionOverrideEntity> PermissionOverrides { get; } = new List<UserPermissionOverrideEntity>();
     public ICollection<RecoveryCodeEntity> RecoveryCodes { get; } = new List<RecoveryCodeEntity>();
 }
 
@@ -45,6 +46,7 @@ internal sealed class PermissionEntity
     public bool IsSensitive { get; set; }
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
     public ICollection<RolePermissionEntity> RolePermissions { get; } = new List<RolePermissionEntity>();
+    public ICollection<UserPermissionOverrideEntity> UserOverrides { get; } = new List<UserPermissionOverrideEntity>();
 }
 
 internal sealed class UserRoleEntity
@@ -64,6 +66,19 @@ internal sealed class RolePermissionEntity
     public long RoleId { get; set; }
     public long PermissionId { get; set; }
     public RoleEntity Role { get; set; } = null!;
+    public PermissionEntity Permission { get; set; } = null!;
+}
+
+internal sealed class UserPermissionOverrideEntity
+{
+    public long Id { get; set; }
+    public long UserAccountId { get; set; }
+    public long PermissionId { get; set; }
+    public string Effect { get; set; } = string.Empty;
+    public DateTime UpdatedAtUtc { get; set; }
+    public long UpdatedByUserId { get; set; }
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+    public UserAccountEntity UserAccount { get; set; } = null!;
     public PermissionEntity Permission { get; set; } = null!;
 }
 

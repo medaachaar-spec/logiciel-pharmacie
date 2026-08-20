@@ -61,6 +61,7 @@ public interface ISecurityAdministrationService
     Task<Result<SecurityUserSummaryView>> CreateUserAsync(CreateSecurityUserRequest request, CancellationToken cancellationToken = default);
     Task<Result<SecurityUserSummaryView>> SetUserActiveAsync(SetUserActiveRequest request, CancellationToken cancellationToken = default);
     Task<Result<SecurityUserSummaryView>> SetUserRolesAsync(SetUserRolesRequest request, CancellationToken cancellationToken = default);
+    Task<Result<SecurityUserSummaryView>> SetUserPermissionOverridesAsync(SetUserPermissionOverridesRequest request, CancellationToken cancellationToken = default);
     Task<Result<RecoveryCodeBatchView>> GenerateRecoveryCodesAsync(long userId, Guid operationId, CancellationToken cancellationToken = default);
     Task<Result<SecurityRoleView>> CreateRoleAsync(CreateSecurityRoleRequest request, CancellationToken cancellationToken = default);
     Task<Result<SecurityRoleView>> UpdateRoleAsync(UpdateSecurityRoleRequest request, CancellationToken cancellationToken = default);

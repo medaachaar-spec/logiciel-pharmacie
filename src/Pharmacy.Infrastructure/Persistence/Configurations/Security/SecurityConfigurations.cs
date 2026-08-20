@@ -56,15 +56,34 @@ internal sealed class RoleConfiguration : IEntityTypeConfiguration<RoleEntity>
         builder.Property(entity => entity.IsActive).IsRequired();
         builder.Property(entity => entity.RowVersion).IsRowVersion();
         builder.HasIndex(entity => entity.Code).IsUnique().HasDatabaseName("UX_security_Roles_Code");
-        builder.HasData(new
-        {
-            Id = 1L,
-            Code = "OWNER",
-            Name = "Propriétaire",
-            Description = "Compte propriétaire partagé du pilote ; attribution individuelle limitée.",
-            IsSystemRole = true,
-            IsActive = true
-        });
+        builder.HasData(
+            new
+            {
+                Id = 1L,
+                Code = SecurityRolePresets.OwnerCode,
+                Name = "Propriétaire",
+                Description = "Compte propriétaire partagé du pilote ; attribution individuelle limitée.",
+                IsSystemRole = true,
+                IsActive = true
+            },
+            new
+            {
+                Id = 2L,
+                Code = SecurityRolePresets.ManagerCode,
+                Name = "Manager",
+                Description = "Responsable des opérations courantes et de la gestion des employés.",
+                IsSystemRole = true,
+                IsActive = true
+            },
+            new
+            {
+                Id = 3L,
+                Code = SecurityRolePresets.SellerCode,
+                Name = "Vendeur",
+                Description = "Vente et consultations nécessaires au point de vente.",
+                IsSystemRole = true,
+                IsActive = true
+            });
     }
 }
 
@@ -139,6 +158,50 @@ internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<Rol
             RoleId = 1L,
             PermissionId = (long)index + 1
         }));
+
+        builder.HasData(SecurityRolePresets.ManagerPermissions.Select((code, index) => new
+        {
+            Id = 100L + index,
+            RoleId = 2L,
+            PermissionId = PermissionId(code)
+        }));
+
+        builder.HasData(SecurityRolePresets.SellerPermissions.Select((code, index) => new
+        {
+            Id = 200L + index,
+            RoleId = 3L,
+            PermissionId = PermissionId(code)
+        }));
+    }
+
+    private static long PermissionId(string code) =>
+        SecurityPermissions.All.Select((value, index) => (value, index))
+            .Single(item => item.value == code).index + 1L;
+}
+
+internal sealed class UserPermissionOverrideConfiguration : IEntityTypeConfiguration<UserPermissionOverrideEntity>
+{
+    public void Configure(EntityTypeBuilder<UserPermissionOverrideEntity> builder)
+    {
+        builder.ToTable("UserPermissionOverrides", SecuritySchema.Name, table =>
+        {
+            table.HasCheckConstraint("CK_security_UserPermissionOverrides_Effect", "[Effect] IN (N'Allow', N'Deny')");
+        });
+        builder.HasKey(entity => entity.Id).HasName("PK_security_UserPermissionOverrides");
+        builder.Property(entity => entity.Id).UseIdentityColumn();
+        builder.Property(entity => entity.Effect).HasColumnType("nvarchar(16)").HasMaxLength(16).IsRequired();
+        builder.Property(entity => entity.UpdatedAtUtc).HasColumnType("datetime2(7)").IsRequired();
+        builder.Property(entity => entity.RowVersion).IsRowVersion().IsConcurrencyToken();
+        builder.HasOne(entity => entity.UserAccount).WithMany(user => user.PermissionOverrides)
+            .HasForeignKey(entity => entity.UserAccountId).OnDelete(DeleteBehavior.NoAction)
+            .HasConstraintName("FK_security_UserPermissionOverrides_UserAccounts_UserAccountId");
+        builder.HasOne(entity => entity.Permission).WithMany(permission => permission.UserOverrides)
+            .HasForeignKey(entity => entity.PermissionId).OnDelete(DeleteBehavior.NoAction)
+            .HasConstraintName("FK_security_UserPermissionOverrides_Permissions_PermissionId");
+        builder.HasIndex(entity => new { entity.UserAccountId, entity.PermissionId }).IsUnique()
+            .HasDatabaseName("UX_security_UserPermissionOverrides_User_Permission");
+        builder.HasIndex(entity => entity.UpdatedByUserId)
+            .HasDatabaseName("IX_security_UserPermissionOverrides_UpdatedByUserId");
     }
 }
 

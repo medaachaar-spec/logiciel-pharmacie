@@ -41,7 +41,8 @@ public sealed class SecurityArchitectureTests
         Assert.Contains("Session.IsAuthenticated", root, StringComparison.Ordinal);
         Assert.Contains("Session.IsLocked", root, StringComparison.Ordinal);
         Assert.Contains("LockIfInactive", root, StringComparison.Ordinal);
-        Assert.Contains("Allowed(item)", navigation, StringComparison.Ordinal);
+        Assert.Contains(".Where(Allowed)", navigation, StringComparison.Ordinal);
+        Assert.Contains("AuthorizedRouteView", root, StringComparison.Ordinal);
         Assert.Contains("PermissionAuthorizer", application, StringComparison.Ordinal);
         Assert.Contains("ReauthenticationRequired", application, StringComparison.Ordinal);
     }

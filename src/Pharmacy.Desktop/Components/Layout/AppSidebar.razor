@@ -27,9 +27,7 @@
                 <ul>
                     @foreach (var item in group)
                     {
-                        var state = Allowed(item)
-                            ? DevelopmentAccessCatalog.ResolveState(item, AccessProfile)
-                            : AppNavigationAccessState.Locked;
+                        var state = DevelopmentAccessCatalog.ResolveState(item, AccessProfile);
                         <li>
                             @if (state == AppNavigationAccessState.Locked)
                             {
@@ -89,6 +87,7 @@
     public Func<AppNavigationItem, bool> Allowed { get; set; } = _ => true;
 
     private IEnumerable<IGrouping<AppNavigationGroup, AppNavigationItem>> GroupedItems => Items
+        .Where(Allowed)
         .GroupBy(item => item.Group)
         .OrderBy(group => AppNavigationCatalog.GetGroupOrder(group.Key));
 

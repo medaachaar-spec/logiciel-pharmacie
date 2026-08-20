@@ -68,6 +68,10 @@ public static class SecurityErrors
         "security.role.system_protected",
         "Ce rôle système est protégé et reste disponible en lecture seule.");
 
+    public static Error LastOwnerProtected { get; } = new(
+        "security.owner.last_account_protected",
+        "Le dernier compte propriétaire technique actif doit rester protégé.");
+
     public static Error InvalidPermissionSelection { get; } = new(
         "security.permission.invalid_selection",
         "La sélection contient une permission inexistante. Rechargez la matrice avant de recommencer.");

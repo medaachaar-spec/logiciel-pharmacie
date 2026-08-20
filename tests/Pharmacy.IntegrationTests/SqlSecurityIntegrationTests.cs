@@ -50,7 +50,7 @@ public sealed class SqlSecurityIntegrationTests
                     item.EndsWith("_SecurityRbacAuditPersistenceV01", StringComparison.Ordinal));
             }
 
-            Assert.Equal(7, await ScalarAsync<int>(database.ConnectionString,
+            Assert.Equal(8, await ScalarAsync<int>(database.ConnectionString,
                 "SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE s.name=N'security';"));
             Assert.Equal(2, await ScalarAsync<int>(database.ConnectionString,
                 "SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE s.name=N'audit';"));

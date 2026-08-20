@@ -81,8 +81,8 @@
                         <label>Identifiant<input autocomplete="off" @bind="login" /></label>
                         <label>Nom affiché<input autocomplete="off" @bind="displayName" /></label>
                         <label>Mot de passe initial<input type="password" autocomplete="new-password" @bind="initialPassword" /></label>
-                        <label>Rôle
-                            <select @bind="selectedRoleId"><option value="0">Sélectionner</option>@foreach (var role in Security.Roles) { <option value="@role.RoleId">@role.Name</option> }</select>
+                        <label>Rôle prédéfini ou personnalisé
+                            <select @bind="selectedRoleId"><option value="0">Sélectionner</option>@foreach (var role in Security.AssignableRoles) { <option value="@role.RoleId">@role.Name</option> }</select>
                         </label>
                         <button class="security-primary" disabled="@(selectedRoleId == 0)">Créer</button>
                     </form>
@@ -95,15 +95,79 @@
             <div class="security-table-wrap" tabindex="0"><table class="security-accounts-table"><thead><tr><th>Compte</th><th>Rôles</th><th>État</th><th>Actions sensibles</th></tr></thead><tbody>
             @foreach (var user in Security.Users)
             {
-                <tr><td><strong>@user.DisplayName</strong><small>@user.Login</small></td><td>@string.Join(", ", user.Roles)</td><td>@(user.IsActive ? "Actif" : "Désactivé")</td><td><div class="security-account-actions">
-                    <button @onclick="() => Security.SetUserActiveAsync(user, !user.IsActive)">@(user.IsActive ? "Désactiver" : "Réactiver")</button>
+                <tr class="@(selectedAccessUser?.UserId == user.UserId ? "security-account--selected" : null)"><td><strong>@user.DisplayName</strong><small>@user.Login</small></td><td>@Security.UserRoleLabel(user)</td><td>@(user.IsActive ? "Actif" : "Désactivé")</td><td><div class="security-account-actions">
+                    @if (!user.Roles.Contains(SecurityRolePresets.OwnerCode, StringComparer.Ordinal))
+                    {
+                        <button @onclick="() => Security.SetUserActiveAsync(user, !user.IsActive)">@(user.IsActive ? "Désactiver" : "Réactiver")</button>
+                    }
+                    else
+                    {
+                        <span class="security-system-role">Compte principal protégé</span>
+                    }
                     <button @onclick="() => Security.GenerateRecoveryCodesAsync(user)">Régénérer les codes</button>
-                    <select aria-label="Rôle à affecter" @bind="roleAssignmentId"><option value="0">Rôle…</option>@foreach (var role in Security.Roles) { <option value="@role.RoleId">@role.Name</option> }</select>
-                    <button disabled="@(roleAssignmentId == 0)" @onclick="() => Security.SetUserRoleAsync(user, roleAssignmentId)">Affecter</button>
+                    @if (canManageRoles)
+                    {
+                        @if (!user.Roles.Contains(SecurityRolePresets.OwnerCode, StringComparer.Ordinal))
+                        {
+                            <select aria-label="Rôle à affecter" @bind="roleAssignmentId"><option value="0">Rôle…</option>@foreach (var role in Security.AssignableRoles) { <option value="@role.RoleId">@role.Name</option> }</select>
+                            <button disabled="@(roleAssignmentId == 0)" @onclick="() => Security.SetUserRoleAsync(user, roleAssignmentId)">Affecter</button>
+                        }
+                        <button type="button" @onclick="() => EditUserPermissions(user)">Personnaliser les permissions</button>
+                    }
                 </div></td></tr>
             }
             </tbody></table></div>
         </section>
+
+        @if (canManageRoles && selectedAccessUser is not null)
+        {
+            <section class="security-panel security-user-access" aria-labelledby="security-user-access-title">
+                <header class="security-user-access__heading">
+                    <div>
+                        <h2 id="security-user-access-title">Permissions de @selectedAccessUser.DisplayName</h2>
+                        <p>Rôle : <strong>@Security.UserRoleLabel(selectedAccessUser)</strong>. Un refus personnalisé est prioritaire sur le rôle.</p>
+                    </div>
+                    <button type="button" @onclick="CloseUserPermissions">Fermer</button>
+                </header>
+
+                <div class="security-permission-groups">
+                    @foreach (var module in Security.Permissions.GroupBy(permission => permission.Module).OrderBy(group => group.Key, StringComparer.Ordinal))
+                    {
+                        <section class="security-permission-group">
+                            <h3>@SecurityPermissionPresentation.ModuleLabel(module.Key)</h3>
+                            @foreach (var permission in module.OrderBy(item => item.Code, StringComparer.Ordinal))
+                            {
+                                <div class="security-user-permission-row">
+                                    <span>
+                                        <strong>@SecurityPermissionPresentation.PermissionLabel(permission.Code)</strong>
+                                        <small>@(IsInherited(permission.PermissionId) ? "Incluse dans le rôle" : "Non incluse dans le rôle")</small>
+                                    </span>
+                                    <select aria-label="Personnalisation pour @SecurityPermissionPresentation.PermissionLabel(permission.Code)"
+                                            value="@OverrideValue(permission.PermissionId)"
+                                            @onchange="args => ChangeOverride(permission.PermissionId, args)">
+                                        <option value="Role">Rôle uniquement</option>
+                                        <option value="Allow">Autoriser</option>
+                                        <option value="Deny">Refuser</option>
+                                    </select>
+                                </div>
+                            }
+                        </section>
+                    }
+                </div>
+
+                <div class="security-user-access__actions">
+                    <button class="security-primary" disabled="@Security.IsBusy" @onclick="SaveUserPermissionsAsync">Enregistrer les personnalisations</button>
+                    @if (!confirmOverrideReset)
+                    {
+                        <button type="button" disabled="@(Security.IsBusy || permissionOverrides.Count == 0)" @onclick="RequestOverrideReset">Réinitialiser les personnalisations</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="security-danger" disabled="@Security.IsBusy" @onclick="ResetUserPermissionsAsync">Confirmer le retour aux permissions du rôle</button>
+                    }
+                </div>
+            </section>
+        }
 
         @if (Security.RecoveryCodes.Count > 0)
         {
@@ -154,7 +218,7 @@
                                                 <input type="checkbox"
                                                        checked="@selectedPermissionIds.Contains(permission.PermissionId)"
                                                        @onchange="args => TogglePermission(permission.PermissionId, args)" />
-                                                <span><code>@permission.Code</code><small>@permission.Name</small></span>
+                                                <span><strong>@SecurityPermissionPresentation.PermissionLabel(permission.Code)</strong><small>@permission.Code</small></span>
                                             </label>
                                         }
                                     </section>
@@ -182,7 +246,7 @@
             {
                 <p class="security-empty-state">Aucun rôle disponible.</p>
             }
-            @foreach (var role in Security.Roles)
+            @foreach (var role in Security.Roles.Where(role => role.Code != SecurityRolePresets.OwnerCode))
             {
                 <div class="security-role-summary">
                     <details>
@@ -193,7 +257,7 @@
                         }
                         else
                         {
-                            <ul>@foreach (var permission in role.Permissions) { <li><code>@permission.Code</code> — @permission.Name</li> }</ul>
+                            <ul>@foreach (var permission in role.Permissions) { <li>@SecurityPermissionPresentation.PermissionLabel(permission.Code) <small>(@permission.Code)</small></li> }</ul>
                         }
                     </details>
                     @if (role.IsSystemRole)
@@ -220,7 +284,10 @@
     private byte[]? pendingLogoContent;
     private long selectedRoleId, roleAssignmentId;
     private SecurityRoleView? editingRole;
+    private SecurityUserSummaryView? selectedAccessUser;
+    private bool confirmOverrideReset;
     private readonly HashSet<long> selectedPermissionIds = new();
+    private readonly Dictionary<long, SecurityPermissionOverrideEffect> permissionOverrides = new();
     protected override async Task OnInitializedAsync()
     {
         denied = Authorizer.Authorize(SecurityPermissions.SecurityManageUsers).IsFailure;
@@ -347,5 +414,61 @@
             ? await Security.CreateRoleAsync(roleCode, roleName, permissionIds)
             : await Security.UpdateRoleAsync(editingRole, roleName, permissionIds);
         if (saved) ResetRoleEditor();
+    }
+
+    private void EditUserPermissions(SecurityUserSummaryView user)
+    {
+        selectedAccessUser = user;
+        permissionOverrides.Clear();
+        foreach (var item in user.PermissionOverrides) permissionOverrides[item.PermissionId] = item.Effect;
+        confirmOverrideReset = false;
+    }
+
+    private void CloseUserPermissions()
+    {
+        selectedAccessUser = null;
+        permissionOverrides.Clear();
+        confirmOverrideReset = false;
+    }
+
+    private bool IsInherited(long permissionId)
+    {
+        if (selectedAccessUser is null) return false;
+        return Security.Roles
+            .Where(role => selectedAccessUser.Roles.Contains(role.Code, StringComparer.Ordinal))
+            .SelectMany(role => role.Permissions)
+            .Any(permission => permission.PermissionId == permissionId);
+    }
+
+    private string OverrideValue(long permissionId) => permissionOverrides.TryGetValue(permissionId, out var effect)
+        ? effect.ToString()
+        : "Role";
+
+    private void ChangeOverride(long permissionId, ChangeEventArgs args)
+    {
+        confirmOverrideReset = false;
+        var value = args.Value?.ToString();
+        if (Enum.TryParse<SecurityPermissionOverrideEffect>(value, out var effect)) permissionOverrides[permissionId] = effect;
+        else permissionOverrides.Remove(permissionId);
+    }
+
+    private async Task SaveUserPermissionsAsync()
+    {
+        if (selectedAccessUser is null) return;
+        var userId = selectedAccessUser.UserId;
+        var selections = permissionOverrides.OrderBy(item => item.Key)
+            .Select(item => new SecurityPermissionOverrideSelection(item.Key, item.Value)).ToArray();
+        if (await Security.SetUserPermissionOverridesAsync(selectedAccessUser, selections))
+            EditUserPermissions(Security.Users.Single(user => user.UserId == userId));
+    }
+
+    private void RequestOverrideReset() => confirmOverrideReset = true;
+
+    private async Task ResetUserPermissionsAsync()
+    {
+        if (selectedAccessUser is null) return;
+        var userId = selectedAccessUser.UserId;
+        if (await Security.SetUserPermissionOverridesAsync(selectedAccessUser, Array.Empty<SecurityPermissionOverrideSelection>()))
+            EditUserPermissions(Security.Users.Single(user => user.UserId == userId));
     }
 }

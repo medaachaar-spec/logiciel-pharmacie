@@ -223,7 +223,8 @@ public static class AppNavigationCatalog
                 0,
                 AppNavigationAccessState.Available,
                 true,
-                AppNavigationKind.Technical));
+                AppNavigationKind.Technical,
+                RequiredPermission: SecurityPermissions.DevicesConfigure));
         items.Add(
             new AppNavigationItem(
                 "ui-lab",
@@ -235,7 +236,8 @@ public static class AppNavigationCatalog
                 1,
                 AppNavigationAccessState.Available,
                 true,
-                AppNavigationKind.Technical));
+                AppNavigationKind.Technical,
+                RequiredPermission: SecurityPermissions.SecurityManageRoles));
 #endif
 
         return items

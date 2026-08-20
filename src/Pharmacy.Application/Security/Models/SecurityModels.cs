@@ -37,6 +37,21 @@ public sealed record SecurityUserSummaryView(
     DateTime? LockedUntilUtc,
     DateTime? LastLoginAtUtc,
     IReadOnlyList<string> Roles,
+    IReadOnlySet<string> EffectivePermissions,
+    IReadOnlyList<SecurityUserPermissionOverrideView> PermissionOverrides,
+    byte[] RowVersion);
+
+public enum SecurityPermissionOverrideEffect
+{
+    Allow,
+    Deny
+}
+
+public sealed record SecurityUserPermissionOverrideView(
+    long PermissionId,
+    string PermissionCode,
+    SecurityPermissionOverrideEffect Effect,
+    DateTime UpdatedAtUtc,
     byte[] RowVersion);
 
 public sealed record SecurityRoleView(
@@ -74,6 +89,16 @@ public sealed record SetUserRolesRequest(
     Guid OperationId,
     long UserId,
     IReadOnlyList<long> RoleIds,
+    byte[] RowVersion);
+
+public sealed record SecurityPermissionOverrideSelection(
+    long PermissionId,
+    SecurityPermissionOverrideEffect Effect);
+
+public sealed record SetUserPermissionOverridesRequest(
+    Guid OperationId,
+    long UserId,
+    IReadOnlyList<SecurityPermissionOverrideSelection> Overrides,
     byte[] RowVersion);
 
 public sealed record CreateSecurityRoleRequest(

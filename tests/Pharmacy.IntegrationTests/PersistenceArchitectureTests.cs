@@ -198,6 +198,7 @@ public sealed class PersistenceArchitectureTests
                 "security.RolePermissions",
                 "security.Roles",
                 "security.UserAccounts",
+                "security.UserPermissionOverrides",
                 "security.UserRoles"
             },
             tables);
@@ -248,7 +249,7 @@ public sealed class PersistenceArchitectureTests
             .Where(property => property.GetColumnType() == "rowversion")
             .ToArray();
 
-        Assert.Equal(22, rowVersions.Length);
+        Assert.Equal(23, rowVersions.Length);
         Assert.All(rowVersions, property =>
         {
             Assert.True(property.IsConcurrencyToken);

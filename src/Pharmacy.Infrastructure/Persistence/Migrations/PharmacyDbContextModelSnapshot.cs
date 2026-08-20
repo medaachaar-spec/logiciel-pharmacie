@@ -2743,6 +2743,24 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                             IsActive = true,
                             IsSystemRole = true,
                             Name = "Propriétaire"
+                        },
+                        new
+                        {
+                            Id = 2L,
+                            Code = "MANAGER",
+                            Description = "Responsable des opérations courantes et de la gestion des employés.",
+                            IsActive = true,
+                            IsSystemRole = true,
+                            Name = "Manager"
+                        },
+                        new
+                        {
+                            Id = 3L,
+                            Code = "SELLER",
+                            Description = "Vente et consultations nécessaires au point de vente.",
+                            IsActive = true,
+                            IsSystemRole = true,
+                            Name = "Vendeur"
                         });
                 });
 
@@ -2939,6 +2957,198 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                             Id = 28L,
                             PermissionId = 28L,
                             RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 100L,
+                            PermissionId = 1L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 101L,
+                            PermissionId = 2L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 102L,
+                            PermissionId = 3L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 103L,
+                            PermissionId = 4L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 104L,
+                            PermissionId = 5L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 105L,
+                            PermissionId = 6L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 106L,
+                            PermissionId = 7L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 107L,
+                            PermissionId = 8L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 108L,
+                            PermissionId = 9L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 109L,
+                            PermissionId = 10L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 110L,
+                            PermissionId = 11L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 111L,
+                            PermissionId = 12L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 112L,
+                            PermissionId = 13L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 113L,
+                            PermissionId = 14L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 114L,
+                            PermissionId = 15L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 115L,
+                            PermissionId = 16L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 116L,
+                            PermissionId = 17L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 117L,
+                            PermissionId = 18L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 118L,
+                            PermissionId = 19L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 119L,
+                            PermissionId = 20L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 120L,
+                            PermissionId = 21L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 121L,
+                            PermissionId = 22L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 122L,
+                            PermissionId = 23L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 123L,
+                            PermissionId = 24L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 124L,
+                            PermissionId = 26L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 125L,
+                            PermissionId = 27L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 126L,
+                            PermissionId = 28L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 200L,
+                            PermissionId = 1L,
+                            RoleId = 3L
+                        },
+                        new
+                        {
+                            Id = 201L,
+                            PermissionId = 2L,
+                            RoleId = 3L
+                        },
+                        new
+                        {
+                            Id = 202L,
+                            PermissionId = 10L,
+                            RoleId = 3L
+                        },
+                        new
+                        {
+                            Id = 203L,
+                            PermissionId = 5L,
+                            RoleId = 3L
+                        },
+                        new
+                        {
+                            Id = 204L,
+                            PermissionId = 13L,
+                            RoleId = 3L
                         });
                 });
 
@@ -3024,6 +3234,55 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_security_UserAccounts_NormalizedLogin_NotBlank", "LEN(LTRIM(RTRIM([NormalizedLogin]))) > 0");
 
                             t.HasCheckConstraint("CK_security_UserAccounts_PasswordHash_NotBlank", "LEN([PasswordHash]) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Security.UserPermissionOverrideEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Effect")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<long>("PermissionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<long>("UpdatedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("UserAccountId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id")
+                        .HasName("PK_security_UserPermissionOverrides");
+
+                    b.HasIndex("PermissionId");
+
+                    b.HasIndex("UpdatedByUserId")
+                        .HasDatabaseName("IX_security_UserPermissionOverrides_UpdatedByUserId");
+
+                    b.HasIndex("UserAccountId", "PermissionId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_security_UserPermissionOverrides_User_Permission");
+
+                    b.ToTable("UserPermissionOverrides", "security", t =>
+                        {
+                            t.HasCheckConstraint("CK_security_UserPermissionOverrides_Effect", "[Effect] IN (N'Allow', N'Deny')");
                         });
                 });
 
@@ -3488,6 +3747,27 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                     b.Navigation("Role");
                 });
 
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Security.UserPermissionOverrideEntity", b =>
+                {
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Security.PermissionEntity", "Permission")
+                        .WithMany("UserOverrides")
+                        .HasForeignKey("PermissionId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_security_UserPermissionOverrides_Permissions_PermissionId");
+
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Security.UserAccountEntity", "UserAccount")
+                        .WithMany("PermissionOverrides")
+                        .HasForeignKey("UserAccountId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_security_UserPermissionOverrides_UserAccounts_UserAccountId");
+
+                    b.Navigation("Permission");
+
+                    b.Navigation("UserAccount");
+                });
+
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Security.UserRoleEntity", b =>
                 {
                     b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Security.RoleEntity", "Role")
@@ -3613,6 +3893,8 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Security.PermissionEntity", b =>
                 {
                     b.Navigation("RolePermissions");
+
+                    b.Navigation("UserOverrides");
                 });
 
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Security.RoleEntity", b =>
@@ -3624,6 +3906,8 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Security.UserAccountEntity", b =>
                 {
+                    b.Navigation("PermissionOverrides");
+
                     b.Navigation("RecoveryCodes");
 
                     b.Navigation("UserRoles");

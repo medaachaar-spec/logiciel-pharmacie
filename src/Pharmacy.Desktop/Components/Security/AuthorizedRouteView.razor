@@ -1,0 +1,47 @@
+@using Microsoft.AspNetCore.Components.Routing
+@inject NavigationManager NavigationManager
+@inject IPermissionAuthorizer Authorizer
+
+@if (IsAuthorized)
+{
+    <RouteView RouteData="@RouteData" DefaultLayout="@DefaultLayout" />
+}
+else
+{
+    <LayoutView Layout="@DefaultLayout">
+        <div class="page-content security-route-denied" role="alert">
+            <UiAlert Title="Accès refusé" Variant="UiAlertVariant.Danger">
+                <p>Ce module n’est pas autorisé pour votre compte.</p>
+            </UiAlert>
+        </div>
+    </LayoutView>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public RouteData RouteData { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public Type DefaultLayout { get; set; } = null!;
+
+    private bool IsAuthorized
+    {
+        get
+        {
+            var relative = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+            var route = NormalizeRoute(relative);
+            var item = AppNavigationCatalog.FindByRoute(route)
+                ?? AppNavigationCatalog.FindModule(route.Split('/').LastOrDefault());
+            if (item is null) return !route.StartsWith("/module/", StringComparison.OrdinalIgnoreCase);
+            return string.IsNullOrWhiteSpace(item.RequiredPermission)
+                || Authorizer.Authorize(item.RequiredPermission).IsSuccess;
+        }
+    }
+
+    private static string NormalizeRoute(string route)
+    {
+        var path = route.Split('?', '#')[0];
+        var normalized = $"/{path.Trim('/')}";
+        return normalized.Length == 1 ? "/" : normalized;
+    }
+}

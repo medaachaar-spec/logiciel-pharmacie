@@ -147,6 +147,7 @@ public sealed class SecurityBootstrapWorkflowTests
         public Task<Result<SecurityUserSummaryView>> CreateUserAsync(CreateSecurityUserRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<Result<SecurityUserSummaryView>> SetUserActiveAsync(SetUserActiveRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<Result<SecurityUserSummaryView>> SetUserRolesAsync(SetUserRolesRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<Result<SecurityUserSummaryView>> SetUserPermissionOverridesAsync(SetUserPermissionOverridesRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<Result<RecoveryCodeBatchView>> GenerateRecoveryCodesAsync(long userId, Guid operationId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<Result<SecurityRoleView>> CreateRoleAsync(CreateSecurityRoleRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<Result<SecurityRoleView>> UpdateRoleAsync(UpdateSecurityRoleRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();

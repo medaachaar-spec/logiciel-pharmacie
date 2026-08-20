@@ -1,3 +1,4 @@
+using Pharmacy.Application.Security;
 using Pharmacy.Application.Security.Contracts;
 using Pharmacy.Application.Security.Models;
 
@@ -44,6 +45,9 @@ public sealed class SecurityCoordinator
     public IReadOnlyList<string> RecoveryCodes { get; private set; } = Array.Empty<string>();
     public IReadOnlyList<SecurityUserSummaryView> Users { get; private set; } = Array.Empty<SecurityUserSummaryView>();
     public IReadOnlyList<SecurityRoleView> Roles { get; private set; } = Array.Empty<SecurityRoleView>();
+    public IReadOnlyList<SecurityRoleView> AssignableRoles => Roles
+        .Where(role => role.IsActive && role.Code != SecurityRolePresets.OwnerCode)
+        .ToArray();
     public IReadOnlyList<SecurityPermissionView> Permissions { get; private set; } = Array.Empty<SecurityPermissionView>();
     public IReadOnlyList<AuditEventView> AuditEvents { get; private set; } = Array.Empty<AuditEventView>();
 
@@ -241,6 +245,37 @@ public sealed class SecurityCoordinator
             await RefreshAdministrationCoreAsync(cancellationToken);
         });
     }
+
+    public async Task<bool> SetUserPermissionOverridesAsync(
+        SecurityUserSummaryView user,
+        IReadOnlyList<SecurityPermissionOverrideSelection> overrides,
+        CancellationToken cancellationToken = default)
+    {
+        var succeeded = false;
+        await RunAsync(async () =>
+        {
+            var result = await administration.SetUserPermissionOverridesAsync(
+                new SetUserPermissionOverridesRequest(Guid.NewGuid(), user.UserId, overrides, user.RowVersion), cancellationToken);
+            if (result.IsFailure) { Message = result.Error.Message; return; }
+            Message = overrides.Count == 0
+                ? "Personnalisations réinitialisées : les permissions du rôle s’appliquent à nouveau."
+                : "Permissions personnalisées enregistrées. Elles seront actives à la prochaine connexion du compte concerné.";
+            await RefreshAdministrationCoreAsync(cancellationToken);
+            succeeded = true;
+        });
+        return succeeded;
+    }
+
+    public string RoleLabel(string code)
+    {
+        if (code is SecurityRolePresets.OwnerCode or SecurityRolePresets.ManagerCode) return "Manager";
+        if (code == SecurityRolePresets.SellerCode) return "Vendeur";
+        return Roles.FirstOrDefault(role => role.Code == code)?.Name ?? code;
+    }
+
+    public string UserRoleLabel(SecurityUserSummaryView user) => string.Join(", ", user.Roles
+        .Select(RoleLabel)
+        .Distinct(StringComparer.Ordinal));
 
     public async Task<bool> CreateRoleAsync(
         string code,

@@ -132,7 +132,7 @@ public sealed class SqlSecurityGateIntegrationTests : IClassFixture<SecurityGate
     {
         var admin = Administration(Now);
         var created = await admin.Service.CreateUserAsync(new CreateSecurityUserRequest(
-            Guid.NewGuid(), "sec008", "SEC 008", Password, [fixture.OwnerRoleId]), Token);
+            Guid.NewGuid(), "sec008", "SEC 008", Password, [fixture.ManagerRoleId]), Token);
         Assert.True(created.IsSuccess, Error(created));
         var disabled = await admin.Service.SetUserActiveAsync(new SetUserActiveRequest(
             Guid.NewGuid(), created.Value.UserId, false, created.Value.RowVersion), Token);
@@ -198,7 +198,7 @@ public sealed class SqlSecurityGateIntegrationTests : IClassFixture<SecurityGate
     {
         var created = await CreateUserAsync("sec012", "SEC 012");
         Assert.Equal(1, await fixture.ScalarAsync<int>(
-            "SELECT COUNT(*) FROM security.UserRoles WHERE UserAccountId=@id AND RoleId=@role;", P("@id", created.UserId), P("@role", fixture.OwnerRoleId)));
+            "SELECT COUNT(*) FROM security.UserRoles WHERE UserAccountId=@id AND RoleId=@role;", P("@id", created.UserId), P("@role", fixture.ManagerRoleId)));
         Assert.Equal(1, await fixture.ScalarAsync<int>(
             "SELECT COUNT(*) FROM audit.AuditEvents WHERE EntityType=N'UserAccount' AND EntityId=@id AND Action=N'user.create' AND Result=N'Success';",
             P("@id", created.UserId.ToString())));
@@ -213,7 +213,7 @@ public sealed class SqlSecurityGateIntegrationTests : IClassFixture<SecurityGate
     {
         var first = await CreateUserAsync(" sec013 ", "SEC 013");
         var second = await Administration(Now).Service.CreateUserAsync(new CreateSecurityUserRequest(
-            Guid.NewGuid(), "SEC013", "Duplicate", Password, [fixture.OwnerRoleId]), Token);
+            Guid.NewGuid(), "SEC013", "Duplicate", Password, [fixture.ManagerRoleId]), Token);
         Assert.Equal(SecurityErrors.LoginAlreadyExists.Code, second.Error.Code);
         Assert.Equal(1, await fixture.ScalarAsync<int>(
             "SELECT COUNT(*) FROM security.UserAccounts WHERE NormalizedLogin=N'SEC013';"));
@@ -359,7 +359,7 @@ public sealed class SqlSecurityGateIntegrationTests : IClassFixture<SecurityGate
             Guid.NewGuid(), role.Value.RoleId, "SEC 026 updated", inventory, role.Value.RowVersion), Token);
         Assert.True(roleUpdated.IsSuccess, Error(roleUpdated));
         var user = await admin.Service.CreateUserAsync(new CreateSecurityUserRequest(
-            Guid.NewGuid(), "sec026", "SEC 026", Password, [fixture.OwnerRoleId]), Token);
+            Guid.NewGuid(), "sec026", "SEC 026", Password, [fixture.ManagerRoleId]), Token);
         Assert.True(user.IsSuccess, Error(user));
         var assigned = await admin.Service.SetUserRolesAsync(new SetUserRolesRequest(
             Guid.NewGuid(), user.Value.UserId, [role.Value.RoleId], user.Value.RowVersion), Token);
@@ -399,7 +399,7 @@ public sealed class SqlSecurityGateIntegrationTests : IClassFixture<SecurityGate
         const string rawPassword = "SEC027-Unique-Raw-Password-2026!";
         var admin = Administration(Now);
         var user = await admin.Service.CreateUserAsync(new CreateSecurityUserRequest(
-            Guid.NewGuid(), "sec027", "SEC 027", rawPassword, [fixture.OwnerRoleId]), Token);
+            Guid.NewGuid(), "sec027", "SEC 027", rawPassword, [fixture.ManagerRoleId]), Token);
         Assert.True(user.IsSuccess, Error(user));
         var codes = await admin.Service.GenerateRecoveryCodesAsync(user.Value.UserId, Guid.NewGuid(), Token);
         Assert.True(codes.IsSuccess, Error(codes));
@@ -533,7 +533,7 @@ public sealed class SqlSecurityGateIntegrationTests : IClassFixture<SecurityGate
     {
         var admin = Administration(Now);
         var user = await admin.Service.CreateUserAsync(new CreateSecurityUserRequest(
-            Guid.NewGuid(), "sec032", "SEC 032", Password, [fixture.OwnerRoleId]), Token);
+            Guid.NewGuid(), "sec032", "SEC 032", Password, [fixture.ManagerRoleId]), Token);
         Assert.True(user.IsSuccess, Error(user));
         var first = await admin.Service.SetUserActiveAsync(new SetUserActiveRequest(
             Guid.NewGuid(), user.Value.UserId, false, user.Value.RowVersion), Token);
@@ -552,9 +552,9 @@ public sealed class SqlSecurityGateIntegrationTests : IClassFixture<SecurityGate
         var tooLongLogin = new string('L', 129);
         var tooLongName = new string('N', 257);
         var invalidLogin = await admin.Service.CreateUserAsync(new CreateSecurityUserRequest(
-            Guid.NewGuid(), tooLongLogin, "SEC 033", Password, [fixture.OwnerRoleId]), Token);
+            Guid.NewGuid(), tooLongLogin, "SEC 033", Password, [fixture.ManagerRoleId]), Token);
         var invalidName = await admin.Service.CreateUserAsync(new CreateSecurityUserRequest(
-            Guid.NewGuid(), "sec033-name", tooLongName, Password, [fixture.OwnerRoleId]), Token);
+            Guid.NewGuid(), "sec033-name", tooLongName, Password, [fixture.ManagerRoleId]), Token);
         var missingRole = await admin.Service.CreateUserAsync(new CreateSecurityUserRequest(
             Guid.NewGuid(), "sec033-no-role", "SEC 033", Password, []), Token);
         Assert.Equal(SecurityErrors.InvalidUser.Code, invalidLogin.Error.Code);
@@ -669,7 +669,7 @@ public sealed class SqlSecurityGateIntegrationTests : IClassFixture<SecurityGate
     private async Task<SecurityUserSummaryView> CreateUserAsync(string login, string displayName)
     {
         var result = await Administration(Now).Service.CreateUserAsync(new CreateSecurityUserRequest(
-            Guid.NewGuid(), login, displayName, Password, [fixture.OwnerRoleId]), Token);
+            Guid.NewGuid(), login, displayName, Password, [fixture.ManagerRoleId]), Token);
         Assert.True(result.IsSuccess, Error(result));
         return result.Value;
     }
@@ -712,6 +712,7 @@ public sealed class SecurityGateSqlFixture : IAsyncLifetime
     internal string ConnectionString { get; private set; } = string.Empty;
     internal long OwnerUserId { get; private set; }
     internal long OwnerRoleId { get; private set; }
+    internal long ManagerRoleId { get; private set; }
     internal SecurityTestDbContextFactory Factory { get; private set; } = null!;
     internal IPasswordHasher<UserAccountEntity> Hasher { get; } =
         new PasswordHasher<UserAccountEntity>(Options.Create(new PasswordHasherOptions
@@ -756,6 +757,7 @@ public sealed class SecurityGateSqlFixture : IAsyncLifetime
             if (bootstrap.IsFailure) throw new InvalidOperationException(bootstrap.Error.Code);
             OwnerUserId = bootstrap.Value.UserId;
             OwnerRoleId = await ScalarAsync<long>("SELECT Id FROM security.Roles WHERE Code=N'OWNER';");
+            ManagerRoleId = await ScalarAsync<long>("SELECT Id FROM security.Roles WHERE Code=N'MANAGER';");
         }
         catch
         {

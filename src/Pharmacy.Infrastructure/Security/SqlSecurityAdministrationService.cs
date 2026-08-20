@@ -196,7 +196,7 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
                         return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityRoleView>>(
                             Result<SecurityRoleView>.Failure(SecurityErrors.RoleNotFound), false);
                     }
-                    if (role.IsSystemRole || string.Equals(role.Code, "OWNER", StringComparison.Ordinal))
+                    if (role.IsSystemRole || string.Equals(role.Code, SecurityRolePresets.OwnerCode, StringComparison.Ordinal))
                     {
                         return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityRoleView>>(
                             Result<SecurityRoleView>.Failure(SecurityErrors.SystemRoleProtected), false);
@@ -286,6 +286,9 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
                     if (roles.Length != roleIds.Length)
                         return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
                             Result<SecurityUserSummaryView>.Failure(SecurityErrors.InvalidRoleSelection), false);
+                    if (roles.Any(role => role.Code == SecurityRolePresets.OwnerCode))
+                        return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
+                            Result<SecurityUserSummaryView>.Failure(SecurityErrors.SystemRoleProtected), false);
                     var now = clock.UtcNow;
                     var user = new UserAccountEntity
                     {
@@ -303,9 +306,12 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
                         user.UserRoles.Add(new UserRoleEntity { Role = role, AssignedAtUtc = now, AssignedByUserId = session.User!.UserId });
                     context.UserAccounts.Add(user);
                     await context.SaveChangesAsync(cancellationToken);
-                    context.AuditEvents.Add(SecurityPersistenceSupport.AuditEvent(
+                    var audit = SecurityPersistenceSupport.AuditEvent(
                         "Administration", "security", "UserAccount", user.Id.ToString(), "user.create",
-                        session.User!.UserId, session.User.DisplayName, "Success", now, request.OperationId, request.OperationId));
+                        session.User!.UserId, session.User.DisplayName, "Success", now, request.OperationId, request.OperationId);
+                    audit.Details.Add(PermissionAuditDetail(
+                        "RolesAssigned", null, PermissionCodes(roles.Select(role => role.Code).Order(StringComparer.Ordinal))));
+                    context.AuditEvents.Add(audit);
                     await context.SaveChangesAsync(cancellationToken);
                     return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
                         Result<SecurityUserSummaryView>.Success(MapUser(user)), true);
@@ -329,23 +335,41 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
         if (authorization.IsFailure) return Result<SecurityUserSummaryView>.Failure(authorization.Error);
         if (!request.IsActive && request.UserId == session.User?.UserId)
             return Result<SecurityUserSummaryView>.Failure(SecurityErrors.PermissionDenied);
+        if (request.OperationId == Guid.Empty || request.UserId <= 0 || request.RowVersion is not { Length: 8 })
+            return Result<SecurityUserSummaryView>.Failure(SecurityErrors.InvalidUser);
         try
         {
-            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-            var user = await SecurityPersistenceSupport.UserGraph(context).SingleOrDefaultAsync(candidate => candidate.Id == request.UserId, cancellationToken);
-            if (user is null) return Result<SecurityUserSummaryView>.Failure(SecurityErrors.UserNotFound);
-            context.Entry(user).Property(entity => entity.RowVersion).OriginalValue = request.RowVersion;
-            var now = clock.UtcNow;
-            user.IsActive = request.IsActive;
-            user.DisabledAtUtc = request.IsActive ? null : now;
-            user.DisabledByUserId = request.IsActive ? null : session.User!.UserId;
-            user.SecurityStamp = Guid.NewGuid();
-            user.UpdatedAtUtc = now;
-            context.AuditEvents.Add(SecurityPersistenceSupport.AuditEvent(
-                "Administration", "security", "UserAccount", user.Id.ToString(), request.IsActive ? "user.activate" : "user.disable",
-                session.User!.UserId, session.User.DisplayName, "Success", now, request.OperationId, request.OperationId));
-            await context.SaveChangesAsync(cancellationToken);
-            return Result<SecurityUserSummaryView>.Success(MapUser(user));
+            return await SecurityPersistenceSupport.ExecuteSerializableAsync(
+                contextFactory,
+                async context =>
+                {
+                    var user = await SecurityPersistenceSupport.UserGraph(context)
+                        .SingleOrDefaultAsync(candidate => candidate.Id == request.UserId, cancellationToken);
+                    if (user is null)
+                        return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
+                            Result<SecurityUserSummaryView>.Failure(SecurityErrors.UserNotFound), false);
+                    context.Entry(user).Property(entity => entity.RowVersion).OriginalValue = request.RowVersion;
+                    if (!request.IsActive && user.UserRoles.Any(item => item.Role.Code == SecurityRolePresets.OwnerCode))
+                    {
+                        var activeOwnerCount = await context.UserRoles.CountAsync(item =>
+                            item.Role.Code == SecurityRolePresets.OwnerCode && item.UserAccount.IsActive, cancellationToken);
+                        if (activeOwnerCount <= 1)
+                            return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
+                                Result<SecurityUserSummaryView>.Failure(SecurityErrors.LastOwnerProtected), false);
+                    }
+                    var now = clock.UtcNow;
+                    user.IsActive = request.IsActive;
+                    user.DisabledAtUtc = request.IsActive ? null : now;
+                    user.DisabledByUserId = request.IsActive ? null : session.User!.UserId;
+                    user.SecurityStamp = Guid.NewGuid();
+                    user.UpdatedAtUtc = now;
+                    context.AuditEvents.Add(SecurityPersistenceSupport.AuditEvent(
+                        "Administration", "security", "UserAccount", user.Id.ToString(), request.IsActive ? "user.activate" : "user.disable",
+                        session.User!.UserId, session.User.DisplayName, "Success", now, request.OperationId, request.OperationId));
+                    await context.SaveChangesAsync(cancellationToken);
+                    return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
+                        Result<SecurityUserSummaryView>.Success(MapUser(user)), true);
+                }, cancellationToken);
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -363,6 +387,9 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
     {
         var authorization = authorizer.Authorize(SecurityPermissions.SecurityManageRoles, true);
         if (authorization.IsFailure) return Result<SecurityUserSummaryView>.Failure(authorization.Error);
+        if (request.OperationId == Guid.Empty || request.UserId <= 0
+            || request.RowVersion is not { Length: 8 } || request.RoleIds is null || request.RoleIds.Count == 0)
+            return Result<SecurityUserSummaryView>.Failure(SecurityErrors.InvalidRoleSelection);
         try
         {
             return await SecurityPersistenceSupport.ExecuteSerializableAsync(
@@ -376,9 +403,24 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
                     context.Entry(user).Property(entity => entity.RowVersion).OriginalValue = request.RowVersion;
                     var roleIds = request.RoleIds.Distinct().ToArray();
                     var roles = await context.Roles.Where(role => roleIds.Contains(role.Id) && role.IsActive).ToArrayAsync(cancellationToken);
-                    if (roles.Length != roleIds.Length || request.UserId == session.User?.UserId && roles.All(role => role.Code != "OWNER"))
+                    if (roles.Length != roleIds.Length || request.UserId == session.User?.UserId && roles.All(role => role.Code != SecurityRolePresets.OwnerCode))
                         return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
                             Result<SecurityUserSummaryView>.Failure(SecurityErrors.PermissionDenied), false);
+                    var previousRoleCodes = user.UserRoles.Select(item => item.Role.Code).ToHashSet(StringComparer.Ordinal);
+                    var ownerAssignmentChanged = previousRoleCodes.Contains(SecurityRolePresets.OwnerCode)
+                        != roles.Any(role => role.Code == SecurityRolePresets.OwnerCode);
+                    if (ownerAssignmentChanged)
+                        return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
+                            Result<SecurityUserSummaryView>.Failure(SecurityErrors.SystemRoleProtected), false);
+                    if (previousRoleCodes.Contains(SecurityRolePresets.OwnerCode)
+                        && roles.All(role => role.Code != SecurityRolePresets.OwnerCode))
+                    {
+                        var activeOwnerCount = await context.UserRoles.CountAsync(item =>
+                            item.Role.Code == SecurityRolePresets.OwnerCode && item.UserAccount.IsActive, cancellationToken);
+                        if (activeOwnerCount <= 1)
+                            return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
+                                Result<SecurityUserSummaryView>.Failure(SecurityErrors.LastOwnerProtected), false);
+                    }
                     context.UserRoles.RemoveRange(user.UserRoles);
                     user.UserRoles.Clear();
                     var now = clock.UtcNow;
@@ -386,9 +428,110 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
                         user.UserRoles.Add(new UserRoleEntity { Role = role, AssignedAtUtc = now, AssignedByUserId = session.User!.UserId });
                     user.SecurityStamp = Guid.NewGuid();
                     user.UpdatedAtUtc = now;
-                    context.AuditEvents.Add(SecurityPersistenceSupport.AuditEvent(
+                    var audit = SecurityPersistenceSupport.AuditEvent(
                         "Administration", "security", "UserAccount", user.Id.ToString(), "user.roles.set",
-                        session.User!.UserId, session.User.DisplayName, "Success", now, request.OperationId, request.OperationId));
+                        session.User!.UserId, session.User.DisplayName, "Success", now, request.OperationId, request.OperationId);
+                    audit.Details.Add(PermissionAuditDetail("RolesBefore", PermissionCodes(previousRoleCodes.Order(StringComparer.Ordinal)), null));
+                    audit.Details.Add(PermissionAuditDetail("RolesAfter", null, PermissionCodes(roles.Select(role => role.Code).Order(StringComparer.Ordinal))));
+                    context.AuditEvents.Add(audit);
+                    await context.SaveChangesAsync(cancellationToken);
+                    return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
+                        Result<SecurityUserSummaryView>.Success(MapUser(user)), true);
+                }, cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result<SecurityUserSummaryView>.Failure(SecurityErrors.ConcurrencyConflict);
+        }
+        catch (Exception exception) when (SecurityPersistenceSupport.IsDatabaseUnavailable(exception))
+        {
+            return Result<SecurityUserSummaryView>.Failure(SecurityErrors.DatabaseUnavailable);
+        }
+    }
+
+    public async Task<Result<SecurityUserSummaryView>> SetUserPermissionOverridesAsync(
+        SetUserPermissionOverridesRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var authorization = authorizer.Authorize(SecurityPermissions.SecurityManageRoles, true);
+        if (authorization.IsFailure) return Result<SecurityUserSummaryView>.Failure(authorization.Error);
+        if (request.OperationId == Guid.Empty || request.UserId <= 0
+            || request.RowVersion is not { Length: 8 } || request.Overrides is null
+            || request.Overrides.Any(item => item.PermissionId <= 0 || !Enum.IsDefined(item.Effect))
+            || request.Overrides.Select(item => item.PermissionId).Distinct().Count() != request.Overrides.Count)
+        {
+            return Result<SecurityUserSummaryView>.Failure(SecurityErrors.InvalidPermissionSelection);
+        }
+
+        try
+        {
+            return await SecurityPersistenceSupport.ExecuteSerializableAsync(
+                contextFactory,
+                async context =>
+                {
+                    var user = await SecurityPersistenceSupport.UserGraph(context)
+                        .SingleOrDefaultAsync(candidate => candidate.Id == request.UserId, cancellationToken);
+                    if (user is null)
+                        return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
+                            Result<SecurityUserSummaryView>.Failure(SecurityErrors.UserNotFound), false);
+                    context.Entry(user).Property(entity => entity.RowVersion).OriginalValue = request.RowVersion;
+
+                    var permissionIds = request.Overrides.Select(item => item.PermissionId).ToArray();
+                    var permissions = await context.Permissions.Where(item => permissionIds.Contains(item.Id))
+                        .ToDictionaryAsync(item => item.Id, cancellationToken);
+                    if (permissions.Count != permissionIds.Length)
+                        return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
+                            Result<SecurityUserSummaryView>.Failure(SecurityErrors.InvalidPermissionSelection), false);
+
+                    var isOwner = user.UserRoles.Any(item => item.Role.Code == SecurityRolePresets.OwnerCode);
+                    var protectedPermissionIds = permissions.Values
+                        .Where(item => item.Code is SecurityPermissions.SecurityManageUsers or SecurityPermissions.SecurityManageRoles)
+                        .Select(item => item.Id).ToHashSet();
+                    if (isOwner && request.Overrides.Any(item =>
+                        item.Effect == SecurityPermissionOverrideEffect.Deny && protectedPermissionIds.Contains(item.PermissionId)))
+                    {
+                        return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
+                            Result<SecurityUserSummaryView>.Failure(SecurityErrors.LastOwnerProtected), false);
+                    }
+
+                    var previous = user.PermissionOverrides
+                        .Select(item => $"{item.Effect}:{item.Permission.Code}")
+                        .Order(StringComparer.Ordinal).ToArray();
+                    var now = clock.UtcNow;
+                    var requested = request.Overrides.ToDictionary(item => item.PermissionId);
+                    var removed = user.PermissionOverrides.Where(item => !requested.ContainsKey(item.PermissionId)).ToArray();
+                    context.UserPermissionOverrides.RemoveRange(removed);
+                    foreach (var item in removed) user.PermissionOverrides.Remove(item);
+                    foreach (var selection in request.Overrides.OrderBy(item => permissions[item.PermissionId].Code, StringComparer.Ordinal))
+                    {
+                        var existing = user.PermissionOverrides.SingleOrDefault(item => item.PermissionId == selection.PermissionId);
+                        if (existing is not null)
+                        {
+                            existing.Effect = selection.Effect.ToString();
+                            existing.UpdatedAtUtc = now;
+                            existing.UpdatedByUserId = session.User!.UserId;
+                            continue;
+                        }
+                        user.PermissionOverrides.Add(new UserPermissionOverrideEntity
+                        {
+                            Permission = permissions[selection.PermissionId],
+                            Effect = selection.Effect.ToString(),
+                            UpdatedAtUtc = now,
+                            UpdatedByUserId = session.User!.UserId
+                        });
+                    }
+                    user.SecurityStamp = Guid.NewGuid();
+                    user.UpdatedAtUtc = now;
+                    var current = user.PermissionOverrides
+                        .Select(item => $"{item.Effect}:{item.Permission.Code}")
+                        .Order(StringComparer.Ordinal).ToArray();
+                    var action = current.Length == 0 ? "user.permission_overrides.reset" : "user.permission_overrides.set";
+                    var audit = SecurityPersistenceSupport.AuditEvent(
+                        "Administration", "security", "UserAccount", user.Id.ToString(), action,
+                        session.User!.UserId, session.User.DisplayName, "Success", now, request.OperationId, request.OperationId);
+                    audit.Details.Add(PermissionAuditDetail("OverridesBefore", PermissionCodes(previous), null));
+                    audit.Details.Add(PermissionAuditDetail("OverridesAfter", null, PermissionCodes(current)));
+                    context.AuditEvents.Add(audit);
                     await context.SaveChangesAsync(cancellationToken);
                     return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
                         Result<SecurityUserSummaryView>.Success(MapUser(user)), true);
@@ -443,6 +586,21 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
 
     private static SecurityUserSummaryView MapUser(UserAccountEntity user)
     {
+        var roleGrants = user.UserRoles.Where(join => join.Role.IsActive)
+            .SelectMany(join => join.Role.RolePermissions)
+            .Select(join => join.Permission.Code);
+        var overridePairs = user.PermissionOverrides.Select(item => new KeyValuePair<string, SecurityPermissionOverrideEffect>(
+            item.Permission.Code,
+            Enum.Parse<SecurityPermissionOverrideEffect>(item.Effect, ignoreCase: false)));
+        var effectivePermissions = Pharmacy.Application.Security.Services.EffectivePermissionResolver.Resolve(roleGrants, overridePairs);
+        var overrides = user.PermissionOverrides.OrderBy(item => item.Permission.Code, StringComparer.Ordinal)
+            .Select(item => new SecurityUserPermissionOverrideView(
+                item.PermissionId,
+                item.Permission.Code,
+                Enum.Parse<SecurityPermissionOverrideEffect>(item.Effect, ignoreCase: false),
+                item.UpdatedAtUtc,
+                item.RowVersion))
+            .ToArray();
         return new SecurityUserSummaryView(
             user.Id,
             user.Login,
@@ -453,6 +611,8 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
             user.LockedUntilUtc,
             user.LastLoginAtUtc,
             Array.AsReadOnly(user.UserRoles.Select(join => join.Role.Code).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray()),
+            effectivePermissions,
+            Array.AsReadOnly(overrides),
             user.RowVersion);
     }
 

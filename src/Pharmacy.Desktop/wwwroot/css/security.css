@@ -69,6 +69,17 @@
 .security-role-summary > button { flex: 0 0 auto; }
 .security-system-role { flex: 0 0 auto; padding: var(--space-1) var(--space-2); border: var(--border-width) solid var(--color-border); border-radius: var(--radius-pill); color: var(--color-text-secondary); background: var(--color-surface-subtle); font-size: var(--font-size-metadata); font-weight: var(--font-weight-bold); }
 .security-empty-state { margin: var(--space-2) 0; }
+.security-account--selected { background: var(--color-accent-subtle); }
+.security-user-access { display: grid; gap: var(--space-4); }
+.security-user-access__heading { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); }
+.security-user-access__heading p { margin: 0; color: var(--color-text-secondary); }
+.security-user-permission-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(9rem, .45fr); align-items: center; gap: var(--space-3); padding: var(--space-2); border-radius: var(--radius-small); background: var(--color-surface); }
+.security-user-permission-row > span { display: grid; min-width: 0; gap: var(--space-1); }
+.security-user-permission-row strong { overflow-wrap: anywhere; }
+.security-user-permission-row small { color: var(--color-text-secondary); }
+.security-user-access__actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-2); }
+.security-panel .security-danger { border-color: var(--color-danger); color: var(--color-danger); }
+.security-route-denied { padding-top: var(--space-6); }
 
 .branding-root { min-width: 0; min-height: 100vh; background: var(--color-app-background); }
 .pharmacy-brand-mark { display: flex; align-items: center; min-width: 0; gap: var(--space-3); }
@@ -104,4 +115,6 @@
     .security-role-form__actions { justify-content: stretch; }
     .security-role-form__actions button { flex: 1 1 100%; }
     .branding-admin__color-fields { grid-template-columns: 1fr; }
+    .security-user-permission-row { grid-template-columns: 1fr; }
+    .security-user-access__actions button { flex: 1 1 100%; }
 }

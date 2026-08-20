@@ -51,7 +51,7 @@ public sealed class SqlCustomerCreditIntegrationTests
             {
                 await context.Database.MigrateAsync(token);
                 Assert.Empty(await context.Database.GetPendingMigrationsAsync(token));
-                Assert.Equal(10, (await context.Database.GetAppliedMigrationsAsync(token)).Count());
+                Assert.Equal(11, (await context.Database.GetAppliedMigrationsAsync(token)).Count());
             }
 
             var clock = new FixedClock(

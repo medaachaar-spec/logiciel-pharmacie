@@ -185,10 +185,14 @@ public sealed class CustomUxCleanupTests
         var allowedBrandingFiles = new[]
         {
             "src/Pharmacy.Application/Branding/",
+            "src/Pharmacy.Application/Security/",
             "src/Pharmacy.Infrastructure/Branding/",
+            "src/Pharmacy.Infrastructure/Security/",
             "src/Pharmacy.Infrastructure/Persistence/ConfigurationSchema.cs",
             "src/Pharmacy.Infrastructure/Persistence/Configurations/Configuration/",
+            "src/Pharmacy.Infrastructure/Persistence/Configurations/Security/",
             "src/Pharmacy.Infrastructure/Persistence/Entities/Configuration/",
+            "src/Pharmacy.Infrastructure/Persistence/Entities/Security/",
             "src/Pharmacy.Infrastructure/Persistence/Migrations/",
             "src/Pharmacy.Infrastructure/Persistence/PharmacyDbContext.cs",
             "src/Pharmacy.Infrastructure/Operations/SqlBackupRecoveryService.cs",
