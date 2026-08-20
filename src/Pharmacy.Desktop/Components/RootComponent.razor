@@ -1,40 +1,43 @@
 @implements IDisposable
 @inject SecurityCoordinator Security
+@inject BrandingCoordinator Branding
 @inject ICurrentSecuritySession Session
 @inject ISecurityClock SecurityClock
 
-@if (!Security.IsInitialized)
-{
-    <p class="loading-message" role="status">Chargement…</p>
-}
-else if (!Session.IsAuthenticated)
-{
-    <SecurityEntry />
-}
-else if (Session.IsLocked)
-{
-    <SecurityLockScreen />
-}
-else if (Security.MustChangePassword)
-{
-    <SecurityPasswordChangeRequired />
-}
-else
-{
-    <div @onclick="RecordActivity" @onkeydown="RecordActivity">
-        <Router AppAssembly="@typeof(RootComponent).Assembly">
-            <Found Context="routeData">
-                <RouteView RouteData="@routeData" DefaultLayout="@typeof(AppShellLayout)" />
-                <FocusOnNavigate RouteData="@routeData" Selector="h1" />
-            </Found>
-            <NotFound>
-                <LayoutView Layout="@typeof(AppShellLayout)">
-                    <DynamicComponent Type="@typeof(Pharmacy.Desktop.Components.Pages.NotFound)" />
-                </LayoutView>
-            </NotFound>
-        </Router>
-    </div>
-}
+<div class="branding-root" style="@Branding.ThemeStyle">
+    @if (!Security.IsInitialized)
+    {
+        <p class="loading-message" role="status">Chargement…</p>
+    }
+    else if (!Session.IsAuthenticated)
+    {
+        <SecurityEntry />
+    }
+    else if (Session.IsLocked)
+    {
+        <SecurityLockScreen />
+    }
+    else if (Security.MustChangePassword)
+    {
+        <SecurityPasswordChangeRequired />
+    }
+    else
+    {
+        <div @onclick="RecordActivity" @onkeydown="RecordActivity">
+            <Router AppAssembly="@typeof(RootComponent).Assembly">
+                <Found Context="routeData">
+                    <RouteView RouteData="@routeData" DefaultLayout="@typeof(AppShellLayout)" />
+                    <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+                </Found>
+                <NotFound>
+                    <LayoutView Layout="@typeof(AppShellLayout)">
+                        <DynamicComponent Type="@typeof(Pharmacy.Desktop.Components.Pages.NotFound)" />
+                    </LayoutView>
+                </NotFound>
+            </Router>
+        </div>
+    }
+</div>
 
 @code {
     private System.Threading.Timer? inactivityTimer;
@@ -42,6 +45,8 @@ else
     protected override async Task OnInitializedAsync()
     {
         Session.Changed += HandleSessionChanged;
+        Branding.Changed += HandleBrandingChanged;
+        await Branding.InitializeAsync();
         await Security.InitializeAsync();
         inactivityTimer = new System.Threading.Timer(CheckInactivity, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
@@ -49,6 +54,7 @@ else
     public void Dispose()
     {
         Session.Changed -= HandleSessionChanged;
+        Branding.Changed -= HandleBrandingChanged;
         inactivityTimer?.Dispose();
         GC.SuppressFinalize(this);
     }
@@ -68,4 +74,6 @@ else
     }
 
     private void HandleSessionChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private void HandleBrandingChanged() => _ = InvokeAsync(StateHasChanged);
 }

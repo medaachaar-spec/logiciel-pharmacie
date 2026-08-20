@@ -525,6 +525,67 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Configuration.PharmacyBrandingEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .HasColumnType("bigint");
+
+                    b.Property<byte[]>("LogoContent")
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("LogoFileName")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("LogoMimeType")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("PharmacyName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<string>("PrimaryColor")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("nvarchar(7)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_configuration_PharmacyBranding");
+
+                    b.ToTable("PharmacyBranding", "configuration", t =>
+                        {
+                            t.HasCheckConstraint("CK_configuration_PharmacyBranding_Logo_Metadata", "([LogoContent] IS NULL AND [LogoMimeType] IS NULL AND [LogoFileName] IS NULL) OR ([LogoContent] IS NOT NULL AND [LogoMimeType] IS NOT NULL AND [LogoFileName] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_configuration_PharmacyBranding_Logo_Size", "[LogoContent] IS NULL OR DATALENGTH([LogoContent]) <= 2097152");
+
+                            t.HasCheckConstraint("CK_configuration_PharmacyBranding_Name_NotBlank", "LEN(LTRIM(RTRIM([PharmacyName]))) > 0");
+
+                            t.HasCheckConstraint("CK_configuration_PharmacyBranding_PrimaryColor", "[PrimaryColor] LIKE '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]'");
+
+                            t.HasCheckConstraint("CK_configuration_PharmacyBranding_Singleton", "[Id] = 1");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1L,
+                            PharmacyName = "Pharmacie Diar Douha",
+                            PrimaryColor = "#0D9A48",
+                            UpdatedAtUtc = new DateTime(2026, 8, 20, 0, 0, 0, 0, DateTimeKind.Utc)
+                        });
+                });
+
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Customers.CustomerEntity", b =>
                 {
                     b.Property<long>("Id")

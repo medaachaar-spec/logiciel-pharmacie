@@ -1,6 +1,6 @@
 # SQL Server Express — cible pilote V1
 
-Statut au 11 août 2026 : `SQL EXPRESS PILOT GATE PENDING`. L’instance Express requise `.\PHARMACY` et la base `Pharmacy` sont présentes avec les 9 migrations. La détection à zéro utilisateur et l’affichage du bootstrap Owner ont été validés sans créer de compte. La création manuelle du premier Owner et les autres contrôles de cette procédure restent requis avant de lever le gate.
+Statut avant déploiement BRAND-01 : `SQL EXPRESS PILOT GATE PENDING`. L’instance Express requise `.\PHARMACY` et la base `Pharmacy` restent volontairement à l’état pré-BRAND avec 9 migrations ; les tests BRAND-01 ne la modifient jamais. Le prochain `install-or-upgrade` contrôlé doit sauvegarder cette base puis appliquer la dixième migration. La création manuelle du premier Owner et les autres contrôles de cette procédure restent requis avant de lever le gate.
 
 ## Convention
 
@@ -24,7 +24,7 @@ Sur un poste/VM dédié sans donnée réelle :
 1. confirmer service `MSSQL$PHARMACY` et édition contenant `Express` ;
 2. vérifier connexion Windows, TLS local, création `Pharmacy` ;
 3. exécuter le Setup RC fresh ;
-4. confirmer 9 migrations, 0 pending, aucune variation de modèle ;
+4. confirmer 10 migrations, 0 pending, aucune variation de modèle et l’identité de pharmacie chargée ;
 5. confirmer absence d’utilisateur métier seedé ;
 6. exécuter les scénarios catalogue, achat/réception, vente FEFO, crédit, retour, inventaire, RBAC, reporting, import ;
 7. créer backup, `RESTORE VERIFYONLY`, hash, copie externe et restore-test isolé ;

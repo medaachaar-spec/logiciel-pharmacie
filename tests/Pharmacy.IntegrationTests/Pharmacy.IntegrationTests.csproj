@@ -39,5 +39,9 @@
              Link="ReportingCoordinator.cs" />
     <Compile Include="..\..\src\Pharmacy.Desktop\Components\Operations\OperationsCoordinator.cs"
              Link="OperationsCoordinator.cs" />
+    <Compile Include="..\..\src\Pharmacy.Desktop\Components\Branding\BrandingCoordinator.cs"
+             Link="BrandingCoordinator.cs" />
+    <Compile Include="..\..\src\Pharmacy.Desktop\Components\Branding\BrandingThemePalette.cs"
+             Link="BrandingThemePalette.cs" />
   </ItemGroup>
 </Project>

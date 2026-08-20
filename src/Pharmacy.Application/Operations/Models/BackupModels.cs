@@ -40,4 +40,7 @@ public sealed record RestoreTestView(
     int CriticalTableCount,
     bool HealthCheckPassed,
     bool CleanupPassed,
-    DateTime CompletedAtUtc);
+    DateTime CompletedAtUtc,
+    string? PharmacyName = null,
+    string? PrimaryColor = null,
+    string? LogoSha256 = null);

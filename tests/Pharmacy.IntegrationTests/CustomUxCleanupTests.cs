@@ -182,9 +182,26 @@ public sealed class CustomUxCleanupTests
             "diff", "--name-only", "v1.0.0-pre-customization", "--",
             "src/Pharmacy.Domain", "src/Pharmacy.Application", "src/Pharmacy.Infrastructure");
 
+        var allowedBrandingFiles = new[]
+        {
+            "src/Pharmacy.Application/Branding/",
+            "src/Pharmacy.Infrastructure/Branding/",
+            "src/Pharmacy.Infrastructure/Persistence/ConfigurationSchema.cs",
+            "src/Pharmacy.Infrastructure/Persistence/Configurations/Configuration/",
+            "src/Pharmacy.Infrastructure/Persistence/Entities/Configuration/",
+            "src/Pharmacy.Infrastructure/Persistence/Migrations/",
+            "src/Pharmacy.Infrastructure/Persistence/PharmacyDbContext.cs",
+            "src/Pharmacy.Infrastructure/Operations/SqlBackupRecoveryService.cs",
+            "src/Pharmacy.Application/Operations/Models/BackupModels.cs"
+        };
+        var unexpected = changedBusinessFiles.Split(
+                ['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(path => !allowedBrandingFiles.Any(prefix => path.StartsWith(prefix, StringComparison.Ordinal)))
+            .ToArray();
+
         Assert.True(
-            string.IsNullOrWhiteSpace(changedBusinessFiles),
-            $"CUSTOM-01 must not modify business handlers or services:{Environment.NewLine}{changedBusinessFiles}");
+            unexpected.Length == 0,
+            $"CUSTOM-01 must not modify unrelated business handlers or services:{Environment.NewLine}{string.Join(Environment.NewLine, unexpected)}");
     }
 
     [Fact]

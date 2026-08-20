@@ -23,7 +23,7 @@
 .security-card input, .security-panel input, .security-panel select { min-height: var(--control-height-medium); padding: var(--space-2) var(--space-3); border: var(--border-width) solid var(--color-border-strong); border-radius: var(--radius-small); color: var(--color-text-primary); background: var(--color-surface); }
 .security-card input:focus-visible, .security-panel input:focus-visible, .security-panel select:focus-visible, .security-card button:focus-visible, .security-panel button:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
 .security-card button, .security-panel button, .security-topbar-button { min-height: var(--control-height-small); padding: var(--space-2) var(--space-3); border: var(--border-width) solid var(--color-accent-border); border-radius: var(--radius-small); color: var(--color-accent-active); background: var(--color-surface); font-weight: var(--font-weight-bold); cursor: pointer; }
-.security-card .security-primary, .security-panel .security-primary { color: var(--color-text-inverse); background: var(--color-accent); }
+.security-card .security-primary, .security-panel .security-primary { color: var(--pharmacy-on-primary); background: var(--color-accent); }
 .security-feedback { margin-block: var(--space-4); padding: var(--space-3); border: var(--border-width) solid var(--color-information); border-radius: var(--radius-medium); color: var(--color-information); background: var(--color-information-surface); }
 .security-recovery { margin-top: var(--space-4); padding: var(--space-4); border-color: var(--color-warning); background: var(--color-warning-surface); }
 .security-recovery ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin-top: var(--space-3); }
@@ -70,8 +70,30 @@
 .security-system-role { flex: 0 0 auto; padding: var(--space-1) var(--space-2); border: var(--border-width) solid var(--color-border); border-radius: var(--radius-pill); color: var(--color-text-secondary); background: var(--color-surface-subtle); font-size: var(--font-size-metadata); font-weight: var(--font-weight-bold); }
 .security-empty-state { margin: var(--space-2) 0; }
 
+.branding-root { min-width: 0; min-height: 100vh; background: var(--color-app-background); }
+.pharmacy-brand-mark { display: flex; align-items: center; min-width: 0; gap: var(--space-3); }
+.pharmacy-brand-mark__logo { display: block; flex: 0 0 auto; object-fit: contain; }
+.pharmacy-brand-mark__name { min-width: 0; overflow-wrap: anywhere; color: inherit; line-height: var(--line-height-tight); }
+.pharmacy-brand-mark--sidebar { width: 100%; }
+.pharmacy-brand-mark--sidebar .pharmacy-brand-mark__logo { width: var(--control-height-medium); height: var(--control-height-medium); padding: .2rem; border-radius: var(--radius-medium); background: var(--color-surface); }
+.pharmacy-brand-mark--sidebar .pharmacy-brand-mark__name { overflow: hidden; color: var(--color-text-inverse); text-overflow: ellipsis; white-space: nowrap; }
+.pharmacy-brand-mark--login { align-items: center; flex-direction: column; margin-bottom: var(--space-6); text-align: center; }
+.pharmacy-brand-mark--login .pharmacy-brand-mark__logo { width: 5.25rem; height: 5.25rem; }
+.pharmacy-brand-mark--login .pharmacy-brand-mark__name { max-width: 100%; font-size: var(--font-size-section-title); }
+.pharmacy-brand-mark__fallback { display: grid; flex: 0 0 auto; width: var(--control-height-medium); height: var(--control-height-medium); place-items: center; border-radius: var(--radius-medium); color: var(--pharmacy-on-primary); background: var(--color-accent); font-weight: var(--font-weight-bold); }
+.branding-admin { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(15rem, .55fr); align-items: start; gap: var(--space-6); }
+.branding-admin__editor > div > p { color: var(--color-text-secondary); }
+.branding-admin__color-fields { display: grid; grid-template-columns: minmax(7rem, .35fr) minmax(0, 1fr); gap: var(--space-3); }
+.security-panel input.branding-admin__color-picker { width: 100%; padding: var(--space-1); cursor: pointer; }
+.branding-admin__preview { display: grid; min-width: 0; justify-items: center; padding: var(--space-5); gap: var(--space-3); border: var(--border-width) solid var(--color-accent-border); border-radius: var(--radius-large); overflow: hidden; background: var(--color-accent-subtle); text-align: center; }
+.branding-admin__preview > span { color: var(--color-text-secondary); font-size: var(--font-size-metadata); font-weight: var(--font-weight-bold); text-transform: uppercase; }
+.branding-admin__preview img { display: block; width: 5rem; height: 5rem; object-fit: contain; }
+.branding-admin__preview strong { max-width: 100%; overflow-wrap: anywhere; }
+.branding-admin__preview button { color: var(--pharmacy-on-primary); background: var(--color-accent); pointer-events: none; }
+
 @media (max-width: 72rem) {
     .security-admin__grid { grid-template-columns: 1fr; }
+    .branding-admin { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 52rem) {
@@ -81,4 +103,5 @@
     .security-role-summary { align-items: flex-start; flex-direction: column; padding-bottom: var(--space-3); }
     .security-role-form__actions { justify-content: stretch; }
     .security-role-form__actions button { flex: 1 1 100%; }
+    .branding-admin__color-fields { grid-template-columns: 1fr; }
 }

@@ -1,0 +1,20 @@
+@inject BrandingCoordinator Branding
+
+<div class="pharmacy-brand-mark @CssClass">
+    @if (!string.IsNullOrWhiteSpace(Branding.LogoSource))
+    {
+        <img class="pharmacy-brand-mark__logo" src="@Branding.LogoSource" alt="" />
+    }
+    else
+    {
+        <span class="pharmacy-brand-mark__fallback" aria-hidden="true">+</span>
+    }
+    <strong class="pharmacy-brand-mark__name" title="@Branding.Current.PharmacyName">@Branding.Current.PharmacyName</strong>
+</div>
+
+@code {
+    [Parameter]
+    public string Variant { get; set; } = "sidebar";
+
+    private string CssClass => $"pharmacy-brand-mark--{Variant}";
+}

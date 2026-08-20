@@ -1,6 +1,7 @@
 @page "/module/administration"
 @inject SecurityCoordinator Security
 @inject IPermissionAuthorizer Authorizer
+@inject BrandingCoordinator Branding
 
 <PageTitle>Administration</PageTitle>
 <div class="page-content catalog-page security-admin">
@@ -15,6 +16,45 @@
     else
     {
         @if (!string.IsNullOrWhiteSpace(Security.Message)) { <div class="security-feedback" role="status">@Security.Message</div> }
+        @if (!string.IsNullOrWhiteSpace(Branding.Message)) { <div class="security-feedback" role="status">@Branding.Message</div> }
+        @if (!string.IsNullOrWhiteSpace(brandingFileMessage)) { <div class="security-feedback" role="alert">@brandingFileMessage</div> }
+
+        <section class="security-panel branding-admin" aria-labelledby="branding-admin-title">
+            <div class="branding-admin__editor">
+                <div>
+                    <h2 id="branding-admin-title">Identité de la pharmacie</h2>
+                    <p>Le nom, le logo et la couleur sont appliqués à la connexion et à la navigation.</p>
+                </div>
+                <form @onsubmit="SaveBrandingAsync" @onsubmit:preventDefault>
+                    <label>Nom
+                        <input required maxlength="160" autocomplete="organization" @bind="brandingName" />
+                    </label>
+                    <label>Logo
+                        <InputFile OnChange="ReadBrandingLogoAsync"
+                                   accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" />
+                        <small>PNG, JPEG ou WEBP ; 2 Mo maximum.</small>
+                    </label>
+                    <div class="branding-admin__color-fields">
+                        <label>Couleur
+                            <input class="branding-admin__color-picker" type="color" aria-label="Sélecteur de couleur principale" @bind="brandingColor" />
+                        </label>
+                        <label>Valeur hexadécimale
+                            <input required maxlength="7" pattern="#[0-9A-Fa-f]{6}" autocomplete="off" @bind="brandingColor" />
+                        </label>
+                    </div>
+                    <button class="security-primary" disabled="@Branding.IsBusy">
+                        @(Branding.IsBusy ? "Enregistrement…" : "Enregistrer l’identité")
+                    </button>
+                </form>
+            </div>
+            <div class="branding-admin__preview" style="@PreviewThemeStyle" aria-label="Aperçu de l’identité">
+                <span>Aperçu</span>
+                <img src="@PreviewLogoSource" alt="" />
+                <strong>@brandingName</strong>
+                <button type="button" tabindex="-1">Action principale</button>
+            </div>
+        </section>
+
         <section class="security-admin__grid" aria-label="Gestion des comptes et mots de passe">
             <div class="security-admin__column">
                 <div class="security-panel">
@@ -175,6 +215,9 @@
     private string reauthPassword = string.Empty, login = string.Empty, displayName = string.Empty, initialPassword = string.Empty;
     private string currentPassword = string.Empty, newPassword = string.Empty;
     private string roleCode = string.Empty, roleName = string.Empty;
+    private string brandingName = string.Empty, brandingColor = string.Empty;
+    private string? brandingFileMessage, pendingLogoMimeType, pendingLogoFileName, pendingLogoSource;
+    private byte[]? pendingLogoContent;
     private long selectedRoleId, roleAssignmentId;
     private SecurityRoleView? editingRole;
     private readonly HashSet<long> selectedPermissionIds = new();
@@ -182,7 +225,11 @@
     {
         denied = Authorizer.Authorize(SecurityPermissions.SecurityManageUsers).IsFailure;
         canManageRoles = Authorizer.Authorize(SecurityPermissions.SecurityManageRoles).IsSuccess;
-        if (!denied) await Security.LoadAdministrationAsync();
+        if (!denied)
+        {
+            SyncBrandingForm();
+            await Security.LoadAdministrationAsync();
+        }
     }
     private async Task ReauthenticateAsync() { await Security.ReauthenticateAsync(reauthPassword); reauthPassword = string.Empty; }
     private async Task CreateUserAsync()
@@ -194,6 +241,78 @@
     {
         await Security.ChangePasswordAsync(currentPassword, newPassword);
         currentPassword = newPassword = string.Empty;
+    }
+
+    private string PreviewLogoSource => pendingLogoSource ?? Branding.LogoSource;
+
+    private string PreviewThemeStyle
+    {
+        get
+        {
+            try { return BrandingCoordinator.BuildThemeStyle(brandingColor); }
+            catch (FormatException) { return Branding.ThemeStyle; }
+            catch (ArgumentOutOfRangeException) { return Branding.ThemeStyle; }
+        }
+    }
+
+    private async Task ReadBrandingLogoAsync(InputFileChangeEventArgs args)
+    {
+        brandingFileMessage = null;
+        pendingLogoContent = null;
+        pendingLogoMimeType = null;
+        pendingLogoFileName = null;
+        pendingLogoSource = null;
+        var file = args.File;
+        if (file.Size <= 0 || file.Size > Pharmacy.Application.Branding.PharmacyBrandingDefaults.MaxLogoBytes)
+        {
+            brandingFileMessage = "Le logo doit être non vide et ne pas dépasser 2 Mo.";
+            return;
+        }
+
+        try
+        {
+            await using var stream = file.OpenReadStream(Pharmacy.Application.Branding.PharmacyBrandingDefaults.MaxLogoBytes);
+            using var buffer = new MemoryStream((int)file.Size);
+            await stream.CopyToAsync(buffer);
+            var content = buffer.ToArray();
+            var validation = Pharmacy.Application.Branding.PharmacyBrandingValidator.ValidateLogo(content, file.ContentType, file.Name);
+            if (validation.IsFailure)
+            {
+                brandingFileMessage = validation.Error.Message;
+                return;
+            }
+
+            pendingLogoContent = content;
+            pendingLogoMimeType = file.ContentType;
+            pendingLogoFileName = file.Name;
+            pendingLogoSource = $"data:{file.ContentType};base64,{Convert.ToBase64String(content)}";
+        }
+        catch (IOException)
+        {
+            brandingFileMessage = "Le logo n’a pas pu être lu. Sélectionnez un autre fichier.";
+        }
+    }
+
+    private async Task SaveBrandingAsync()
+    {
+        var saved = await Branding.UpdateAsync(
+            brandingName,
+            brandingColor,
+            pendingLogoContent,
+            pendingLogoMimeType,
+            pendingLogoFileName);
+        if (saved) SyncBrandingForm();
+    }
+
+    private void SyncBrandingForm()
+    {
+        brandingName = Branding.Current.PharmacyName;
+        brandingColor = Branding.Current.PrimaryColor;
+        pendingLogoContent = null;
+        pendingLogoMimeType = null;
+        pendingLogoFileName = null;
+        pendingLogoSource = null;
+        brandingFileMessage = null;
     }
 
     private void EditRole(SecurityRoleView role)

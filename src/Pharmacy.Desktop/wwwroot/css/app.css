@@ -130,7 +130,7 @@
     height: var(--control-height-medium);
     place-items: center;
     border-radius: var(--radius-medium);
-    color: var(--color-text-inverse);
+    color: var(--pharmacy-on-primary);
     background: var(--color-accent);
     font-weight: var(--font-weight-bold);
 }

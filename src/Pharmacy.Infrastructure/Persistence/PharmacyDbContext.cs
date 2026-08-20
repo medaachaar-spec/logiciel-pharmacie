@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Pharmacy.Infrastructure.Persistence.Entities.Audit;
 using Pharmacy.Infrastructure.Persistence.Entities.Cash;
 using Pharmacy.Infrastructure.Persistence.Entities.Catalog;
+using Pharmacy.Infrastructure.Persistence.Entities.Configuration;
 using Pharmacy.Infrastructure.Persistence.Entities.Customers;
 using Pharmacy.Infrastructure.Persistence.Entities.Inventory;
 using Pharmacy.Infrastructure.Persistence.Entities.Purchasing;
@@ -28,6 +29,8 @@ public sealed class PharmacyDbContext : DbContext
     internal DbSet<ProductBarcodeEntity> ProductBarcodes => Set<ProductBarcodeEntity>();
 
     internal DbSet<ProductPriceHistoryEntity> ProductPriceHistories => Set<ProductPriceHistoryEntity>();
+
+    internal DbSet<PharmacyBrandingEntity> PharmacyBranding => Set<PharmacyBrandingEntity>();
 
     internal DbSet<StockLocationEntity> StockLocations => Set<StockLocationEntity>();
 

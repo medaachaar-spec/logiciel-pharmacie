@@ -30,6 +30,8 @@ using Pharmacy.Infrastructure.Reporting;
 using Pharmacy.Desktop.Components.Reporting;
 using Pharmacy.Desktop.Components.Operations;
 using Pharmacy.Infrastructure.Operations;
+using Pharmacy.Infrastructure.Branding;
+using Pharmacy.Desktop.Components.Branding;
 
 namespace Pharmacy.Desktop;
 
@@ -46,6 +48,7 @@ public static class SalesServiceCollectionExtensions
         services.AddLocalSqlSecurity();
         services.AddSqlReporting();
         services.AddOperationalServices();
+        services.AddSqlPharmacyBranding();
         services.AddSingleton<ISaleDraftStore, InMemorySaleDraftStore>();
         services.AddSingleton<ISaleDraftIdGenerator, InMemorySaleDraftIdGenerator>();
         services.AddSingleton<ISaleFinalizationPreparationStore, InMemorySaleFinalizationPreparationStore>();
@@ -99,6 +102,7 @@ public static class SalesServiceCollectionExtensions
         services.AddScoped<SecurityCoordinator>();
         services.AddScoped<ReportingCoordinator>();
         services.AddScoped<OperationsCoordinator>();
+        services.AddScoped<BrandingCoordinator>();
         return services;
     }
 }

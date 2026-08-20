@@ -463,7 +463,7 @@ public sealed class SqlSalesGateFixture : IAsyncLifetime
         {
             await context.Database.MigrateAsync();
             Assert.Empty(await context.Database.GetPendingMigrationsAsync());
-            Assert.Equal(9, (await context.Database.GetAppliedMigrationsAsync()).Count());
+            Assert.Equal(10, (await context.Database.GetAppliedMigrationsAsync()).Count());
         }
 
         var category = await new SqlCatalogStore(Factory).CreateAsync(

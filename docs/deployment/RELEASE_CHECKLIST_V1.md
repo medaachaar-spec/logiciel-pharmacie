@@ -15,7 +15,7 @@ Cocher avec preuve datée ; une case critique vide signifie NO-GO.
 ## Base et exploitation
 
 - [ ] SQL Express réel PASS ;
-- [ ] fresh DB, 9 migrations, 0 pending/model changes ;
+- [ ] fresh DB, 10 migrations, 0 pending/model changes ;
 - [ ] aucun utilisateur/mot de passe/donnée métier seedé ;
 - [ ] backup pré-upgrade + verify + hash ;
 - [ ] rollback restauré sur cible isolée ;

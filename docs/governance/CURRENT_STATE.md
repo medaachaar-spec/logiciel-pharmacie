@@ -1,6 +1,6 @@
 # CURRENT_STATE - Logiciel Pharmacie
 
-Date de mise à jour : 2026-08-10
+Date de mise à jour : 2026-08-20
 
 ## Sprint 18 — Release Candidate pilote
 
@@ -18,7 +18,7 @@ Date de mise à jour : 2026-08-10
 
 - Documentation : INSTALLÉE ; package de gouvernance complet et cinq PDF de référence présents.
 - Dépôt réel : `C:\Users\HP\Desktop\Logiciel pharmacie`.
-- Branche active : `main`.
+- Branche active : `customization/branding`.
 - Sprint 0 : `IMPLEMENTED — FOUNDATION READY WITH WARNINGS` après correction de classification Sprint 0.1.
 - Git : dépôt local sur `a46ffb7`, zéro remote ; changements Sprints 12 et 13 laissés hors index pour revue, aucun commit ou push.
 - Solution .NET créée : OUI — `Pharmacy.slnx`, six projets .NET 10.
@@ -281,3 +281,15 @@ Effectuer les revues manuelles Sprints 12 et 13 dans SSMS et Desktop, notamment 
 - Tests : SQL Server réel avec vente espèces FEFO, carte, refus atomiques, idempotence, contraintes, rollback et réapplication ; base temporaire supprimée.
 - Gate restant : revue manuelle POS/Stock/SSMS, SQL Server Express et certificat TLS local.
 - Git : branche `main`, HEAD initial `a46ffb7`, index vide, zéro nouveau commit, remote ou push ; changements Sprints 12 et 13 visibles pour revue.
+
+## Mise à jour BRAND-01
+
+- Statut : `IMPLEMENTED — PHARMACY BRANDING AUTOMATED GATE PASS`.
+- Identité : nom, couleur principale et logo configurables depuis Administration ; valeurs initiales `Pharmacie Diar Douha`, `#0D9A48` et actif PNG fourni.
+- Persistence : singleton `configuration.PharmacyBranding`, logo personnalisé sauvegardable en SQL, `rowversion`, UTC, validation 2 Mo et signatures PNG/JPEG/WEBP.
+- Desktop : branding sur Connexion et Sidebar, nom long contrôlé, ratio du logo conservé, fallback embarqué et remise à zéro sans valeur stale lors d’une panne de lecture.
+- Thème : tokens CSS runtime vert pharmacie, texte primaire contrasté, focus contrôlé et couleurs sémantiques conservées.
+- Sécurité : lecture pré-authentification ; mise à jour protégée côté Infrastructure par `security.manage_users`, sans nouveau rôle, permission ou module.
+- Audit/backup : champs modifiés audités sans blob ; restore-test officiel compare nom, couleur et SHA-256 du logo avant nettoyage de sa base isolée.
+- EF : migration additive `PharmacyBrandingPersistenceV01`, 10 migrations au total, aucune variation du modèle après migration ; aucune ancienne migration modifiée.
+- SQL : validations exclusivement sur `Pharmacy_BRAND01_Test_*`; la base pilote `.\PHARMACY / Pharmacy` reste à 9 migrations et n’a pas été mutée.

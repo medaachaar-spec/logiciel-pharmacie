@@ -37,29 +37,12 @@
     border-bottom: var(--border-width) solid var(--color-development-bar-border);
 }
 
-.app-sidebar__monogram {
-    display: grid;
-    flex: 0 0 auto;
-    width: var(--control-height-medium);
-    height: var(--control-height-medium);
-    place-items: center;
-    border: var(--border-width) solid var(--color-accent-border);
-    border-radius: var(--radius-medium);
-    color: var(--color-text-inverse);
-    background: var(--color-accent);
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
-    letter-spacing: 0.04em;
-}
-
-.app-sidebar__brand-copy,
 .app-sidebar__scope-copy {
     display: grid;
     min-width: 0;
     line-height: var(--line-height-tight);
 }
 
-.app-sidebar__brand-copy strong,
 .app-sidebar__scope-copy strong {
     overflow: hidden;
     color: var(--color-text-inverse);
@@ -67,7 +50,6 @@
     white-space: nowrap;
 }
 
-.app-sidebar__brand-copy span,
 .app-sidebar__scope-copy span {
     overflow: hidden;
     color: var(--color-development-muted);
@@ -160,9 +142,9 @@
 
 .app-navigation__link--active {
     border-color: var(--color-accent-border);
-    color: var(--color-text-inverse);
+    color: var(--pharmacy-on-primary);
     background: var(--color-accent);
-    box-shadow: inset 0.2rem 0 0 var(--color-text-inverse);
+    box-shadow: inset 0.2rem 0 0 var(--pharmacy-on-primary);
 }
 
 .app-navigation__link--active:hover {
@@ -242,7 +224,7 @@
     padding-inline: var(--space-2);
 }
 
-.app-shell--collapsed .app-sidebar__brand-copy,
+.app-shell--collapsed .pharmacy-brand-mark__name,
 .app-shell--collapsed .app-sidebar__toggle-text,
 .app-shell--collapsed .app-sidebar__scope-copy,
 .app-shell--collapsed .app-navigation__label,
@@ -403,7 +385,7 @@
     height: var(--control-height-small);
     place-items: center;
     border-radius: var(--radius-pill);
-    color: var(--color-text-inverse);
+    color: var(--pharmacy-on-primary);
     background: var(--color-accent);
     font-size: var(--font-size-metadata);
     font-weight: var(--font-weight-bold);

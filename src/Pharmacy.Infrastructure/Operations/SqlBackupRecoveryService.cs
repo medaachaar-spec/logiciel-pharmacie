@@ -89,8 +89,13 @@ public sealed class SqlBackupRecoveryService : IBackupRecoveryService
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var record = new BackupRecordEntity
         {
-            OperationId = request.OperationId, BackupType = request.Type.ToString(), Status = "Running",
-            FileName = safeName, VerificationStatus = "Pending", ExternalCopyStatus = "NotRequested", CreatedAtUtc = started
+            OperationId = request.OperationId,
+            BackupType = request.Type.ToString(),
+            Status = "Running",
+            FileName = safeName,
+            VerificationStatus = "Pending",
+            ExternalCopyStatus = "NotRequested",
+            CreatedAtUtc = started
         };
         context.BackupRecords.Add(record);
         try
@@ -194,13 +199,28 @@ public sealed class SqlBackupRecoveryService : IBackupRecoveryService
             await using var health = new SqlConnection(restored.ConnectionString);
             await health.OpenAsync(cancellationToken);
             var migrations = await ScalarIntAsync(health, "SELECT COUNT(*) FROM dbo.__EFMigrationsHistory;", cancellationToken);
-            var critical = await ScalarIntAsync(health, "SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE (s.name=N'catalog' AND t.name=N'Products') OR (s.name=N'inventory' AND t.name=N'StockBalances') OR (s.name=N'sales' AND t.name=N'Sales') OR (s.name=N'security' AND t.name=N'Permissions');", cancellationToken);
-            if (migrations <= 0 || critical != 4) throw new InvalidOperationException("Le health check de restauration est incomplet.");
+            var coreCritical = await ScalarIntAsync(health, "SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE (s.name=N'catalog' AND t.name=N'Products') OR (s.name=N'inventory' AND t.name=N'StockBalances') OR (s.name=N'sales' AND t.name=N'Sales') OR (s.name=N'security' AND t.name=N'Permissions');", cancellationToken);
+            var brandingTable = await ScalarIntAsync(health, "SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE s.name=N'configuration' AND t.name=N'PharmacyBranding';", cancellationToken);
+            var critical = coreCritical + brandingTable;
+            string? pharmacyName = null;
+            string? primaryColor = null;
+            string? logoSha256 = null;
+            if (brandingTable == 1)
+            {
+                pharmacyName = await ScalarStringAsync(health, "SELECT PharmacyName FROM configuration.PharmacyBranding WHERE Id=1;", cancellationToken);
+                primaryColor = await ScalarStringAsync(health, "SELECT PrimaryColor FROM configuration.PharmacyBranding WHERE Id=1;", cancellationToken);
+                logoSha256 = await ScalarStringAsync(health, "SELECT COALESCE(CONVERT(varchar(64), HASHBYTES('SHA2_256', LogoContent), 2), '') FROM configuration.PharmacyBranding WHERE Id=1;", cancellationToken);
+            }
+            if (migrations <= 0 || coreCritical != 4 || brandingTable is < 0 or > 1
+                || brandingTable == 1 && (string.IsNullOrWhiteSpace(pharmacyName) || string.IsNullOrWhiteSpace(primaryColor)))
+                throw new InvalidOperationException("Le health check de restauration est incomplet.");
             await health.CloseAsync();
             SqlConnection.ClearAllPools();
             await DropDatabaseAsync(connection, tempName, cancellationToken); cleanup = true;
             await audit.RecordSuccessAsync("backup", "RestoreTest", tempName, "backup.restore.test", request.OperationId, cancellationToken);
-            return Result<RestoreTestView>.Success(new RestoreTestView(request.OperationId, tempName, migrations, critical, true, true, clock.UtcNow));
+            return Result<RestoreTestView>.Success(new RestoreTestView(
+                request.OperationId, tempName, migrations, critical, true, true, clock.UtcNow,
+                pharmacyName, primaryColor, string.IsNullOrEmpty(logoSha256) ? null : logoSha256));
         }
         catch (Exception ex)
         {
@@ -307,7 +327,7 @@ public sealed class SqlBackupRecoveryService : IBackupRecoveryService
 
         return false;
     }
-    private static async Task<string> ScalarStringAsync(SqlConnection c, string sql, CancellationToken t) { await using var cmd=c.CreateCommand(); cmd.CommandText=sql; return Convert.ToString(await cmd.ExecuteScalarAsync(t), System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty; }
-    private static async Task<int> ScalarIntAsync(SqlConnection c, string sql, CancellationToken t) { await using var cmd=c.CreateCommand(); cmd.CommandText=sql; return Convert.ToInt32(await cmd.ExecuteScalarAsync(t), System.Globalization.CultureInfo.InvariantCulture); }
+    private static async Task<string> ScalarStringAsync(SqlConnection c, string sql, CancellationToken t) { await using var cmd = c.CreateCommand(); cmd.CommandText = sql; return Convert.ToString(await cmd.ExecuteScalarAsync(t), System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty; }
+    private static async Task<int> ScalarIntAsync(SqlConnection c, string sql, CancellationToken t) { await using var cmd = c.CreateCommand(); cmd.CommandText = sql; return Convert.ToInt32(await cmd.ExecuteScalarAsync(t), System.Globalization.CultureInfo.InvariantCulture); }
     private async Task AuditFailureQuietlyAsync(string action, Guid operationId, string reasonCode, CancellationToken token) { try { await audit.RecordFailureAsync("backup", "BackupOperation", null, action, operationId, reasonCode, token); } catch { } }
 }

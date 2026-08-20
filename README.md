@@ -69,6 +69,8 @@ Le Sprint 15 ajoute l’authentification locale, le RBAC deny-by-default et l’
 
 Le Sprint 17 ajoute la page `/module/operations` : sauvegardes SQL avec CHECKSUM/VERIFYONLY/SHA-256, copie externe protégée par un gate de chiffrement, restore-test isolé, imports CSV UTF-8 prévisualisés (Catalogue CreateOnly, stock initial, lots) et diagnostic du poste. Le scanner suit le contrat clavier HID ; le ticket passe par `IReceiptPrinter` seulement après le commit de vente ; le TPE reste externe et manuel. Aucun matériel physique n’est certifié par le simulateur. Les procédures se trouvent dans `docs/operations/`, `docs/import/` et `docs/hardware/`.
 
+BRAND-01 ajoute l’identité configurable de la pharmacie. Le nom, la couleur principale et un logo PNG/JPEG/WEBP peuvent être modifiés dans Administration avec contrôle RBAC, audit et concurrence optimiste. Le nom et le logo apparaissent sur Connexion et dans la Sidebar ; les tokens CSS sont calculés au runtime. Le logo personnalisé est conservé dans SQL et vérifié par le restore-test officiel. Voir `docs/customization/PHARMACY_BRANDING_V0.1.md`.
+
 ### Commandes de persistance contrôlées
 
 La connexion n’est jamais stockée dans le dépôt. Elle doit être fournie temporairement par `PHARMACY_SQLSERVER_CONNECTION` pour les commandes EF ou `PHARMACY_TEST_SQLSERVER_CONNECTION` pour les tests SQL réels.

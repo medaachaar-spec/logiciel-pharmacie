@@ -60,7 +60,7 @@ La base métier est vide. Seules les références techniques et permissions des 
   --config "$env:ProgramData\LogicielPharmacie\config\pilot.json"
 ```
 
-Attendu : `Passed=true`, 9 migrations appliquées, 0 pending, 5 tables critiques. Vérifier ensuite connexion Owner, vente synthétique, backup/verify et arrêt propre. Ne pas importer de données réelles avant GO pilote.
+Attendu : `Passed=true`, 10 migrations appliquées, 0 pending, 5 tables critiques, dont `configuration.PharmacyBranding`. Vérifier ensuite identité de la pharmacie, connexion Owner, vente synthétique, backup/verify et arrêt propre. Ne pas importer de données réelles avant GO pilote.
 
 ## Échec
 

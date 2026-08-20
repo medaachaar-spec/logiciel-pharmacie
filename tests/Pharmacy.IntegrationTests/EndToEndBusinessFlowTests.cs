@@ -708,13 +708,13 @@ public sealed class EndToEndBusinessFlowTests
 
         var restoredByService = Success(await backups.RestoreTestAsync(
             new RestoreTestRequest(Guid.NewGuid(), environment.BackupPath), token));
-        Assert.Equal(9, restoredByService.AppliedMigrationCount);
+        Assert.Equal(10, restoredByService.AppliedMigrationCount);
         Assert.True(restoredByService.HealthCheckPassed);
         Assert.True(restoredByService.CleanupPassed);
         state.Pass("E2E25 Restore-test");
 
         await environment.RestoreForComparisonAsync(environment.BackupPath, token);
-        Assert.Equal(9, await environment.ScalarAsync<int>(
+        Assert.Equal(10, await environment.ScalarAsync<int>(
             "SELECT COUNT(*) FROM dbo.__EFMigrationsHistory;", token, databaseName: environment.RestoreDatabaseName));
 
         foreach (var table in new[]
@@ -954,7 +954,7 @@ public sealed class EndToEndBusinessFlowTests
                 var options = optionsBuilder.Options;
                 await using var context = new PharmacyDbContext(options);
                 await context.Database.MigrateAsync(token);
-                Assert.Equal(9, (await context.Database.GetAppliedMigrationsAsync(token)).Count());
+                Assert.Equal(10, (await context.Database.GetAppliedMigrationsAsync(token)).Count());
                 Assert.Empty(await context.Database.GetPendingMigrationsAsync(token));
                 return environment;
             }

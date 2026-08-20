@@ -139,3 +139,12 @@ Figma n’est pas obligatoire. Le prototype frontend sera construit directement 
 - L’idempotence persiste une empreinte SHA-256 couvrant brouillon, snapshots et paiement. Même opération équivalente recharge la vente ; un sens différent est un conflit explicite.
 - Les espèces persistent montant reçu et monnaie ; la carte ne conserve qu’un paiement externe confirmé. Paiement mixte, PAN, CVV/CVC et autres données carte restent hors périmètre.
 - Le rollback technique de `SalesPersistenceV01` restitue les quantités des mouvements `Sale` avant de retirer ces mouvements et le schéma Sales, afin de revenir à un état Sprint 12 réconcilié.
+
+## Décisions techniques locales — BRAND-01
+
+- `ReportSettings` reste réservé aux alertes Reporting. L’identité de la pharmacie utilise le singleton `configuration.PharmacyBranding`, avec `rowversion`, UTC et une migration additive unique.
+- Le seed contient seulement `Pharmacie Diar Douha` et `#0D9A48`. Le logo initial est livré dans les actifs Desktop ; un remplacement validé PNG/JPEG/WEBP est stocké en SQL jusqu’à 2 Mo afin d’être inclus dans la sauvegarde officielle.
+- La lecture de l’identité est locale et pré-authentification. L’écriture est contrôlée côté service par `security.manage_users`; aucune permission, aucun rôle et aucune entrée de navigation ne sont ajoutés.
+- Le thème est injecté au runtime par variables CSS. Les variantes et la couleur de texte sont dérivées avec contrôle de contraste, tandis que les couleurs danger, warning, success et information gardent leur signification.
+- Une erreur de lecture réinitialise immédiatement le coordinateur sur le branding central par défaut : une ancienne valeur en mémoire n’est jamais présentée comme fraîche.
+- Les changements de nom, couleur et métadonnées du logo sont audités dans la même écriture SQL. Le contenu binaire du logo n’entre jamais dans l’audit.
