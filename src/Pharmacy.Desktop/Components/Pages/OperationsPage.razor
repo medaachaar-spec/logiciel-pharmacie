@@ -2,16 +2,15 @@
 @inject OperationsCoordinator Operations
 @implements IDisposable
 
-<PageTitle>Continuité, imports et périphériques</PageTitle>
+<PageTitle>Sauvegardes et outils</PageTitle>
 
 <div class="page-content catalog-page operations-page">
     <header class="page-header catalog-page-header" aria-labelledby="operations-title">
-        <div><p class="catalog-kicker">Exploitation locale contrôlée</p><h1 id="operations-title">Continuité, imports et périphériques</h1><p class="page-subtitle">Sauvegardes SQL vérifiables, imports CSV prévisualisés et diagnostic matériel sans faux état prêt.</p></div>
-        <UiBadge Text="SQL local" Variant="UiBadgeVariant.Information" />
+        <div><h1 id="operations-title">Sauvegardes et outils</h1></div>
     </header>
 
     <UiAlert Title="Validation matérielle encore requise" Variant="UiAlertVariant.Warning">
-        Scanner HID, imprimante 80 mm, TPE externe et onduleur restent soumis à un pilote sur le matériel réel. Le mode actuel simule l’impression et ne traite aucune donnée bancaire.
+        Le scanner, l’imprimante 80 mm, le TPE et l’onduleur doivent être vérifiés sur le matériel réel. Le logiciel ne saisit aucune donnée bancaire.
     </UiAlert>
     @if (!string.IsNullOrWhiteSpace(Operations.Error)) { <UiAlert Title="Opération refusée ou échouée" Variant="UiAlertVariant.Danger"><p>@Operations.Error</p></UiAlert> }
     @if (!string.IsNullOrWhiteSpace(Operations.Message)) { <UiAlert Title="Résultat" Variant="UiAlertVariant.Success"><p>@Operations.Message</p></UiAlert> }
@@ -27,7 +26,7 @@
         @if (Operations.BackupFiles.Count == 0) { <UiEmptyState Title="Aucune sauvegarde gérée" Description="Créez une sauvegarde complète ; son checksum SQL et son SHA-256 seront vérifiés." /> }
         else
         {
-            <div class="catalog-table-scroll" tabindex="0"><table class="catalog-table catalog-table--compact"><thead><tr><th>Fichier</th><th>Type</th><th>Date UTC</th><th>Taille</th><th>Contrôles</th></tr></thead><tbody>@foreach (var file in Operations.BackupFiles) { <tr><td><code>@file.FileName</code><small class="operations-path">@file.FullPath</small></td><td>@file.Type</td><td>@file.LastWriteAtUtc.ToString("u")</td><td>@FormatBytes(file.SizeBytes)</td><td><div class="operations-row-actions"><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" Disabled="@Operations.IsBusy" OnClick="@(_ => Operations.VerifyBackupAsync(file.FullPath, lifetime.Token))">Vérifier</UiButton>@if (file.Type == SqlBackupType.Full) { <UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Danger" Disabled="@Operations.IsBusy" OnClick="@(_ => Operations.RestoreTestAsync(file.FullPath, lifetime.Token))">Test restaurer</UiButton> }</div></td></tr> }</tbody></table></div>
+            <div class="catalog-table-scroll" tabindex="0"><table class="catalog-table catalog-table--compact"><thead><tr><th>Fichier</th><th>Type</th><th>Date UTC</th><th>Taille</th><th>Contrôles</th></tr></thead><tbody>@foreach (var file in Operations.BackupFiles) { <tr><td><code>@file.FileName</code><small class="operations-path">@file.FullPath</small></td><td>@file.Type</td><td>@file.LastWriteAtUtc.ToString("u")</td><td>@FormatBytes(file.SizeBytes)</td><td><div class="operations-row-actions"><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" Disabled="@Operations.IsBusy" OnClick="@(_ => Operations.VerifyBackupAsync(file.FullPath, lifetime.Token))">Vérifier</UiButton>@if (file.Type == SqlBackupType.Full) { <UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Danger" Disabled="@Operations.IsBusy" OnClick="@(_ => Operations.RestoreTestAsync(file.FullPath, lifetime.Token))">Tester la restauration</UiButton> }</div></td></tr> }</tbody></table></div>
         }
     </section>
 
@@ -56,10 +55,10 @@
     </section>
 
     <section class="catalog-panel" aria-labelledby="devices-title">
-        <div class="catalog-section-heading"><div><p class="section-kicker">Poste local</p><h2 id="devices-title">Diagnostic périphériques</h2></div><UiButton Variant="UiButtonVariant.Secondary" Disabled="@Operations.IsBusy" OnClick="@(_ => Operations.CheckDevicesAsync(lifetime.Token))">Exécuter le diagnostic</UiButton></div>
+        <div class="catalog-section-heading"><div><h2 id="devices-title">Diagnostic périphériques</h2></div><UiButton Variant="UiButtonVariant.Secondary" Disabled="@Operations.IsBusy" OnClick="@(_ => Operations.CheckDevicesAsync(lifetime.Token))">Exécuter le diagnostic</UiButton></div>
         @if (Operations.DeviceDiagnostic is null) { <UiEmptyState Title="Diagnostic non exécuté" Description="Le contrôle distingue explicitement simulateur, manuel, configuré et matériel non certifié." /> }
         else { <div class="operations-device-grid">@foreach (var item in Operations.DeviceDiagnostic.Items) { <article><UiBadge Text="@item.Status" Variant="@(item.IsReady ? UiBadgeVariant.Success : UiBadgeVariant.Warning)" /><h3>@item.Device</h3><p>@item.Detail</p></article> }</div> }
-        <div class="operations-scanner"><label class="ui-field"><span class="ui-field__label">Test scanner HID / saisie manuelle (suffixe Entrée)</span><input class="ui-field__control" @onkeydown="ScannerKeyDown" @bind="scannerText" placeholder="Scannez ou saisissez un code" /></label><output aria-live="polite">@scannerResult</output></div>
+        <div class="operations-scanner"><label class="ui-field"><span class="ui-field__label">Scanner HID ou saisie manuelle</span><input class="ui-field__control" @onkeydown="ScannerKeyDown" @bind="scannerText" placeholder="Scannez ou saisissez un code" /></label><output aria-live="polite">@scannerResult</output></div>
     </section>
 </div>
 

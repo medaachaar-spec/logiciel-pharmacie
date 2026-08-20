@@ -19,7 +19,7 @@
                    @onchange="SelectCash" />
             <span>
                 <strong>Espèces</strong>
-                <small>Calcul local de la monnaie</small>
+                <small>Monnaie calculée automatiquement</small>
             </span>
         </label>
         <label class="pos-payment-option">
@@ -121,7 +121,7 @@
             }
             else if (Session.CardPaymentStatus == DemoCardPaymentStatus.AwaitingConfirmation)
             {
-                <p>Après lecture du TPE externe simulé, choisissez explicitement le résultat observé.</p>
+                <p>Après lecture du TPE externe, choisissez le résultat observé.</p>
                 <div class="pos-terminal-actions">
                     <UiButton OnClick="ReportCardConfirmedAsync">Paiement confirmé</UiButton>
                     <UiButton Variant="UiButtonVariant.Secondary" OnClick="ReportCardNotCompletedAsync">
@@ -185,7 +185,7 @@
         <UiButton Size="UiButtonSize.Large"
                   Disabled="@(!Session.CanComplete || IsCompleting)"
                   IsLoading="@IsCompleting"
-                  LoadingText="Commit SQL en cours"
+                  LoadingText="Finalisation en cours"
                   OnClick="ConfirmAsync">
             Confirmer et enregistrer la vente
         </UiButton>

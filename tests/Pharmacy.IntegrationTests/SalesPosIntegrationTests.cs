@@ -439,7 +439,9 @@ public sealed class SalesPosIntegrationTests
         var page = DesktopText("Components", "Pages", "DemoPosPage.razor");
 
         Assert.Contains("@inject SalesPosCoordinator", page, StringComparison.Ordinal);
-        Assert.Contains("Ventes SQL V0.1 — continuité de vente persistante", page, StringComparison.Ordinal);
+        Assert.Contains("Nouvelle vente", page, StringComparison.Ordinal);
+        Assert.Contains("Suspendre", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("Sprint", page, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("OnAbandon=\"RequestAbandonSuspendedAsync\"", page, StringComparison.Ordinal);
         Assert.Contains("SuspendedSaleWorkflow", File.ReadAllText(Path.Combine(
             RepositoryRoot,

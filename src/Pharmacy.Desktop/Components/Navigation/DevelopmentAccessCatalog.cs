@@ -8,24 +8,24 @@ public sealed record DevelopmentAccessProfile(
 
 public static class DevelopmentAccessCatalog
 {
-    public const string Warning = "Profils de prévisualisation — ne représentent pas les rôles métier finaux";
+    public const string Warning = "Profils internes sans effet sur les permissions métier";
 
     public static IReadOnlyList<DevelopmentAccessProfile> Profiles { get; } =
         new[]
         {
             new DevelopmentAccessProfile(
                 "full",
-                "Démo — accès complet",
+                "Accès complet",
                 new HashSet<string>(StringComparer.Ordinal),
                 true),
             new DevelopmentAccessProfile(
                 "operations",
-                "Démo — opérations",
+                "Opérations",
                 CreateSet("home", "sales", "catalog", "inventory", "purchasing", "cash", "customers", "diagnostic", "ui-lab"),
                 false),
             new DevelopmentAccessProfile(
                 "read",
-                "Démo — lecture",
+                "Lecture",
                 CreateSet("home", "catalog", "inventory", "reporting", "diagnostic", "ui-lab"),
                 false)
         };

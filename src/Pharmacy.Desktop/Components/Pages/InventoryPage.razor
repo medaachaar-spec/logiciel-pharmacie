@@ -1,33 +1,26 @@
 @page "/module/inventory"
 @inject InventoryCoordinator Inventory
 
-<PageTitle>Stock SQL — Logiciel Pharmacie</PageTitle>
+<PageTitle>Stock — Logiciel Pharmacie</PageTitle>
 
 <div class="page-content inventory-page">
     <header class="page-header inventory-header" aria-labelledby="inventory-title">
         <div>
-            <p class="eyebrow">Stock</p>
-            <h1 id="inventory-title" tabindex="-1">Stock SQL</h1>
-            <p class="page-subtitle">Lots, mouvements et inventaires persistés dans SQL Server.</p>
+            <h1 id="inventory-title" tabindex="-1">Stock</h1>
         </div>
-        <UiBadge Text="SQL actif — ventes non persistées" Variant="UiBadgeVariant.Information" />
     </header>
-
-    <UiAlert Title="Périmètre Sprint 11" Variant="UiAlertVariant.Warning">
-        Le Stock et la disponibilité du POS proviennent de SQL Server. Les ventes restent non persistées et ne consomment aucun stock.
-    </UiAlert>
 
     @if (!Inventory.IsInitialized && Inventory.ErrorCode is null)
     {
         <section class="inventory-state catalog-panel" role="status" aria-live="polite">
-            <UiSpinner Label="Chargement du Stock SQL" />
+            <UiSpinner Label="Chargement du stock" />
         </section>
     }
     else if (Inventory.ErrorCode == "inventory.database.unavailable")
     {
-        <UiAlert Title="Stock SQL indisponible" Variant="UiAlertVariant.Warning">
+        <UiAlert Title="Stock indisponible" Variant="UiAlertVariant.Warning">
             <p>@Inventory.Message</p>
-            <p>Le shell reste accessible. Vérifiez la configuration locale dans Diagnostic puis réessayez.</p>
+            <p>Réessayez ou consultez Diagnostic.</p>
             <UiButton OnClick="ReloadAsync">Réessayer</UiButton>
         </UiAlert>
     }
@@ -59,7 +52,7 @@
 
         <section class="catalog-toolbar inventory-toolbar" aria-labelledby="stock-search-title" aria-busy="@Inventory.IsBusy.ToString().ToLowerInvariant()">
             <div>
-                <p class="section-kicker">Recherche SQL</p>
+                <p class="section-kicker">Recherche</p>
                 <h2 id="stock-search-title">Rechercher dans le stock</h2>
             </div>
 
@@ -67,7 +60,7 @@
                 <UiTextField Id="stock-search"
                              Label="Produit, référence ou code-barres"
                              Type="UiTextFieldType.Search"
-                             Placeholder="DEMO-000001"
+                             Placeholder="Référence produit"
                              Value="@searchText"
                              ValueChanged="SetSearchText" />
                 <UiSelect Id="stock-location"
@@ -92,7 +85,7 @@
         <section class="catalog-panel inventory-panel inventory-list-panel" aria-labelledby="stock-list-title">
             <div class="catalog-section-heading inventory-section-heading">
                 <div>
-                    <p class="section-kicker">Lecture SQL</p>
+                    <p class="section-kicker">Produits</p>
                     <h2 id="stock-list-title">Résumé par produit</h2>
                 </div>
                 <span>@Inventory.Products.Count résultat(s)</span>
@@ -139,7 +132,7 @@
                     </div>
                 </div>
                 <UiEmptyState Title="Sélectionnez un produit"
-                              Description="Le détail affichera les lots, les balances, les mouvements et les opérations de stock disponibles." />
+                              Description="Choisissez un produit pour afficher son stock." />
             }
             else
             {
@@ -250,7 +243,6 @@
         <section class="catalog-panel inventory-panel inventory-sessions-panel" aria-labelledby="inventory-session-title">
             <div class="catalog-section-heading inventory-section-heading">
                 <div><p class="section-kicker">Comptage contrôlé</p><h2 id="inventory-session-title">Sessions d’inventaire</h2></div>
-                <UiBadge Text="Finalisation atomique" Variant="UiBadgeVariant.Information" />
             </div>
 
             <div class="inventory-action-grid">

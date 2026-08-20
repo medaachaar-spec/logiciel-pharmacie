@@ -2,16 +2,15 @@
 @inject SecurityCoordinator Security
 @inject IPermissionAuthorizer Authorizer
 
-<PageTitle>Administration de la sécurité</PageTitle>
+<PageTitle>Administration</PageTitle>
 <div class="page-content catalog-page security-admin">
     <header class="page-header catalog-page-header" aria-labelledby="administration-title">
-        <div><p class="catalog-kicker">Sécurité locale</p><h1 id="administration-title">Comptes, rôles et récupération</h1><p class="page-subtitle">Désactivation sans suppression et contrôle par permissions, avec réauthentification pour les opérations sensibles.</p></div>
-        <UiBadge Text="SQL local" Variant="UiBadgeVariant.Success" />
+        <div><h1 id="administration-title">Administration</h1></div>
     </header>
 
     @if (denied)
     {
-        <UiAlert Title="Accès refusé" Variant="UiAlertVariant.Danger"><p>La permission <code>security.manage_users</code> est requise.</p></UiAlert>
+        <UiAlert Title="Accès refusé" Variant="UiAlertVariant.Danger"><p>Vous n’avez pas la permission d’accéder à cette page.</p></UiAlert>
     }
     else
     {
@@ -20,7 +19,7 @@
             <div class="security-admin__column">
                 <div class="security-panel">
                     <h2>Réauthentification</h2>
-                    <p>Confirme les opérations sensibles pendant cinq minutes.</p>
+                    <p>Valable pendant cinq minutes.</p>
                     <form @onsubmit="ReauthenticateAsync" @onsubmit:preventDefault>
                         <label>Mot de passe actuel<input type="password" autocomplete="current-password" @bind="reauthPassword" /></label>
                         <button class="security-primary">Confirmer</button>
@@ -52,7 +51,7 @@
         </section>
 
         <section class="security-panel security-panel--accounts">
-            <h2>Comptes locaux</h2>
+            <h2>Comptes utilisateurs</h2>
             <div class="security-table-wrap" tabindex="0"><table class="security-accounts-table"><thead><tr><th>Compte</th><th>Rôles</th><th>État</th><th>Actions sensibles</th></tr></thead><tbody>
             @foreach (var user in Security.Users)
             {

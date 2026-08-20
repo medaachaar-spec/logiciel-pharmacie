@@ -3,13 +3,11 @@
 
 <header class="app-topbar">
     <div class="app-topbar__heading">
-        <p class="app-topbar__eyebrow">Espace de travail</p>
         <h2>@PageTitle</h2>
         <p>@PageDescription</p>
     </div>
     <div class="app-topbar__context">
-        <div class="app-topbar__badges" aria-label="Contexte d’exécution">
-            <span class="context-badge context-badge--local"><span aria-hidden="true">●</span> Mode local sécurisé</span>
+        <div class="app-topbar__badges" aria-label="Rôles du compte">
             @foreach (var role in Session.User?.Roles ?? Array.Empty<string>()) { <span class="context-badge">@role</span> }
         </div>
         <div class="app-topbar__account" aria-label="Compte courant">

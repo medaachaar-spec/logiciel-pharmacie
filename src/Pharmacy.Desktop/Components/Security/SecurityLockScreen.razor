@@ -5,7 +5,7 @@
     <section class="security-card" aria-labelledby="lock-title">
         <p class="security-card__kicker">Session verrouillée</p>
         <h1 id="lock-title">@Session.User?.DisplayName</h1>
-        <p class="security-card__intro">L’activité a été masquée. Saisissez votre mot de passe pour reprendre cette session locale.</p>
+        <p class="security-card__intro">Saisissez votre mot de passe pour reprendre la session.</p>
         @if (!string.IsNullOrWhiteSpace(Security.Message)) { <div class="security-feedback" role="alert">@Security.Message</div> }
         <form @onsubmit="UnlockAsync" @onsubmit:preventDefault>
             <label>Mot de passe<input type="password" autocomplete="current-password" autofocus @bind="password" /></label>

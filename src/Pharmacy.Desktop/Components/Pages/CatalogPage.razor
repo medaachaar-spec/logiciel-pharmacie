@@ -2,21 +2,14 @@
 @implements IAsyncDisposable
 @inject CatalogCoordinator Catalog
 
-<PageTitle>Catalogue SQL — Logiciel Pharmacie</PageTitle>
+<PageTitle>Produits — Logiciel Pharmacie</PageTitle>
 
 <div class="page-content catalog-page">
     <header class="page-header catalog-header">
         <div>
-            <p class="eyebrow">Catalogue</p>
-            <h1>Catalogue SQL</h1>
-            <p class="page-subtitle">Références, catégories, codes-barres et prix persistés dans SQL Server.</p>
+            <h1>Produits</h1>
         </div>
-        <UiBadge Text="SQL Server — données Demo" Variant="UiBadgeVariant.Information" />
     </header>
-
-    <UiAlert Title="Périmètre Sprint 10" Variant="UiAlertVariant.Warning">
-        La création d’un produit ne crée aucun stock. La disponibilité du POS vient du Stock SQL et les ventes ne sont pas persistées.
-    </UiAlert>
 
     @if (!string.IsNullOrWhiteSpace(Catalog.Message))
     {
@@ -28,18 +21,18 @@
 
     <section class="catalog-toolbar" aria-labelledby="catalog-search-title" aria-busy="@Catalog.IsBusy.ToString().ToLowerInvariant()">
         <div>
-            <p class="section-kicker">Recherche SQL</p>
+            <p class="section-kicker">Recherche</p>
             <h2 id="catalog-search-title">Produits</h2>
         </div>
         <div class="catalog-filter-grid">
             <label>
-                <span>Nom, présentation, référence ou barcode</span>
+                <span>Nom, présentation, référence ou code-barres</span>
                 <input class="ui-field__control"
                        type="search"
                        value="@searchText"
                        @oninput="OnSearchInput"
                        @onkeydown="HandleSearchKeyDownAsync"
-                       placeholder="DEMO-000001 ou Produit Démo"
+                       placeholder="Référence ou désignation"
                        disabled="@Catalog.IsBusy" />
             </label>
             <label>
@@ -74,15 +67,15 @@
         <section class="catalog-panel" aria-labelledby="create-product-title">
             <div class="catalog-section-heading">
                 <div>
-                    <p class="section-kicker">Création transactionnelle</p>
-                    <h2 id="create-product-title">Nouveau produit synthétique</h2>
+                    <p class="section-kicker">Création</p>
+                    <h2 id="create-product-title">Nouveau produit</h2>
                 </div>
                 <span>Aucun stock créé</span>
             </div>
             <div class="catalog-form-grid">
                 <label><span>Désignation *</span><input class="ui-field__control" @bind="createName" disabled="@Catalog.IsBusy" /></label>
                 <label><span>Présentation</span><input class="ui-field__control" @bind="createPresentation" disabled="@Catalog.IsBusy" /></label>
-                <label><span>Référence interne *</span><input class="ui-field__control" @bind="createInternalCode" placeholder="DEMO-000011" disabled="@Catalog.IsBusy" /></label>
+                <label><span>Référence interne *</span><input class="ui-field__control" @bind="createInternalCode" placeholder="REF-0001" disabled="@Catalog.IsBusy" /></label>
                 <label>
                     <span>Catégorie *</span>
                     <select class="ui-field__control" @bind="createCategoryId" disabled="@Catalog.IsBusy">
@@ -94,7 +87,7 @@
                     </select>
                 </label>
                 <label><span>Prix initial MAD</span><input class="ui-field__control" type="number" min="0" step="0.0001" @bind="createPrice" disabled="@Catalog.IsBusy" /></label>
-                <label><span>Barcode Demo</span><input class="ui-field__control" @bind="createBarcode" placeholder="DEMO-BARCODE-000011" disabled="@Catalog.IsBusy" /></label>
+                <label><span>Code-barres</span><input class="ui-field__control" @bind="createBarcode" placeholder="Code-barres" disabled="@Catalog.IsBusy" /></label>
             </div>
             <UiButton IsLoading="@Catalog.IsBusy" OnClick="CreateProductAsync">Créer le produit</UiButton>
         </section>
@@ -103,17 +96,17 @@
     <div class="catalog-workspace">
         <section class="catalog-panel catalog-list-panel" aria-labelledby="catalog-list-title">
             <div class="catalog-section-heading">
-                <h2 id="catalog-list-title">Liste limitée</h2>
+                <h2 id="catalog-list-title">Liste des produits</h2>
                 <span>@Catalog.Products.Count résultat(s)</span>
             </div>
             @if (!Catalog.IsInitialized && Catalog.IsBusy)
             {
-                <UiSpinner Label="Chargement du Catalogue SQL" />
+                <UiSpinner Label="Chargement des produits" />
             }
             else if (Catalog.Products.Count == 0)
             {
                 <UiEmptyState Title="Aucun produit"
-                              Description="Aucun produit ne correspond aux filtres, ou le Catalogue SQL est indisponible." />
+                              Description="Aucun produit ne correspond aux filtres." />
             }
             else
             {
@@ -144,7 +137,7 @@
             @if (Catalog.SelectedProduct is null)
             {
                 <UiEmptyState Title="Sélectionnez un produit"
-                              Description="La fiche détaillée affichera identité, paramètres locaux, codes-barres et historique des prix." />
+                              Description="Choisissez un produit pour afficher sa fiche." />
             }
             else
             {
@@ -173,7 +166,7 @@
                     </label>
                 </div>
                 <div class="catalog-action-row">
-                    <UiButton IsLoading="@Catalog.IsBusy" OnClick="UpdateProductAsync">Enregistrer identité et paramètres</UiButton>
+                    <UiButton IsLoading="@Catalog.IsBusy" OnClick="UpdateProductAsync">Enregistrer</UiButton>
                     <UiButton Variant="@(product.IsActive && product.IsLocallyActive ? UiButtonVariant.Danger : UiButtonVariant.Secondary)"
                               Disabled="@Catalog.IsBusy"
                               OnClick="ToggleProductActivationAsync">
@@ -185,7 +178,7 @@
                 <section class="catalog-subsection" aria-labelledby="barcode-title">
                     <h3 id="barcode-title">Codes-barres</h3>
                     <div class="catalog-inline-form">
-                        <label><span>Nouveau code</span><input class="ui-field__control" @bind="newBarcode" placeholder="DEMO-BARCODE-..." disabled="@Catalog.IsBusy" /></label>
+                        <label><span>Nouveau code</span><input class="ui-field__control" @bind="newBarcode" placeholder="Code-barres" disabled="@Catalog.IsBusy" /></label>
                         <label class="catalog-check"><input type="checkbox" @bind="newBarcodePrimary" disabled="@Catalog.IsBusy" /> Principal</label>
                         <UiButton Size="UiButtonSize.Small" Disabled="@Catalog.IsBusy" OnClick="AddBarcodeAsync">Ajouter</UiButton>
                     </div>

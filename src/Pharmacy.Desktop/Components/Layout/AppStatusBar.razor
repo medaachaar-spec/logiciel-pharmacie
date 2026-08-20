@@ -1,14 +1,3 @@
 <footer class="app-statusbar" aria-label="État de l’application">
-    <span><span class="app-statusbar__dot app-statusbar__dot--ok" aria-hidden="true"></span>Local</span>
-    <span><span class="app-statusbar__dot" aria-hidden="true"></span>Version @ReleaseVersion</span>
-    <span><span class="app-statusbar__dot" aria-hidden="true"></span>Catalogue SQL : voir Diagnostic</span>
-    <span><strong>@BuildConfiguration</strong></span>
-    <span>Shell : prêt pour revue</span>
+    <span><span class="app-statusbar__dot app-statusbar__dot--ok" aria-hidden="true"></span>Application prête</span>
 </footer>
-
-@code {
-    private static string ReleaseVersion => Pharmacy.Infrastructure.Deployment.PilotReleaseInfo.Version;
-
-    [Parameter, EditorRequired]
-    public string BuildConfiguration { get; set; } = string.Empty;
-}

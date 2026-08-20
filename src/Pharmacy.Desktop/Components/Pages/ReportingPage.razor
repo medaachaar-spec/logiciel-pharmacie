@@ -2,25 +2,21 @@
 @inject ReportingCoordinator Reporting
 @implements IDisposable
 
-<PageTitle>Rapports et alertes — Logiciel Pharmacie</PageTitle>
+<PageTitle>Rapports — Logiciel Pharmacie</PageTitle>
 
 <div class="page-content catalog-page reporting-page">
     <header class="page-header catalog-page-header" aria-labelledby="reporting-title">
         <div>
-            <p class="catalog-kicker">Pilotage descriptif</p>
-            <h1 id="reporting-title">Rapports, alertes et exports</h1>
-            <p class="page-subtitle">Indicateurs SQL traçables, filtres temporels explicites et exports CSV sécurisés.</p>
+            <h1 id="reporting-title">Rapports</h1>
         </div>
-        <UiBadge Text="SQL — lecture seule" Variant="UiBadgeVariant.Information" />
     </header>
 
-    <UiAlert Title="Interprétation contrôlée" Variant="UiAlertVariant.Information">
-        Les montants sont exprimés en MAD. Les retours sont séparés du brut et le net documenté est brut moins remboursements.
-        Aucune tendance, recommandation ou prévision n’est calculée.
+    <UiAlert Title="Montants" Variant="UiAlertVariant.Information">
+        Les montants sont en MAD. Le total net déduit les remboursements.
     </UiAlert>
 
     <section class="catalog-toolbar reporting-filters" aria-labelledby="reporting-filters-title">
-        <div><p class="section-kicker">Période UTC</p><h2 id="reporting-filters-title">Filtres actifs</h2></div>
+        <div><p class="section-kicker">Période</p><h2 id="reporting-filters-title">Filtres actifs</h2></div>
         <div class="reporting-filter-grid">
             <label class="ui-field"><span class="ui-field__label">Du (inclus)</span><input class="ui-field__control" type="date" value="@Reporting.FromDate.ToString("yyyy-MM-dd")" @onchange="SetFrom" /></label>
             <label class="ui-field"><span class="ui-field__label">Au (exclus)</span><input class="ui-field__control" type="date" value="@Reporting.ToDate.ToString("yyyy-MM-dd")" @onchange="SetTo" /></label>
@@ -36,16 +32,16 @@
 
     @if (Reporting.IsBusy && Reporting.Snapshot is null)
     {
-        <section class="catalog-panel"><UiSpinner Label="Calcul des rapports SQL" /></section>
+        <section class="catalog-panel"><UiSpinner Label="Calcul des rapports" /></section>
     }
     else if (Reporting.Snapshot is { } snapshot)
     {
         <section class="reporting-metrics" aria-label="Indicateurs de synthèse">
             <UiCard Density="UiCardDensity.Compact"><div class="reporting-metric"><span>Ventes brutes</span><strong>@Money(snapshot.Summary.GrossSales)</strong><small>@snapshot.Summary.SaleCount vente(s)</small></div></UiCard>
             <UiCard Density="UiCardDensity.Compact"><div class="reporting-metric"><span>Remboursements</span><strong>@Money(snapshot.Summary.Refunds)</strong><small>@snapshot.Summary.ReturnCount retour(s)</small></div></UiCard>
-            <UiCard Density="UiCardDensity.Compact"><div class="reporting-metric"><span>Ventes nettes documentées</span><strong>@Money(snapshot.Summary.NetSales)</strong><small>Brut − remboursements</small></div></UiCard>
-            <UiCard Density="UiCardDensity.Compact"><div class="reporting-metric"><span>Crédit ouvert</span><strong>@Money(snapshot.Summary.OpenCredit)</strong><small>Solde actuel des journaux</small></div></UiCard>
-            <UiCard Density="UiCardDensity.Compact"><div class="reporting-metric"><span>Stock vendable actuel</span><strong>@snapshot.Summary.CurrentSellableStock</strong><small>@snapshot.Summary.OutOfStockProducts produit(s) en rupture</small></div></UiCard>
+            <UiCard Density="UiCardDensity.Compact"><div class="reporting-metric"><span>Ventes nettes</span><strong>@Money(snapshot.Summary.NetSales)</strong><small>Brut − remboursements</small></div></UiCard>
+            <UiCard Density="UiCardDensity.Compact"><div class="reporting-metric"><span>Crédit ouvert</span><strong>@Money(snapshot.Summary.OpenCredit)</strong><small>Solde client actuel</small></div></UiCard>
+            <UiCard Density="UiCardDensity.Compact"><div class="reporting-metric"><span>Stock disponible</span><strong>@snapshot.Summary.CurrentSellableStock</strong><small>@snapshot.Summary.OutOfStockProducts produit(s) en rupture</small></div></UiCard>
             <UiCard Density="UiCardDensity.Compact"><div class="reporting-metric"><span>Réceptions</span><strong>@snapshot.Summary.ReceivedQuantity</strong><small>@snapshot.Summary.PurchaseOrders commande(s) créée(s)</small></div></UiCard>
         </section>
 
@@ -72,7 +68,7 @@
 
         <section class="catalog-panel" aria-labelledby="sales-report-title">
             <div class="catalog-section-heading"><div><p class="section-kicker">Ventes et retours</p><h2 id="sales-report-title">Ventes détaillées</h2></div><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" OnClick="@(_ => ExportAsync(ReportingExportKind.Sales))">Exporter CSV</UiButton></div>
-            @if (snapshot.Sales.Count == 0) { <UiEmptyState Title="Aucune vente" Description="Aucune vente SQL ne correspond à la période UTC." /> }
+            @if (snapshot.Sales.Count == 0) { <UiEmptyState Title="Aucune vente" Description="Aucune vente ne correspond à la période." /> }
             else { <div class="catalog-table-scroll" tabindex="0"><table class="catalog-table catalog-table--compact"><thead><tr><th>Date UTC</th><th>Référence</th><th>Paiement</th><th>Brut</th><th>Remboursé</th><th>Net</th></tr></thead><tbody>@foreach (var row in snapshot.Sales) { <tr><td>@row.CompletedAtUtc.ToString("u")</td><td><code>@row.Reference</code></td><td>@row.PaymentMethod</td><td>@Money(row.GrossAmount)</td><td>@Money(row.RefundAmount)</td><td><strong>@Money(row.NetAmount)</strong></td></tr> }</tbody></table></div> }
         </section>
 
@@ -95,7 +91,7 @@
             </article>
             <article class="catalog-panel" aria-labelledby="purchasing-report-title">
                 <div class="catalog-section-heading"><div><p class="section-kicker">Achats</p><h2 id="purchasing-report-title">Réceptions</h2></div><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" OnClick="@(_ => ExportAsync(ReportingExportKind.Purchasing))">CSV</UiButton></div>
-                @if (snapshot.Purchasing.Count == 0) { <UiEmptyState Title="Aucune réception" Description="Aucune réception SQL sur la période." /> }
+                @if (snapshot.Purchasing.Count == 0) { <UiEmptyState Title="Aucune réception" Description="Aucune réception sur la période." /> }
                 else { <div class="catalog-table-scroll" tabindex="0"><table class="catalog-table catalog-table--compact"><thead><tr><th>Date UTC</th><th>Réception</th><th>Fournisseur</th><th>Qté</th><th>Coût historique</th></tr></thead><tbody>@foreach (var row in snapshot.Purchasing.Take(12)) { <tr><td>@row.ReceivedAtUtc.ToString("u")</td><td><code>@row.ReceiptNumber</code></td><td>@row.SupplierName</td><td>@row.Quantity</td><td>@Money(row.HistoricalAmount)</td></tr> }</tbody></table></div> }
             </article>
         </section>
@@ -103,24 +99,24 @@
         <section class="reporting-grid">
             <article class="catalog-panel" aria-labelledby="credit-report-title">
                 <div class="catalog-section-heading"><div><p class="section-kicker">Clients</p><h2 id="credit-report-title">Crédit actuel</h2></div><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" OnClick="@(_ => ExportAsync(ReportingExportKind.CustomerCredit))">CSV</UiButton></div>
-                @if (snapshot.CustomerCredit.Count == 0) { <UiEmptyState Title="Aucun client" Description="Aucun journal client à présenter." /> }
+            @if (snapshot.CustomerCredit.Count == 0) { <UiEmptyState Title="Aucun crédit client" Description="Aucun crédit client sur la période." /> }
                 else { <div class="catalog-table-scroll" tabindex="0"><table class="catalog-table catalog-table--compact"><thead><tr><th>Référence</th><th>Client</th><th>Généré</th><th>Payé/réduit</th><th>Solde</th></tr></thead><tbody>@foreach (var row in snapshot.CustomerCredit.Take(12)) { <tr><td><code>@row.CustomerReference</code></td><td>@row.CustomerName</td><td>@Money(row.CreditGenerated)</td><td>@Money(row.CreditPaid)</td><td><strong>@Money(row.OpenBalance)</strong></td></tr> }</tbody></table></div> }
             </article>
             <article class="catalog-panel" aria-labelledby="cash-report-title">
                 <div class="catalog-section-heading"><div><p class="section-kicker">Caisse</p><h2 id="cash-report-title">Journal espèces</h2></div><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" OnClick="@(_ => ExportAsync(ReportingExportKind.Cash))">CSV</UiButton></div>
-                @if (snapshot.Cash.Count == 0) { <UiEmptyState Title="Aucune écriture" Description="Aucun mouvement cash sur la période." /> }
+                @if (snapshot.Cash.Count == 0) { <UiEmptyState Title="Aucune écriture" Description="Aucun mouvement d’espèces sur la période." /> }
                 else { <div class="catalog-table-scroll" tabindex="0"><table class="catalog-table catalog-table--compact"><thead><tr><th>Date UTC</th><th>Type</th><th>Référence</th><th>Montant signé</th></tr></thead><tbody>@foreach (var row in snapshot.Cash.Take(12)) { <tr><td>@row.OccurredAtUtc.ToString("u")</td><td>@row.EntryType</td><td><code>@row.SourceReference</code></td><td><strong>@Money(row.Amount)</strong></td></tr> }</tbody></table></div> }
             </article>
         </section>
 
         <section class="catalog-panel" aria-labelledby="returns-report-title">
             <div class="catalog-section-heading"><div><p class="section-kicker">Retours</p><h2 id="returns-report-title">Retours et remboursements</h2></div><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" OnClick="@(_ => ExportAsync(ReportingExportKind.Returns))">CSV</UiButton></div>
-            @if (snapshot.Returns.Count == 0) { <UiEmptyState Title="Aucun retour" Description="Aucun retour SQL sur la période." /> }
+            @if (snapshot.Returns.Count == 0) { <UiEmptyState Title="Aucun retour" Description="Aucun retour sur la période." /> }
             else { <div class="catalog-table-scroll" tabindex="0"><table class="catalog-table catalog-table--compact"><thead><tr><th>Date UTC</th><th>Retour</th><th>Vente</th><th>Remboursement</th><th>Qté</th><th>Remise en stock</th></tr></thead><tbody>@foreach (var row in snapshot.Returns.Take(12)) { <tr><td>@row.CompletedAtUtc.ToString("u")</td><td><code>@row.ReturnReference</code></td><td><code>@row.SaleReference</code></td><td>@Money(row.RefundAmount)</td><td>@row.ReturnedQuantity</td><td>@row.RestockedQuantity</td></tr> }</tbody></table></div> }
         </section>
 
         <section class="catalog-panel reporting-exports" aria-labelledby="exports-title">
-            <div><p class="section-kicker">Données détaillées</p><h2 id="exports-title">Exports complémentaires</h2><p>UTF-8, dates ISO 8601, décimaux stables et cellules de formule neutralisées.</p></div>
+            <div><p class="section-kicker">Données détaillées</p><h2 id="exports-title">Exports complémentaires</h2><p>Fichiers CSV compatibles avec un tableur.</p></div>
             <div class="reporting-export-actions">
                 @foreach (var kind in Enum.GetValues<ReportingExportKind>().Where(kind => kind is ReportingExportKind.ProductSales or ReportingExportKind.InventoryAdjustments))
                 { <UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" OnClick="@(_ => ExportAsync(kind))">@ExportLabel(kind)</UiButton> }

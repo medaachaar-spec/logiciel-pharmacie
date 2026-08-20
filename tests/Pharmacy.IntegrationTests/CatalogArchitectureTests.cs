@@ -105,7 +105,7 @@ public sealed class CatalogArchitectureTests
         var pos = File.ReadAllText(PathAt(
             "src", "Pharmacy.Desktop", "Components", "Pages", "DemoPosPage.razor"));
 
-        Assert.Contains("Recherche SQL", page, StringComparison.Ordinal);
+        Assert.Contains("Recherche", page, StringComparison.Ordinal);
         Assert.Contains("Nouveau produit", page, StringComparison.Ordinal);
         Assert.Contains("Codes-barres", page, StringComparison.Ordinal);
         Assert.Contains("Prix et historique", page, StringComparison.Ordinal);
@@ -114,8 +114,10 @@ public sealed class CatalogArchitectureTests
         Assert.Contains("UiEmptyState", page, StringComparison.Ordinal);
         Assert.Contains("Catalog.IsBusy", page, StringComparison.Ordinal);
         Assert.Contains("Aucun fallback", diagnostic, StringComparison.Ordinal);
-        Assert.Contains("Catalogue SQL", pos, StringComparison.Ordinal);
-        Assert.Contains("Ventes SQL V0.1", pos, StringComparison.Ordinal);
+        Assert.Contains("Nouvelle vente", pos, StringComparison.Ordinal);
+        Assert.Contains("Recherche", pos, StringComparison.Ordinal);
+        Assert.DoesNotContain("Sprint", page, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("démonstration", pos, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

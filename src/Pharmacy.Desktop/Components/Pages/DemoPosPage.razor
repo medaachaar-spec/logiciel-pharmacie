@@ -10,24 +10,18 @@
         <div>
             <p class="pos-kicker">Ventes</p>
             <h1>Nouvelle vente</h1>
-            <p class="page-subtitle">Catalogue, disponibilité, ventes et paiements persistés dans SQL Server.</p>
         </div>
     </header>
-
-    <UiAlert Title="Ventes SQL V0.1 — continuité de vente persistante"
-             Variant="UiAlertVariant.Information">
-        Le panier actif reste un brouillon local avant validation. Les suspensions sont persistées dans SQL Server; la finalisation enregistre ensuite vente, paiement, allocations FEFO, sorties de stock et clôture de la suspension dans une transaction unique.
-    </UiAlert>
 
     @if (Session.IsInitializing)
     {
         <section class="pos-panel pos-loading" role="status" aria-live="polite">
-            <UiSpinner Label="Initialisation du brouillon Sales Application" />
+            <UiSpinner Label="Initialisation de la vente" />
         </section>
     }
     else if (Session.CurrentDraft is null)
     {
-        <UiAlert Title="Le brouillon Sales Application n’a pas pu être initialisé"
+        <UiAlert Title="La vente n’a pas pu être initialisée"
                  Variant="UiAlertVariant.Danger">
             <p>@Session.UserMessage</p>
             <UiButton OnClick="RetryInitializationAsync">Réessayer l’initialisation</UiButton>
@@ -37,10 +31,8 @@
     {
         @if (Session.Step != DemoPosStep.Success)
         {
-            <section class="pos-session-strip" aria-label="État du brouillon Sales Application">
-                <UiBadge Text="Catalogue + Stock + Ventes SQL — brouillon mémoire" Variant="UiBadgeVariant.Information" />
+            <section class="pos-session-strip" aria-label="État de la vente">
                 <span><strong>Brouillon</strong> @DraftReference</span>
-                <span><strong>Version</strong> @Session.CurrentDraft.Version</span>
                 <span><strong>Lignes</strong> @Session.CurrentDraft.LineCount</span>
                 <span><strong>Total</strong> @DemoMoney.Format(Session.Total)</span>
             </section>
@@ -49,17 +41,17 @@
                 <UiButton Variant="UiButtonVariant.Secondary"
                           Disabled="@(!Session.CanSuspend || isCompleting)"
                           OnClick="RequestSuspendAsync">
-                    Suspendre la vente
+                    Suspendre
                 </UiButton>
                 <UiButton Variant="UiButtonVariant.Secondary"
                           Disabled="@(Session.CurrentDraft.IsEmpty || Session.IsCartMutationInProgress || isCompleting)"
                           OnClick="RequestClearAsync">
-                    Vider le panier
+                    Vider
                 </UiButton>
                 <UiButton Variant="UiButtonVariant.Danger"
                           Disabled="@(!Session.CanAbandon || isCompleting)"
                           OnClick="RequestAbandonAsync">
-                    Abandonner le brouillon
+                    Abandonner
                 </UiButton>
                 <UiButton Variant="UiButtonVariant.Secondary"
                           aria-expanded="@showSuspendedSales.ToString().ToLowerInvariant()"
@@ -175,8 +167,7 @@
                     <section class="pos-search" aria-labelledby="demo-search-title" aria-busy="@Session.IsSearching.ToString().ToLowerInvariant()">
                         <div class="pos-search__heading">
                             <div>
-                                <p class="pos-kicker">Recherche Application</p>
-                                <h2 id="demo-search-title">Rechercher ou scanner un code</h2>
+                                <h2 id="demo-search-title">Recherche</h2>
                             </div>
                             <span>Entrée ajoute un code exact</span>
                         </div>
@@ -188,7 +179,7 @@
                                    type="search"
                                    autocomplete="off"
                                    spellcheck="false"
-                                   placeholder="Nom fictif ou DEMO-000001"
+                                   placeholder="Nom ou code produit"
                                    value="@searchTerm"
                                    aria-describedby="demo-search-help demo-search-message"
                                    disabled="@(Session.IsCartMutationInProgress || Session.IsContinuityActionInProgress)"
@@ -197,17 +188,17 @@
                             <UiButton Variant="UiButtonVariant.Secondary"
                                       Disabled="@(string.IsNullOrWhiteSpace(searchTerm) || Session.IsSearching)"
                                       OnClick="ClearSearchAsync">
-                                Effacer la recherche
+                                Effacer
                             </UiButton>
                         </div>
                         <p id="demo-search-help" class="ui-field__help">
-                            Recherche Application insensible à la casse, sans appel réseau ni création automatique.
+                            Saisissez un nom, une référence ou scannez un code-barres.
                         </p>
                         <div id="demo-search-message" aria-live="polite">
                             @if (Session.LastErrorCode == "sales.product.not_found")
                             {
                                 <UiAlert Title="Code inconnu" Variant="UiAlertVariant.Warning">
-                                    <p>Aucun produit du Catalogue SQL ne correspond à ce code. Aucun produit n’a été créé.</p>
+                                    <p>Aucun produit ne correspond à ce code.</p>
                                     <div class="pos-incident-actions">
                                         <UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" OnClick="ClearSearchAsync">
                                             Effacer la recherche
@@ -218,7 +209,7 @@
                             }
                             else if (!string.IsNullOrWhiteSpace(searchTerm) && Session.SearchResults.Count == 0)
                             {
-                                <p class="ui-field__error" role="status">Aucun résultat vendable dans le Catalogue SQL.</p>
+                                <p class="ui-field__error" role="status">Aucun produit vendable.</p>
                             }
                             else if (Session.IsSearching)
                             {
@@ -233,7 +224,7 @@
                                       OnAdd="AddItemAsync" />
                 </div>
 
-                <aside class="pos-side-column" aria-label="Panier Sales Application">
+                <aside class="pos-side-column" aria-label="Panier">
                     <DemoCartPanel Session="Session"
                                    AvailabilityIncident="Session.AvailabilityIncident"
                                    OnDismissAvailability="DismissAvailabilityAsync"
@@ -256,7 +247,7 @@
                                       OnResolveCardNotCompleted="RequestResolveCardNotCompletedAsync"
                                       OnReturnAmbiguousToPaymentChoice="RequestReturnCardToPaymentChoiceAsync" />
                 </div>
-                <aside class="pos-side-column" aria-label="Résumé du panier Application">
+                <aside class="pos-side-column" aria-label="Résumé du panier">
                     <DemoCartPanel Session="Session" ReadOnly="true" />
                 </aside>
             </div>
@@ -275,8 +266,8 @@
                 <div class="pos-recent-sales__content">
                     @if (Session.RecentSales.Count == 0)
                     {
-                        <UiEmptyState Title="Aucune vente finalisée"
-                                      Description="Les ventes persistées apparaîtront ici après leur commit SQL." />
+                        <UiEmptyState Title="Aucune vente"
+                                      Description="Les ventes terminées apparaîtront ici." />
                     }
                     else
                     {
@@ -365,9 +356,9 @@
     private string ConfirmationMessage => confirmationKind switch
     {
         ConfirmationKind.Suspend =>
-            "Un instantané Application immuable sera persisté dans SQL Server sans modifier le stock. Le paiement courant sera réinitialisé et un nouveau brouillon Application sera créé.",
+            "La vente sera conservée sans modifier le stock. Le paiement courant sera réinitialisé et un nouveau panier sera créé.",
         ConfirmationKind.Clear =>
-            "Toutes les lignes seront retirées via Application. Tout paiement incomplet sera réinitialisé.",
+            "Toutes les lignes seront retirées. Tout paiement incomplet sera réinitialisé.",
         ConfirmationKind.Abandon =>
             "Toutes les lignes et tout paiement incomplet du brouillon courant seront supprimés. Les suspensions existantes resteront disponibles.",
         ConfirmationKind.AbandonSuspended =>
@@ -375,7 +366,7 @@
         ConfirmationKind.ResumeConflict =>
             $"La reprise de {pendingSuspendedReference} ne doit pas écraser le panier courant. Choisissez explicitement de le suspendre ou de l’abandonner.",
         ConfirmationKind.ResolveCardConfirmed =>
-            "Confirmez uniquement après avoir vérifié le résultat affiché par le TPE externe simulé. Aucun nouveau paiement ne sera lancé.",
+            "Confirmez uniquement après avoir vérifié le résultat affiché par le TPE externe. Aucun nouveau paiement ne sera lancé.",
         ConfirmationKind.ResolveCardNotCompleted =>
             "Le paiement carte sera marqué non réalisé et la vente restera non validable.",
         ConfirmationKind.ReturnCardToPaymentChoice =>

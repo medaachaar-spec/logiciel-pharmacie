@@ -2,15 +2,15 @@
 
 <main class="security-stage">
     <section class="security-card" aria-labelledby="security-title">
-        <p class="security-card__kicker">Sécurité locale</p>
         <h1 id="security-title">@Title</h1>
-        <p class="security-card__intro">
-            @(Security.IsUnavailable
-                ? "La base de sécurité n’est pas accessible. Aucun mode local de secours n’est autorisé."
-                : Security.RequiresBootstrap
-                ? "Aucun compte n’existe. Créez l’unique propriétaire initial ; aucun mot de passe par défaut n’est fourni."
-                : "Utilisez votre compte local. Les erreurs d’identifiant et de mot de passe restent volontairement neutres.")
-        </p>
+        @if (Security.IsUnavailable || Security.RequiresBootstrap)
+        {
+            <p class="security-card__intro">
+                @(Security.IsUnavailable
+                    ? "La connexion est momentanément indisponible."
+                    : "Créez le premier compte propriétaire. Aucun mot de passe par défaut n’est fourni.")
+            </p>
+        }
 
         @if (!string.IsNullOrWhiteSpace(Security.Message))
         {
@@ -29,7 +29,7 @@
         @if (Security.IsUnavailable)
         {
             <div class="security-unavailable" role="alert">
-                <p>Vérifiez la configuration pilote et SQL Server, puis relancez la détection.</p>
+                <p>Réessayez. Si le problème persiste, contactez l’administrateur.</p>
                 <button type="button" class="security-primary" disabled="@Security.IsBusy" @onclick="RetryInitializationAsync">
                     Réessayer la détection
                 </button>
@@ -72,7 +72,7 @@
     private string newPassword = string.Empty;
 
     private string Title => Security.IsUnavailable
-        ? "Sécurité locale indisponible"
+        ? "Connexion indisponible"
         : Security.RequiresBootstrap ? "Initialiser le propriétaire" : "Connexion";
 
     private async Task BootstrapAsync()

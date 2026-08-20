@@ -81,7 +81,7 @@ public sealed class AppShellTests
     }
 
     [Fact]
-    public void Sprint17BusinessNavigationEntries_AreDeclared()
+    public void BusinessNavigationEntries_AreDeclared()
     {
         var expectedIds = new[]
         {
@@ -107,7 +107,7 @@ public sealed class AppShellTests
     public void RequiredNavigationGroups_AreDeclaredInFrench()
     {
         var source = DesktopText("Components", "Navigation", "AppNavigationCatalog.cs");
-        var labels = new[] { "Activité", "Gestion", "Pilotage", "Configuration", "Développement" };
+        var labels = new[] { "Activité", "Gestion", "Suivi", "Configuration", "Outils internes" };
 
         Assert.All(labels, label => Assert.Contains($"\"{label}\"", source, StringComparison.Ordinal));
     }
@@ -171,62 +171,63 @@ public sealed class AppShellTests
     }
 
     [Fact]
-    public void Topbar_StatesAuthenticatedLocalSession()
+    public void Topbar_ShowsAuthenticatedAccountWithoutTechnicalContext()
     {
         var source = DesktopText("Components", "Layout", "AppTopBar.razor");
 
-        Assert.Contains("Mode local", source, StringComparison.Ordinal);
-        Assert.Contains("Mode local sécurisé", source, StringComparison.Ordinal);
+        Assert.Contains("@PageTitle", source, StringComparison.Ordinal);
+        Assert.Contains("@PageDescription", source, StringComparison.Ordinal);
         Assert.Contains("Session.User?.DisplayName", source, StringComparison.Ordinal);
         Assert.Contains("Verrouiller", source, StringComparison.Ordinal);
         Assert.Contains("Déconnexion", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Mode local", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Espace de travail", source, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void Statusbar_StatesAllRequiredLocalConditions()
+    public void Statusbar_ShowsOnlyAnUnderstandableReadyState()
     {
         var source = DesktopText("Components", "Layout", "AppStatusBar.razor");
 
-        Assert.Contains("Local", source, StringComparison.Ordinal);
-        Assert.Contains("Version @ReleaseVersion", source, StringComparison.Ordinal);
-        Assert.Contains("Catalogue SQL : voir Diagnostic", source, StringComparison.Ordinal);
-        Assert.Contains("BuildConfiguration", source, StringComparison.Ordinal);
-        Assert.Contains("Shell : prêt pour revue", source, StringComparison.Ordinal);
+        Assert.Contains("Application prête", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Version", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("SQL", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("BuildConfiguration", source, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Home_ClearlySeparatesSyntheticIndicatorsFromSqlModules()
+    public void Home_IsAConciseOperationalEntryPoint()
     {
         var source = DesktopText("Components", "Pages", "Home.razor");
 
-        Assert.Contains("Accueil de démonstration", source, StringComparison.Ordinal);
-        Assert.Contains("Catalogue et Stock utilisent SQL Server", source, StringComparison.Ordinal);
-        Assert.Contains("Vue d’ensemble de démonstration", source, StringComparison.Ordinal);
-        Assert.Contains("aucun calcul métier", source, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(">Accueil</h1>", source, StringComparison.Ordinal);
+        Assert.Contains(">Accès directs</h2>", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("démonstration", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Sprint", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("SQL", source, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void HomePresentationModel_ContainsTheFourExpectedMetrics()
+    public void HomePresentationModel_DoesNotContainSyntheticDashboardData()
     {
         var source = DesktopText("Components", "Pages", "HomePresentationModel.cs");
 
-        Assert.Contains("\"24 opérations\"", source, StringComparison.Ordinal);
-        Assert.Contains("\"7 alertes\"", source, StringComparison.Ordinal);
-        Assert.Contains("\"4 lots\"", source, StringComparison.Ordinal);
-        Assert.Contains("\"3 actions\"", source, StringComparison.Ordinal);
-        Assert.Equal(4, Regex.Matches(source, "new DemoHomeMetric\\(").Count);
+        Assert.DoesNotContain("DemoHomeMetric", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("DemoRecentActivity", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("DemoSystemState", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Valeur de démonstration", source, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void HomeQuickActions_TargetOnlyModulePlaceholders()
+    public void HomeQuickActions_TargetTheFourPrimaryOperationalModules()
     {
         var source = DesktopText("Components", "Pages", "HomePresentationModel.cs");
         var expectedRoutes = new[]
         {
             "/module/sales",
+            "/module/catalog",
             "/module/inventory",
-            "/module/purchasing",
-            "/module/cash"
+            "/module/purchasing"
         };
 
         Assert.All(expectedRoutes, route => Assert.Contains($"\"{route}\"", source, StringComparison.Ordinal));
@@ -234,54 +235,54 @@ public sealed class AppShellTests
     }
 
     [Fact]
-    public void HomeRecentActivity_UsesOnlyGenericDemoReferences()
+    public void Home_DoesNotExposeSyntheticRecentActivity()
     {
+        var page = DesktopText("Components", "Pages", "Home.razor");
         var source = DesktopText("Components", "Pages", "HomePresentationModel.cs");
-        var references = new[]
-        {
-            "DEMO-VENTE-0001",
-            "DEMO-RECEPTION-0001",
-            "DEMO-INVENTAIRE-0001"
-        };
 
-        Assert.All(references, reference => Assert.Contains(reference, source, StringComparison.Ordinal));
-        Assert.Equal(3, Regex.Matches(source, "new DemoRecentActivity\\(").Count);
+        Assert.DoesNotContain("RecentActivity", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("RecentActivity", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("DEMO-", source, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void HomeSystemState_DoesNotPretendServicesAreConfigured()
+    public void Home_DoesNotExposeTechnicalSystemState()
     {
+        var page = DesktopText("Components", "Pages", "Home.razor");
         var source = DesktopText("Components", "Pages", "HomePresentationModel.cs");
 
-        Assert.Contains("\"Voir diagnostic\"", source, StringComparison.Ordinal);
-        Assert.Contains("\"Non configurés\"", source, StringComparison.Ordinal);
-        Assert.Contains("\"Non configurée\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("SystemStates", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("SystemStates", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("SQL", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Non configur", source, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void ModulePlaceholder_IsGenericAndExplicitlyNotImplemented()
+    public void ModulePlaceholder_StatesUnavailabilityWithoutDevelopmentJargon()
     {
         var source = DesktopText("Components", "Pages", "ModulePlaceholder.razor");
 
         Assert.Contains("@page \"/module/{ModuleId}\"", source, StringComparison.Ordinal);
         Assert.Contains("FindModule(ModuleId)", source, StringComparison.Ordinal);
-        Assert.Contains("Prévu — non implémenté", source, StringComparison.Ordinal);
-        Assert.Contains("aucune donnée", source, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Action principale non disponible", source, StringComparison.Ordinal);
+        Assert.Contains("Non disponible", source, StringComparison.Ordinal);
+        Assert.Contains("Fonction non disponible", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("provisoire", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Sprint", source, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void AccessPreview_HasThreeExactProfilesAndTheRequiredWarning()
+    public void AccessPreview_HasThreeNeutralProfilesAndTheRequiredWarning()
     {
         var source = DesktopText("Components", "Navigation", "DevelopmentAccessCatalog.cs");
 
-        Assert.Contains("Démo — accès complet", source, StringComparison.Ordinal);
-        Assert.Contains("Démo — opérations", source, StringComparison.Ordinal);
-        Assert.Contains("Démo — lecture", source, StringComparison.Ordinal);
+        Assert.Contains("\"Accès complet\"", source, StringComparison.Ordinal);
+        Assert.Contains("\"Opérations\"", source, StringComparison.Ordinal);
+        Assert.Contains("\"Lecture\"", source, StringComparison.Ordinal);
         Assert.Contains(
-            "Profils de prévisualisation — ne représentent pas les rôles métier finaux",
+            "Profils internes sans effet sur les permissions métier",
             source,
             StringComparison.Ordinal);
+        Assert.DoesNotContain("Démo", source, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("return AppNavigationAccessState.Locked", source, StringComparison.Ordinal);
     }
 

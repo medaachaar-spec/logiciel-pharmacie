@@ -22,7 +22,7 @@
         @Body
     </main>
 
-    <AppStatusBar BuildConfiguration="@BuildConfiguration" />
+    <AppStatusBar />
 </div>
 
 @code {
@@ -35,30 +35,6 @@
 
     private string CurrentPageDescription => currentItem?.Description
         ?? "Cette adresse ne correspond à aucun écran disponible.";
-
-    private static string BuildConfiguration
-    {
-        get
-        {
-#if DEBUG
-            return "Debug";
-#else
-            return "Release";
-#endif
-        }
-    }
-
-    private static bool IsDevelopmentBuild
-    {
-        get
-        {
-#if DEBUG
-            return true;
-#else
-            return false;
-#endif
-        }
-    }
 
     protected override void OnInitialized()
     {
@@ -75,11 +51,6 @@
     private void ToggleSidebar()
     {
         isSidebarCollapsed = !isSidebarCollapsed;
-    }
-
-    private void SelectProfile(DevelopmentAccessProfile profile)
-    {
-        selectedProfile = profile;
     }
 
     private bool CanAccess(AppNavigationItem item)

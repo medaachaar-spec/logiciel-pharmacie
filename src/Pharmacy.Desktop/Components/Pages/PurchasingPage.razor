@@ -2,20 +2,17 @@
 @implements IAsyncDisposable
 @inject PurchasingCoordinator Purchasing
 
-<PageTitle>Achats et réceptions SQL — Logiciel Pharmacie</PageTitle>
+<PageTitle>Achats — Logiciel Pharmacie</PageTitle>
 
 <div class="page-content catalog-page purchasing-page">
     <header class="page-header catalog-header" aria-labelledby="purchasing-title">
         <div>
-            <p class="eyebrow">Purchasing</p>
-            <h1 id="purchasing-title" tabindex="-1">Achats et réceptions SQL</h1>
-            <p class="page-subtitle">Fournisseurs, commandes d’achat et réceptions reliées au Stock SQL.</p>
+            <h1 id="purchasing-title" tabindex="-1">Achats</h1>
         </div>
-        <UiBadge Text="SQL Server — données Demo" Variant="UiBadgeVariant.Information" />
     </header>
 
-    <UiAlert Title="Effets métier de la réception" Variant="UiAlertVariant.Warning">
-        Finaliser une réception augmente immédiatement le Stock SQL. Les ventes restent non persistées, aucun calcul de marge n’est réalisé et les exemples affichés sont synthétiques.
+    <UiAlert Title="Mise à jour du stock" Variant="UiAlertVariant.Information">
+        Finaliser une réception ajoute immédiatement les quantités au stock.
     </UiAlert>
 
     @if (!string.IsNullOrWhiteSpace(Purchasing.Message))
@@ -34,21 +31,21 @@
 
     @if (Purchasing.IsBusy && Purchasing.Suppliers.Count == 0)
     {
-        <section class="catalog-panel" role="status"><UiSpinner Label="Chargement de Purchasing SQL" /></section>
+        <section class="catalog-panel" role="status"><UiSpinner Label="Chargement des achats" /></section>
     }
     else if (Purchasing.ErrorCode == "purchasing.receipt.database_unavailable" && Purchasing.Suppliers.Count == 0)
     {
         <section class="catalog-panel" aria-labelledby="purchasing-unavailable-title">
-            <h2 id="purchasing-unavailable-title">SQL Purchasing indisponible</h2>
-            <p>Aucune donnée de secours n’est utilisée. Catalogue, Stock et POS conservent leur comportement sûr.</p>
+            <h2 id="purchasing-unavailable-title">Achats indisponibles</h2>
+            <p>Réessayez ou consultez Diagnostic.</p>
         </section>
     }
     else if (activeTab == "suppliers")
     {
         <section class="catalog-toolbar" aria-labelledby="supplier-search-title" aria-busy="@Purchasing.IsBusy.ToString().ToLowerInvariant()">
-            <div><p class="section-kicker">Annuaire SQL</p><h2 id="supplier-search-title">Fournisseurs</h2></div>
+            <div><h2 id="supplier-search-title">Fournisseurs</h2></div>
             <div class="catalog-filter-grid">
-                <label><span>Code ou nom</span><input class="ui-field__control" type="search" @bind="supplierSearch" placeholder="DEMO-S12 ou Alpha" disabled="@Purchasing.IsBusy" /></label>
+                <label><span>Code ou nom</span><input class="ui-field__control" type="search" @bind="supplierSearch" placeholder="Code ou nom du fournisseur" disabled="@Purchasing.IsBusy" /></label>
                 <label class="catalog-check"><input type="checkbox" @bind="includeInactiveSuppliers" disabled="@Purchasing.IsBusy" /> Inclure les fournisseurs inactifs</label>
                 <div class="catalog-toolbar__actions">
                     <UiButton IsLoading="@Purchasing.IsBusy" OnClick="SearchSuppliersAsync">Rechercher</UiButton>
@@ -115,7 +112,7 @@
             <div><p class="section-kicker">Commande sans effet stock</p><h2 id="order-create-title">Nouvelle commande</h2></div>
             <form class="catalog-filter-grid" @onsubmit="CreateOrderAsync" @onsubmit:preventDefault>
                 <label><span>Fournisseur actif *</span><select class="ui-field__control" @bind="newOrderSupplierId" required disabled="@Purchasing.IsBusy"><option value="0">Choisir</option>@foreach (var supplier in Purchasing.Suppliers.Where(x => x.IsActive)){<option value="@supplier.SupplierId">@supplier.Code — @supplier.Name</option>}</select></label>
-                <label><span>Numéro commande *</span><input class="ui-field__control" @bind="newOrderNumber" required maxlength="64" placeholder="DEMO-S12-PO-003" disabled="@Purchasing.IsBusy" /></label>
+                <label><span>Numéro commande *</span><input class="ui-field__control" @bind="newOrderNumber" required maxlength="64" placeholder="BC-0001" disabled="@Purchasing.IsBusy" /></label>
                 <label><span>Date commande</span><input class="ui-field__control" type="date" @bind="newOrderDate" disabled="@Purchasing.IsBusy" /></label>
                 <label><span>Date attendue</span><input class="ui-field__control" type="date" @bind="newOrderExpectedDate" disabled="@Purchasing.IsBusy" /></label>
                 <div class="catalog-toolbar__actions"><UiButton ButtonType="UiButtonType.Submit" IsLoading="@Purchasing.IsBusy">Créer le brouillon</UiButton></div>
@@ -206,7 +203,7 @@
             </div>
             @if (receiptOrderId == 0)
             {
-                <p class="purchasing-direct-warning">Réception directe : aucune commande ne sera rapprochée. Cette voie validée est réservée au prototype autorisé et doit rester explicitement contrôlée.</p>
+                <p class="purchasing-direct-warning">Réception directe : aucune commande ne sera rapprochée. Vérifiez le fournisseur, le bon de livraison et les quantités avant de finaliser.</p>
             }
         </section>
 
@@ -249,7 +246,7 @@
             {
                 <div class="purchasing-confirmation" role="alertdialog" aria-modal="true" aria-labelledby="confirm-receipt-title" tabindex="-1">
                     <h3 id="confirm-receipt-title">Confirmer la réception</h3>
-                    <p>@receiptDraftLines.Sum(x => x.Quantity) unité(s) seront ajoutées au Stock SQL, avec un mouvement par ligne. Cette action est idempotente et ne peut pas être modifiée après finalisation.</p>
+                    <p>@receiptDraftLines.Sum(x => x.Quantity) unité(s) seront ajoutées au stock. Cette réception ne pourra plus être modifiée.</p>
                     <div class="catalog-action-row"><UiButton IsLoading="@Purchasing.IsBusy" OnClick="FinalizeReceiptAsync">Finaliser maintenant</UiButton><UiButton Variant="UiButtonVariant.Tertiary" Disabled="@Purchasing.IsBusy" OnClick="CloseReceiptConfirmationAsync">Retour</UiButton></div>
                 </div>
             }

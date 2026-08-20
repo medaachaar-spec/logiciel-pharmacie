@@ -3,7 +3,7 @@
 <section class="pos-return" aria-labelledby="sale-return-title" aria-live="polite">
     <div class="pos-return__header">
         <div>
-            <p class="pos-kicker">Retour et remboursement SQL</p>
+            <p class="pos-kicker">Retour et remboursement</p>
             <h2 id="sale-return-title">@(Return.Preparation is null ? "Chargement de la vente" : Return.Preparation.Reference)</h2>
         </div>
         <UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Tertiary" Disabled="@Return.IsSubmitting" OnClick="CloseAsync">
@@ -18,7 +18,7 @@
     else if (Return.Preparation is null)
     {
         <UiAlert Title="Vente indisponible" Variant="UiAlertVariant.Danger">
-            @(Return.UserMessage ?? "Le détail de cette vente persistée n’est pas disponible.")
+            @(Return.UserMessage ?? "Le détail de cette vente n’est pas disponible.")
         </UiAlert>
         <UiButton Variant="UiButtonVariant.Secondary" OnClick="ReloadAsync">Réessayer</UiButton>
     }

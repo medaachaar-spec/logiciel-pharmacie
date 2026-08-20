@@ -23,13 +23,13 @@ public sealed class SalesGateDesktopTests
             "Pos",
             "DemoPosSuccess.razor"));
 
-        Assert.Contains("Commit SQL terminé", source, StringComparison.Ordinal);
         Assert.Contains("Vente enregistrée", source, StringComparison.Ordinal);
         Assert.Contains("Ticket non imprimé", source, StringComparison.Ordinal);
         Assert.Contains("Vente terminée", source, StringComparison.Ordinal);
         Assert.Contains("aucun paiement ni vente n’est recréé", source, StringComparison.Ordinal);
         Assert.Contains("Réessayer l’impression", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Réessayer la vente", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Commit SQL", source, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -4,8 +4,8 @@
 
 <PageTitle>Journal d’audit</PageTitle>
 <div class="page-content security-admin">
-    <header class="page-header"><div><p class="eyebrow">Traçabilité</p><h1>Journal d’audit métier et sécurité</h1><p class="page-subtitle">Consultation en lecture seule ; aucun secret ni mot de passe n’est journalisé.</p></div><UiBadge Text="Append-only applicatif" Variant="UiBadgeVariant.Information" /></header>
-    @if (denied) { <UiAlert Title="Accès refusé" Variant="UiAlertVariant.Danger"><p>La permission <code>audit.view</code> est requise.</p></UiAlert> }
+    <header class="page-header"><div><h1>Journal d’audit</h1><p class="page-subtitle">Consultation en lecture seule.</p></div></header>
+    @if (denied) { <UiAlert Title="Accès refusé" Variant="UiAlertVariant.Danger"><p>Vous n’avez pas la permission d’accéder à cette page.</p></UiAlert> }
     else
     {
         @if (!string.IsNullOrWhiteSpace(Security.Message)) { <div class="security-feedback" role="status">@Security.Message</div> }

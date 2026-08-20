@@ -228,7 +228,7 @@ public sealed class SalesArchitectureTests
     }
 
     [Fact]
-    public void RET001_DesktopActivePosUsesApplicationSuspensionWorkflowAndPersistentLanguage()
+    public void RET001_DesktopActivePosUsesApplicationSuspensionWorkflowAndUserFacingContinuity()
     {
         var coordinator = File.ReadAllText(PathAt(
             "src", "Pharmacy.Desktop", "Components", "Pos", "SalesPosCoordinator.cs"));
@@ -242,7 +242,9 @@ public sealed class SalesArchitectureTests
         Assert.Contains("SuspendedSaleCompletionRequest", coordinator, StringComparison.Ordinal);
         Assert.DoesNotContain("DEMO-HOLD", coordinator, StringComparison.Ordinal);
         Assert.DoesNotContain("disparaît", page + panel, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Persistée SQL", panel, StringComparison.Ordinal);
+        Assert.Contains("y compris après un redémarrage", panel, StringComparison.Ordinal);
+        Assert.Contains("Suspendue", panel, StringComparison.Ordinal);
+        Assert.DoesNotContain("Persistée SQL", panel, StringComparison.OrdinalIgnoreCase);
     }
 
     private static XDocument Project(params string[] segments)

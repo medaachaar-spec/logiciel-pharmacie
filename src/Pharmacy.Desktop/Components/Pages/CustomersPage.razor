@@ -3,20 +3,18 @@
 @inject Pharmacy.Desktop.Components.Customers.CustomersCoordinator Coordinator
 @implements IDisposable
 
-<PageTitle>Clients et crédit — Logiciel Pharmacie</PageTitle>
+<PageTitle>Clients — Logiciel Pharmacie</PageTitle>
 
 <div class="page-content catalog-page">
     <header class="page-header catalog-page-header">
         <div>
-            <p class="catalog-kicker">Clients et crédit</p>
-            <h1>Clients fidèles et créances</h1>
-            <p class="page-subtitle">Clients minimaux, autorisation crédit explicite et historique financier SQL.</p>
+            <h1>Clients</h1>
         </div>
     </header>
 
-    <UiAlert Title="Sprint 14 — crédit contrôlé sans plafond automatique"
+    <UiAlert Title="Crédit client"
              Variant="UiAlertVariant.Information">
-        Le crédit exige un client actif avec autorisation explicite. Les règlements et créances sont append-only.
+        Le crédit est disponible uniquement pour les clients autorisés.
     </UiAlert>
 
     <section class="catalog-search-card" aria-labelledby="customers-search-title">
@@ -161,7 +159,7 @@
                         }
                         <UiButton Disabled="@(!CanRegisterPayment)"
                                   IsLoading="@Coordinator.IsPaymentInProgress"
-                                  LoadingText="Enregistrement SQL"
+                                  LoadingText="Enregistrement"
                                   OnClick="RegisterPaymentAsync">
                             Enregistrer le règlement
                         </UiButton>

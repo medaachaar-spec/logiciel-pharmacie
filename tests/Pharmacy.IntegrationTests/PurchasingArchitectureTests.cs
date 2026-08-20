@@ -62,7 +62,8 @@ public sealed class PurchasingArchitectureTests
         Assert.Contains("@page \"/module/purchasing\"", page, StringComparison.Ordinal);
         Assert.Contains("Fournisseurs", page, StringComparison.Ordinal); Assert.Contains("Commandes", page, StringComparison.Ordinal); Assert.Contains("Réceptions", page, StringComparison.Ordinal);
         Assert.Contains("aria-live=\"polite\"", page, StringComparison.Ordinal); Assert.Contains("role=\"alertdialog\"", page, StringComparison.Ordinal); Assert.Contains("Purchasing.IsBusy", page, StringComparison.Ordinal);
-        Assert.Contains("Réception directe", page, StringComparison.Ordinal); Assert.Contains("ventes restent non persistées", page, StringComparison.OrdinalIgnoreCase); Assert.Contains("aucun calcul de marge", page, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Réception directe", page, StringComparison.Ordinal);
+        Assert.Contains("Finaliser une réception ajoute immédiatement les quantités au stock.", page, StringComparison.Ordinal);
         Assert.Contains("\"purchasing\"", navigation, StringComparison.Ordinal); Assert.Contains("AppNavigationAccessState.Available", navigation[navigation.IndexOf("\"purchasing\"", StringComparison.Ordinal)..], StringComparison.Ordinal);
         Assert.DoesNotContain("#", css, StringComparison.Ordinal); Assert.Contains("@media", css, StringComparison.Ordinal); Assert.Contains("overflow", css + File.ReadAllText(PathAt("src", "Pharmacy.Desktop", "wwwroot", "css", "catalog.css")), StringComparison.Ordinal);
     }

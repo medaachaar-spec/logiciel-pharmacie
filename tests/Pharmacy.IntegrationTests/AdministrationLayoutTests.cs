@@ -14,7 +14,7 @@ public sealed class AdministrationLayoutTests
 
         Assert.Contains("page-content catalog-page security-admin", page, StringComparison.Ordinal);
         Assert.Contains("page-header catalog-page-header", page, StringComparison.Ordinal);
-        Assert.Contains("<p class=\"catalog-kicker\">Sécurité locale</p>", page, StringComparison.Ordinal);
+        Assert.Contains("<h1 id=\"administration-title\">Administration</h1>", page, StringComparison.Ordinal);
         Assert.Equal(2, Count(page, "class=\"security-admin__column\""));
         Assert.Contains("grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr)", css, StringComparison.Ordinal);
         Assert.Contains("align-items: start", css, StringComparison.Ordinal);

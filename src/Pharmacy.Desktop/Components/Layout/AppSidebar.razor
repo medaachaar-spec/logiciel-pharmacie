@@ -5,7 +5,6 @@
         <span class="app-sidebar__monogram" aria-hidden="true">LP</span>
         <span class="app-sidebar__brand-copy">
             <strong>Logiciel Pharmacie</strong>
-            <span>Prototype local</span>
         </span>
     </div>
 
@@ -71,13 +70,6 @@
         }
     </nav>
 
-    <div class="app-sidebar__scope">
-        <span class="app-sidebar__scope-dot" aria-hidden="true"></span>
-        <span class="app-sidebar__scope-copy">
-            <strong>Mode démonstration</strong>
-            <span>Aucune donnée réelle</span>
-        </span>
-    </div>
 </aside>
 
 @code {
@@ -133,7 +125,7 @@
 
     private static string GetLockedLabel(AppNavigationItem item)
     {
-        return $"{item.Label} — accès verrouillé pour cette prévisualisation";
+        return $"{item.Label} — accès non autorisé";
     }
 
     private static string GetAvailableLabel(
@@ -141,7 +133,7 @@
         AppNavigationAccessState state)
     {
         return state == AppNavigationAccessState.Soon
-            ? $"{item.Label} — module prévu, ouvrir la page provisoire"
+            ? $"{item.Label} — fonction non disponible"
             : item.Label;
     }
 }

@@ -99,7 +99,7 @@
                 <div><dt>Base</dt><dd>@catalogDiagnostics.DatabaseName</dd></div>
                 <div><dt>Connectivité</dt><dd>@(catalogDiagnostics.IsReachable ? "Disponible" : "Indisponible")</dd></div>
                 <div><dt>Migration</dt><dd>@catalogDiagnostics.MigrationStatus</dd></div>
-                <div><dt>Produits Demo actifs</dt><dd>@catalogDiagnostics.ActiveDemoProductCount</dd></div>
+                <div><dt>Produits de référence actifs</dt><dd>@catalogDiagnostics.ActiveDemoProductCount</dd></div>
                 <div><dt>Stock</dt><dd>Réel dans SQL Server</dd></div>
                 <div><dt>Ventes</dt><dd>Non persistées</dd></div>
                 <div><dt>Connexion</dt><dd>@(catalogDiagnostics.IsConfigured ? "Fournie hors dépôt" : "Non configurée")</dd></div>
@@ -131,13 +131,13 @@
                 <div><dt>Emplacements</dt><dd>@inventoryDiagnostics.LocationCount</dd></div>
                 <div><dt>Lots</dt><dd>@inventoryDiagnostics.BatchCount</dd></div>
                 <div><dt>Balances positives</dt><dd>@inventoryDiagnostics.PositiveBalanceCount</dd></div>
-                <div><dt>Lots Demo expirés</dt><dd>@inventoryDiagnostics.ExpiredDemoBatchCount</dd></div>
+                <div><dt>Lots de référence expirés</dt><dd>@inventoryDiagnostics.ExpiredDemoBatchCount</dd></div>
                 <div><dt>Disponibilité POS</dt><dd>@(inventoryDiagnostics.IsReachable ? "Stock SQL actif" : "Indisponible — aucun fallback")</dd></div>
             </dl>
             @if (!inventoryDiagnostics.IsReachable)
             {
                 <UiAlert Title="Stock SQL indisponible" Variant="UiAlertVariant.Warning">
-                    Le POS et la page Stock signalent l’indisponibilité. Aucun lecteur synthétique de secours n’est activé.
+                    Le POS et la page Stock signalent l’indisponibilité. Aucune source de secours n’est activée.
                 </UiAlert>
             }
         }

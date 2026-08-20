@@ -85,7 +85,7 @@ public sealed class InventoryArchitectureTests
         Assert.DoesNotContain("DbContext", desktop, StringComparison.Ordinal);
         Assert.DoesNotContain("Database.Migrate", desktop, StringComparison.Ordinal);
         Assert.Contains("@page \"/module/inventory\"", page, StringComparison.Ordinal);
-        Assert.Contains("Finalisation atomique", page, StringComparison.Ordinal);
+        Assert.Contains("Sessions d’inventaire", page, StringComparison.Ordinal);
         Assert.Contains("Proposition FEFO", page, StringComparison.Ordinal);
         Assert.Contains("Lots expirés — non vendables", page, StringComparison.Ordinal);
         Assert.Contains("role=\"alertdialog\"", page, StringComparison.Ordinal);
@@ -98,8 +98,7 @@ public sealed class InventoryArchitectureTests
         var inventoryCss = File.ReadAllText(PathAt("src", "Pharmacy.Desktop", "wwwroot", "css", "inventory.css"));
         var catalogCss = File.ReadAllText(PathAt("src", "Pharmacy.Desktop", "wwwroot", "css", "catalog.css"));
 
-        Assert.Contains("<h1 id=\"inventory-title\" tabindex=\"-1\">Stock SQL</h1>", page, StringComparison.Ordinal);
-        Assert.Contains("Les ventes restent non persistées et ne consomment aucun stock.", page, StringComparison.Ordinal);
+        Assert.Contains("<h1 id=\"inventory-title\" tabindex=\"-1\">Stock</h1>", page, StringComparison.Ordinal);
         Assert.Equal(4, Count(page, "<UiCard Density=\"UiCardDensity.Compact\">"));
         Assert.Contains("catalog-toolbar inventory-toolbar", page, StringComparison.Ordinal);
         Assert.Contains("catalog-panel inventory-panel inventory-list-panel", page, StringComparison.Ordinal);
@@ -110,8 +109,8 @@ public sealed class InventoryArchitectureTests
         Assert.Contains("role=\"search\"", page, StringComparison.Ordinal);
         Assert.Contains("aria-busy=", page, StringComparison.Ordinal);
         Assert.Contains("Sélectionnez un produit", page, StringComparison.Ordinal);
-        Assert.Contains("Chargement du Stock SQL", page, StringComparison.Ordinal);
-        Assert.Contains("Stock SQL indisponible", page, StringComparison.Ordinal);
+        Assert.Contains("Chargement du stock", page, StringComparison.Ordinal);
+        Assert.Contains("Stock indisponible", page, StringComparison.Ordinal);
         Assert.Contains("tabindex=\"0\" role=\"region\"", page, StringComparison.Ordinal);
 
         Assert.Contains("overflow: auto", catalogCss, StringComparison.Ordinal);
@@ -132,10 +131,14 @@ public sealed class InventoryArchitectureTests
         var composition = File.ReadAllText(PathAt("src", "Pharmacy.Infrastructure", "Inventory", "InventoryServiceCollectionExtensions.cs"));
         var adapter = File.ReadAllText(PathAt("src", "Pharmacy.Infrastructure", "Inventory", "SqlInventoryStockAvailabilityReader.cs"));
         var pos = File.ReadAllText(PathAt("src", "Pharmacy.Desktop", "Components", "Pages", "DemoPosPage.razor"));
+        var finalizer = File.ReadAllText(PathAt("src", "Pharmacy.Infrastructure", "Sales", "SqlSaleFinalizer.cs"));
 
         Assert.Contains("IStockAvailabilityReader, SqlInventoryStockAvailabilityReader", composition, StringComparison.Ordinal);
         Assert.Contains("balance.StockBatch.ExpiryDate >= currentDate", adapter, StringComparison.Ordinal);
-        Assert.Contains("allocations FEFO", pos, StringComparison.Ordinal);
+        Assert.Contains("@inject SalesPosCoordinator", pos, StringComparison.Ordinal);
+        Assert.Contains(".ThenBy(balance => balance.StockBatch?.ExpiryDate)", finalizer, StringComparison.Ordinal);
+        Assert.Contains("new SaleLineAllocationEntity", finalizer, StringComparison.Ordinal);
+        Assert.Contains("MovementType = StockMovementType.Sale", finalizer, StringComparison.Ordinal);
         Assert.DoesNotContain("RecordMovement", pos, StringComparison.Ordinal);
     }
 

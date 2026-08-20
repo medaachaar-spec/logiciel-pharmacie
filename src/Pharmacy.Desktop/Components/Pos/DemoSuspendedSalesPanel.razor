@@ -1,7 +1,6 @@
 <section class="pos-panel pos-holds" aria-labelledby="demo-holds-title">
     <header class="pos-panel__header">
         <div>
-            <p class="pos-kicker">Continuité SQL</p>
             <h2 id="demo-holds-title">Ventes suspendues</h2>
         </div>
         <span class="pos-result-count">@Sales.Count vente(s)</span>
@@ -23,7 +22,7 @@
                             <strong>@sale.Reference</strong>
                             <span>@sale.SuspendedAtLocal.ToString("dd/MM/yyyy HH:mm:ss")</span>
                         </div>
-                        <UiBadge Text="Persistée SQL" Variant="UiBadgeVariant.Success" />
+                        <UiBadge Text="Suspendue" Variant="UiBadgeVariant.Information" />
                     </div>
                     <dl class="pos-hold__facts">
                         <div><dt>Lignes</dt><dd>@sale.LineCount</dd></div>

@@ -9,7 +9,7 @@
 
     @if (AvailabilityIncident is not null)
     {
-        <UiAlert Title="Quantité indisponible dans le catalogue de démonstration."
+        <UiAlert Title="Quantité indisponible"
                  Variant="UiAlertVariant.Warning"
                  Dismissible="true"
                  OnDismiss="OnDismissAvailability">
@@ -24,7 +24,7 @@
     @if (Lines.Count == 0)
     {
         <UiEmptyState Title="Le panier est vide"
-                      Description="Recherchez un article ou saisissez un code de démonstration." />
+                      Description="Recherchez ou scannez un produit." />
     }
     else
     {
@@ -81,7 +81,7 @@
             <UiButton Size="UiButtonSize.Large"
                       Disabled="@(Lines.Count == 0 || Session.IsCartMutationInProgress)"
                       OnClick="CheckoutAsync">
-                Passer au paiement
+                Paiement
             </UiButton>
         }
     </footer>

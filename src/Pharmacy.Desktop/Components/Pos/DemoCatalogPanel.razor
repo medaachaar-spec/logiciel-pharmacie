@@ -1,8 +1,7 @@
 <section class="pos-panel" aria-labelledby="demo-catalog-title">
     <header class="pos-panel__header">
         <div>
-            <p class="pos-kicker">Catalogue local</p>
-            <h2 id="demo-catalog-title">Articles de démonstration</h2>
+            <h2 id="demo-catalog-title">Produits</h2>
         </div>
         <span class="pos-result-count">@Items.Count résultat(s)</span>
     </header>
@@ -15,13 +14,13 @@
                 <li class="pos-catalog-item" @key="item.ProductId.Value">
                     <div class="pos-catalog-item__copy">
                         <strong>@item.DisplayName</strong>
-                        <span>@item.Presentation · Données synthétiques</span>
+                        <span>@item.Presentation</span>
                         <code>@item.Reference.Value</code>
                     </div>
                     <div class="pos-catalog-item__facts">
-                        <span class="pos-price-label">Prix de vente de démonstration</span>
+                        <span class="pos-price-label">Prix</span>
                         <strong>@DemoMoney.Format(item.UnitSalePrice.Amount)</strong>
-                        <small>Disponibilité synthétique : @item.AvailableQuantity</small>
+                        <small>Disponible : @item.AvailableQuantity</small>
                     </div>
                     <UiButton Size="UiButtonSize.Small"
                               Disabled="@(IsBusy || !item.IsAvailable)"

@@ -6,48 +6,15 @@
 <div class="home-page page-content">
     <header class="page-header" aria-labelledby="home-title">
         <div>
-            <p class="eyebrow">Espace local de démonstration</p>
             <h1 id="home-title" tabindex="-1">Accueil</h1>
-            <p class="page-subtitle">Vue d’ensemble de démonstration</p>
         </div>
-        <UiBadge Text="Prototype Sprint 3" Variant="UiBadgeVariant.Information" />
     </header>
-
-    <UiAlert Title="Accueil de démonstration" Variant="UiAlertVariant.Information">
-        Les indicateurs de cette page restent synthétiques. Catalogue et Stock utilisent SQL Server ; les ventes restent non persistées.
-        <p>Les indicateurs, références et états présentés servent uniquement à valider le shell. Ils ne proviennent d’aucune pharmacie.</p>
-    </UiAlert>
-
-    <section aria-labelledby="metrics-title">
-        <div class="content-section-heading">
-            <div>
-                <p class="section-kicker">Repères synthétiques</p>
-                <h2 id="metrics-title">Aperçu du jour</h2>
-            </div>
-            <span>Présentation uniquement — aucun calcul métier</span>
-        </div>
-        <div class="home-metrics">
-            @foreach (var metric in HomePresentationModel.Metrics)
-            {
-                <article class="metric-card">
-                    <span class="metric-card__icon" aria-hidden="true"><UiIcon Name="@metric.Icon" /></span>
-                    <div>
-                        <p>@metric.Label</p>
-                        <strong>@metric.Value</strong>
-                        <small>@metric.Detail</small>
-                    </div>
-                </article>
-            }
-        </div>
-    </section>
 
     <section aria-labelledby="quick-actions-title">
         <div class="content-section-heading">
             <div>
-                <p class="section-kicker">Navigation rapide</p>
                 <h2 id="quick-actions-title">Accès directs</h2>
             </div>
-            <span>Chaque accès ouvre une page provisoire</span>
         </div>
         <div class="quick-actions">
             @foreach (var action in HomePresentationModel.QuickActions)
@@ -63,51 +30,4 @@
             }
         </div>
     </section>
-
-    <div class="home-columns">
-        <section class="home-panel" aria-labelledby="recent-title">
-            <div class="home-panel__header">
-                <div>
-                    <p class="section-kicker">Exemples génériques</p>
-                    <h2 id="recent-title">Activité récente synthétique</h2>
-                </div>
-                <UiBadge Text="Démo" Variant="UiBadgeVariant.Neutral" />
-            </div>
-            <ul class="recent-list">
-                @foreach (var activity in HomePresentationModel.RecentActivity)
-                {
-                    <li>
-                        <span class="recent-list__marker" aria-hidden="true"></span>
-                        <span>
-                            <strong>@activity.Reference</strong>
-                            <span>@activity.Label</span>
-                            <small>@activity.Context</small>
-                        </span>
-                    </li>
-                }
-            </ul>
-        </section>
-
-        <section class="home-panel" aria-labelledby="system-title">
-            <div class="home-panel__header">
-                <div>
-                    <p class="section-kicker">Contexte technique</p>
-                    <h2 id="system-title">État du système</h2>
-                </div>
-                <UiBadge Text="Local" Variant="UiBadgeVariant.Success" />
-            </div>
-            <dl class="system-state-list">
-                @foreach (var systemState in HomePresentationModel.SystemStates)
-                {
-                    <div>
-                        <dt>@systemState.Label</dt>
-                        <dd>
-                            <strong>@systemState.Status</strong>
-                            <span>@systemState.Detail</span>
-                        </dd>
-                    </div>
-                }
-            </dl>
-        </section>
-    </div>
 </div>
