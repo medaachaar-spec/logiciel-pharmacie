@@ -1,8 +1,8 @@
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Pharmacy.Application.Catalog.Contracts;
 using Pharmacy.Application.Sales.Contracts;
+using Pharmacy.Infrastructure.Deployment;
 using Pharmacy.Infrastructure.Persistence;
 
 namespace Pharmacy.Infrastructure.Catalog;
@@ -11,12 +11,15 @@ public static class CatalogServiceCollectionExtensions
 {
     public static IServiceCollection AddSqlCatalogAdaptersFromEnvironment(
         this IServiceCollection services)
+        => services.AddSqlCatalogAdapters(DesktopConnectionResolver.Resolve());
+
+    public static IServiceCollection AddSqlCatalogAdapters(
+        this IServiceCollection services,
+        string? connectionString)
     {
         ArgumentNullException.ThrowIfNull(services);
-        var connectionString = Environment.GetEnvironmentVariable(
-            PharmacyDbContextFactory.ConnectionEnvironmentVariable);
 
-        if (TargetsDevelopmentDatabase(connectionString))
+        if (!string.IsNullOrWhiteSpace(connectionString))
         {
             services.AddPharmacySqlServerPersistence(connectionString!);
         }
@@ -40,24 +43,4 @@ public static class CatalogServiceCollectionExtensions
         return services;
     }
 
-    private static bool TargetsDevelopmentDatabase(string? connectionString)
-    {
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            return false;
-        }
-
-        try
-        {
-            var builder = new SqlConnectionStringBuilder(connectionString);
-            return string.Equals(
-                builder.InitialCatalog,
-                "Pharmacy_Development",
-                StringComparison.OrdinalIgnoreCase);
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
-    }
 }

@@ -9,7 +9,7 @@ using Pharmacy.Infrastructure.Persistence.Entities.Sales;
 
 namespace Pharmacy.Infrastructure.Sales;
 
-public sealed class SqlSalesReader : ISalesReader
+public sealed class SqlSalesReader : ISalesReader, ISaleReturnReader
 {
     private readonly IDbContextFactory<PharmacyDbContext> contextFactory;
 
@@ -78,6 +78,72 @@ public sealed class SqlSalesReader : ISalesReader
         }
     }
 
+    public async Task<Result<SaleReturnPreparationView>> GetPreparationAsync(
+        long saleId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+            var sale = await context.Sales
+                .AsNoTracking()
+                .Include(candidate => candidate.Lines)
+                .SingleOrDefaultAsync(candidate => candidate.Id == saleId, cancellationToken);
+
+            if (sale is null)
+            {
+                return Result<SaleReturnPreparationView>.Failure(SalesApplicationErrors.SaleNotFound);
+            }
+
+            var previousReturns = await context.SaleReturns
+                .AsNoTracking()
+                .AsSplitQuery()
+                .Include(candidate => candidate.Lines)
+                .Where(candidate => candidate.OriginalSaleId == saleId && candidate.Status == "Completed")
+                .OrderByDescending(candidate => candidate.CompletedAtUtc)
+                .ThenByDescending(candidate => candidate.Id)
+                .ToArrayAsync(cancellationToken);
+
+            var returnedByLine = previousReturns
+                .SelectMany(candidate => candidate.Lines)
+                .GroupBy(line => line.SaleLineId)
+                .ToDictionary(group => group.Key, group => group.Sum(line => line.Quantity));
+            var lines = sale.Lines
+                .OrderBy(line => line.Id)
+                .Select(line =>
+                {
+                    var returned = returnedByLine.GetValueOrDefault(line.Id);
+                    return new SaleReturnableLineView(
+                        line.Id,
+                        ProductId.Create(line.ProductId).Value,
+                        ProductReference.Create(line.ProductReferenceSnapshot).Value,
+                        line.ProductNameSnapshot,
+                        line.PresentationSnapshot,
+                        Money.Create(line.UnitPrice).Value,
+                        line.Quantity,
+                        returned,
+                        Math.Max(0, line.Quantity - returned));
+                })
+                .ToArray();
+            var returns = previousReturns.Select(MapReturn).ToArray();
+
+            return Result<SaleReturnPreparationView>.Success(new SaleReturnPreparationView(
+                sale.Id,
+                sale.Reference,
+                sale.CompletedAtUtc,
+                sale.PaymentMethod,
+                Money.Create(sale.GrandTotal).Value,
+                sale.CustomerId,
+                Money.Create(sale.CreditTotal).Value,
+                Array.AsReadOnly(lines),
+                Array.AsReadOnly(returns)));
+        }
+        catch (Exception exception) when (SalesSqlFailure.IsDatabaseUnavailable(exception))
+        {
+            return Result<SaleReturnPreparationView>.Failure(SalesApplicationErrors.DatabaseUnavailable);
+        }
+    }
+
     internal static async Task<Result<FinalizedSaleView>> LoadByIdAsync(
         PharmacyDbContext context,
         long saleId,
@@ -139,4 +205,22 @@ public sealed class SqlSalesReader : ISalesReader
             sale.CustomerId,
             Money.Create(sale.CreditTotal).Value);
     }
+
+    private static SaleReturnView MapReturn(SaleReturnEntity saleReturn) => new(
+        saleReturn.Id,
+        saleReturn.Reference,
+        saleReturn.OriginalSaleId,
+        Money.Create(saleReturn.RefundAmount).Value,
+        Enum.Parse<ReturnRefundMethod>(saleReturn.RefundMethod),
+        saleReturn.CompletedAtUtc,
+        Array.AsReadOnly(saleReturn.Lines
+            .OrderBy(line => line.Id)
+            .Select(line => new SaleReturnLineView(
+                line.SaleLineId,
+                ProductId.Create(line.ProductId).Value,
+                line.Quantity,
+                Money.Create(line.UnitPrice).Value,
+                Money.Create(line.LineTotal).Value,
+                Enum.Parse<ReturnStockDestination>(line.StockDestination)))
+            .ToArray()));
 }

@@ -5,7 +5,8 @@ namespace Pharmacy.Application.Sales.Models;
 public sealed record FinalizeSaleRequest(
     SaleFinalizationPreparation Preparation,
     SalePaymentRequest Payment,
-    SaleCreditRequest? Credit = null);
+    SaleCreditRequest? Credit = null,
+    SuspendedSaleCompletionRequest? SuspendedSale = null);
 
 public sealed record SalePaymentRequest(
     SalePaymentMethod Method,

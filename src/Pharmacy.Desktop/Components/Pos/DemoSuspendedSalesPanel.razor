@@ -1,7 +1,7 @@
 <section class="pos-panel pos-holds" aria-labelledby="demo-holds-title">
     <header class="pos-panel__header">
         <div>
-            <p class="pos-kicker">Continuité locale</p>
+            <p class="pos-kicker">Continuité SQL</p>
             <h2 id="demo-holds-title">Ventes suspendues</h2>
         </div>
         <span class="pos-result-count">@Sales.Count vente(s)</span>
@@ -10,7 +10,7 @@
     @if (Sales.Count == 0)
     {
         <UiEmptyState Title="Aucune vente suspendue"
-                      Description="Les paniers suspendus apparaîtront ici jusqu’à la fermeture de l’application." />
+                      Description="Les paniers suspendus ouverts apparaîtront ici, y compris après un redémarrage." />
     }
     else
     {
@@ -23,7 +23,7 @@
                             <strong>@sale.Reference</strong>
                             <span>@sale.SuspendedAtLocal.ToString("dd/MM/yyyy HH:mm:ss")</span>
                         </div>
-                        <UiBadge Text="Temporaire en mémoire" Variant="UiBadgeVariant.Warning" />
+                        <UiBadge Text="Persistée SQL" Variant="UiBadgeVariant.Success" />
                     </div>
                     <dl class="pos-hold__facts">
                         <div><dt>Lignes</dt><dd>@sale.LineCount</dd></div>
@@ -37,8 +37,8 @@
                         </UiButton>
                         <UiButton Size="UiButtonSize.Small"
                                   Variant="UiButtonVariant.Danger"
-                                  OnClick="args => DeleteAsync(sale.Reference, args)">
-                            Supprimer
+                                  OnClick="args => AbandonAsync(sale.Reference, args)">
+                            Abandonner
                         </UiButton>
                     </div>
                 </li>
@@ -46,9 +46,7 @@
         </ul>
     }
 
-    <p class="pos-holds__warning">
-        Stockage de démonstration uniquement en mémoire : toutes les suspensions disparaissent à la fermeture.
-    </p>
+    <p class="pos-holds__warning">Suspendre ou reprendre ne modifie pas le stock. Seule la finalisation de la vente le débite.</p>
 </section>
 
 @code {
@@ -59,15 +57,15 @@
     public EventCallback<string> OnResume { get; set; }
 
     [Parameter]
-    public EventCallback<string> OnDelete { get; set; }
+    public EventCallback<string> OnAbandon { get; set; }
 
     private Task ResumeAsync(string reference, MouseEventArgs _)
     {
         return OnResume.InvokeAsync(reference);
     }
 
-    private Task DeleteAsync(string reference, MouseEventArgs _)
+    private Task AbandonAsync(string reference, MouseEventArgs _)
     {
-        return OnDelete.InvokeAsync(reference);
+        return OnAbandon.InvokeAsync(reference);
     }
 }

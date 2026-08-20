@@ -14,6 +14,7 @@ public static class SalesServiceCollectionExtensions
         services.AddTransient<ISaleFinalizer>(provider => provider.GetRequiredService<SqlSaleFinalizer>());
         services.AddTransient<SqlSalesReader>();
         services.AddTransient<ISalesReader>(provider => provider.GetRequiredService<SqlSalesReader>());
+        services.AddTransient<ISaleReturnReader>(provider => provider.GetRequiredService<SqlSalesReader>());
         services.AddTransient<SqlCustomerCreditCashStore>();
         services.AddTransient<ICustomerStore>(provider => provider.GetRequiredService<SqlCustomerCreditCashStore>());
         services.AddTransient<ICreditPaymentStore>(provider => provider.GetRequiredService<SqlCustomerCreditCashStore>());

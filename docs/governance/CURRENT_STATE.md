@@ -2,6 +2,10 @@
 
 Date de mise à jour : 2026-08-10
 
+## Sprint 18 — Release Candidate pilote
+
+`1.0.0-rc.1` est implémentée avec publish/installateur Windows, configuration locale sécurisée, migration externe contrôlée, rollback par restauration, support bundle et plans UAT/go-live. Statut : `SQL EXPRESS PILOT GATE PENDING — MANUAL PILOT UAT REQUIRED`. Aucun GO production n’est déclaré.
+
 ## État fonctionnel et architectural
 
 - Phase 1 ADR : PASS.
@@ -19,7 +23,7 @@ Date de mise à jour : 2026-08-10
 - Git : dépôt local sur `a46ffb7`, zéro remote ; changements Sprints 12 et 13 laissés hors index pour revue, aucun commit ou push.
 - Solution .NET créée : OUI — `Pharmacy.slnx`, six projets .NET 10.
 - Code frontend : pages Catalogue, Stock et Achats/réceptions SQL fonctionnelles ; POS connecté au Catalogue, au stock et à la finalisation Sales SQL avec historique récent ; Diagnostic SQL sûr ; quatre autres modules restent provisoires, UI Lab disponible en Debug.
-- Code backend : noyaux/handlers Catalogue, Inventory, Purchasing et Sales ; finalizer/lecteur Sales SQL ; seuls brouillons, suspensions et impressions restent en mémoire.
+- Code backend : noyaux/handlers Catalogue, Inventory, Purchasing et Sales ; finalizer/lecteur Sales SQL ; suspensions persistées et clôturées avec la vente ; seuls le brouillon actif et l’impression restent en mémoire.
 - Base SQL Server métier : `Pharmacy_Development` sur SQL Server 2025 Developer, compatibilité 170, cinq migrations appliquées ; seeds Catalogue/Inventory/Purchasing synthétiques et zéro vente seedée ; cible Express non encore validée.
 - CI : NON DÉMARRÉE.
 

@@ -89,7 +89,7 @@
                 {
                     <p class="ui-field__error">Erreur : @cashError</p>
                 }
-                else if (Session.ReceivedAmount is not null && Session.ReceivedAmount.Value < Session.Total)
+                else if (Session.ReceivedAmount is not null && Session.ReceivedAmount.Value < Session.ImmediatePaymentDue)
                 {
                     <p class="ui-field__error">Montant insuffisant. Il manque @DemoMoney.Format(Session.ImmediatePaymentDue - Session.ReceivedAmount.Value).</p>
                 }

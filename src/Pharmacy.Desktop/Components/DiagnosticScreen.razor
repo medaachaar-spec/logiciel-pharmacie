@@ -2,6 +2,7 @@
 @inject GetCatalogDiagnosticsHandler CatalogDiagnostics
 @inject InventoryQueryHandlers InventoryQueries
 @inject PurchasingQueryHandlers PurchasingQueries
+@using Pharmacy.Infrastructure.Deployment
 
 <PageTitle>Logiciel Pharmacie — Diagnostic SQL</PageTitle>
 
@@ -149,6 +150,14 @@
         </div>
         <dl class="environment-grid">
             <div>
+                <dt>Version applicative</dt>
+                <dd>@PilotReleaseInfo.Version</dd>
+            </div>
+            <div>
+                <dt>Canal</dt>
+                <dd>@PilotReleaseInfo.Channel</dd>
+            </div>
+            <div>
                 <dt>Version .NET</dt>
                 <dd>@RuntimeInformation.FrameworkDescription</dd>
             </div>
@@ -186,7 +195,7 @@
     <footer class="scope-notes" aria-label="Limites du socle technique">
         <span>Catalogue et stock persistés dans SQL Server</span>
         <span>Aucun secret de connexion affiché</span>
-        <span>Aucune vente persistée</span>
+        <span>Version @PilotReleaseInfo.Version — pilote contrôlé</span>
     </footer>
 </div>
 

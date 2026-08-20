@@ -3,9 +3,11 @@
 <main class="security-stage">
     <section class="security-card" aria-labelledby="security-title">
         <p class="security-card__kicker">Sécurité locale</p>
-        <h1 id="security-title">@(Security.RequiresBootstrap ? "Initialiser le propriétaire" : "Connexion")</h1>
+        <h1 id="security-title">@Title</h1>
         <p class="security-card__intro">
-            @(Security.RequiresBootstrap
+            @(Security.IsUnavailable
+                ? "La base de sécurité n’est pas accessible. Aucun mode local de secours n’est autorisé."
+                : Security.RequiresBootstrap
                 ? "Aucun compte n’existe. Créez l’unique propriétaire initial ; aucun mot de passe par défaut n’est fourni."
                 : "Utilisez votre compte local. Les erreurs d’identifiant et de mot de passe restent volontairement neutres.")
         </p>
@@ -24,7 +26,16 @@
             </div>
         }
 
-        @if (Security.RequiresBootstrap)
+        @if (Security.IsUnavailable)
+        {
+            <div class="security-unavailable" role="alert">
+                <p>Vérifiez la configuration pilote et SQL Server, puis relancez la détection.</p>
+                <button type="button" class="security-primary" disabled="@Security.IsBusy" @onclick="RetryInitializationAsync">
+                    Réessayer la détection
+                </button>
+            </div>
+        }
+        else if (Security.RequiresBootstrap)
         {
             <form @onsubmit="BootstrapAsync" @onsubmit:preventDefault>
                 <label>Identifiant<input autocomplete="username" @bind="login" /></label>
@@ -60,6 +71,10 @@
     private string recoveryCode = string.Empty;
     private string newPassword = string.Empty;
 
+    private string Title => Security.IsUnavailable
+        ? "Sécurité locale indisponible"
+        : Security.RequiresBootstrap ? "Initialiser le propriétaire" : "Connexion";
+
     private async Task BootstrapAsync()
     {
         await Security.BootstrapAsync(login, displayName, password);
@@ -71,6 +86,8 @@
         await Security.LoginAsync(login, password);
         password = string.Empty;
     }
+
+    private Task RetryInitializationAsync() => Security.RetryInitializationAsync();
 
     private async Task RecoverAsync()
     {

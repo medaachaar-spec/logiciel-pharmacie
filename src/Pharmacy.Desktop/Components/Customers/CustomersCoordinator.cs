@@ -1,6 +1,7 @@
 using Pharmacy.Application.Customers.Commands;
 using Pharmacy.Application.Customers.Models;
 using Pharmacy.Application.Customers.Queries;
+using Pharmacy.Application.Sales.Models;
 
 namespace Pharmacy.Desktop.Components.Customers;
 
@@ -8,6 +9,7 @@ public sealed class CustomersCoordinator
 {
     private readonly CustomerQueryHandlers queries;
     private readonly CustomerCommandHandlers commands;
+    private int paymentInProgress;
 
     public CustomersCoordinator(CustomerQueryHandlers queries, CustomerCommandHandlers commands)
     {
@@ -24,6 +26,8 @@ public sealed class CustomersCoordinator
     public string? LastErrorCode { get; private set; }
 
     public bool IsBusy { get; private set; }
+
+    public bool IsPaymentInProgress => Volatile.Read(ref paymentInProgress) == 1;
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
@@ -110,9 +114,19 @@ public sealed class CustomersCoordinator
         }
     }
 
-    public async Task RegisterPaymentAsync(decimal amount, CancellationToken cancellationToken = default)
+    public Task RegisterPaymentAsync(decimal amount, CancellationToken cancellationToken = default)
     {
-        if (SelectedCustomer is null)
+        return RegisterPaymentAsync(amount, SalePaymentMethod.Cash, false, cancellationToken);
+    }
+
+    public async Task RegisterPaymentAsync(
+        decimal amount,
+        SalePaymentMethod paymentMethod,
+        bool externalCardConfirmed,
+        CancellationToken cancellationToken = default)
+    {
+        if (SelectedCustomer is null
+            || Interlocked.CompareExchange(ref paymentInProgress, 1, 0) != 0)
         {
             return;
         }
@@ -127,8 +141,8 @@ public sealed class CustomersCoordinator
                     Guid.NewGuid(),
                     SelectedCustomer.CustomerId,
                     amount,
-                    Application.Sales.Models.SalePaymentMethod.Cash,
-                    false),
+                    paymentMethod,
+                    externalCardConfirmed),
                 cancellationToken);
 
             if (result.IsFailure)
@@ -144,6 +158,7 @@ public sealed class CustomersCoordinator
         finally
         {
             IsBusy = false;
+            Volatile.Write(ref paymentInProgress, 0);
         }
     }
 

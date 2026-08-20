@@ -1,0 +1,253 @@
+@inject SalesReturnCoordinator Return
+
+<section class="pos-return" aria-labelledby="sale-return-title" aria-live="polite">
+    <div class="pos-return__header">
+        <div>
+            <p class="pos-kicker">Retour et remboursement SQL</p>
+            <h2 id="sale-return-title">@(Return.Preparation is null ? "Chargement de la vente" : Return.Preparation.Reference)</h2>
+        </div>
+        <UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Tertiary" Disabled="@Return.IsSubmitting" OnClick="CloseAsync">
+            Fermer
+        </UiButton>
+    </div>
+
+    @if (Return.IsLoading && Return.Preparation is null)
+    {
+        <div class="pos-loading"><UiSpinner Label="Chargement du détail et des retours existants" /></div>
+    }
+    else if (Return.Preparation is null)
+    {
+        <UiAlert Title="Vente indisponible" Variant="UiAlertVariant.Danger">
+            @(Return.UserMessage ?? "Le détail de cette vente persistée n’est pas disponible.")
+        </UiAlert>
+        <UiButton Variant="UiButtonVariant.Secondary" OnClick="ReloadAsync">Réessayer</UiButton>
+    }
+    else
+    {
+        var preparation = Return.Preparation;
+        <dl class="pos-return__facts">
+            <div><dt>Vente</dt><dd>@preparation.Reference</dd></div>
+            <div><dt>Date UTC</dt><dd>@preparation.CompletedAtUtc.ToString("dd/MM/yyyy HH:mm")</dd></div>
+            <div><dt>Total original</dt><dd>@DemoMoney.Format(preparation.Total.Amount)</dd></div>
+            <div><dt>Retours existants</dt><dd>@preparation.PreviousReturns.Count</dd></div>
+        </dl>
+        <p class="pos-result-count">Sélectionnez une ligne selon sa quantité encore retournable.</p>
+
+        @if (!string.IsNullOrWhiteSpace(Return.UserMessage))
+        {
+            <UiAlert Title="@(Return.LastErrorCode is null ? "Retour enregistré" : "Action non réalisée")"
+                     Variant="@(Return.LastErrorCode is null ? UiAlertVariant.Success : UiAlertVariant.Warning)">
+                @Return.UserMessage
+            </UiAlert>
+        }
+
+        @if (!Return.HasReturnableLines)
+        {
+            <UiEmptyState Title="Aucune quantité retournable"
+                          Description="Toutes les quantités de cette vente ont déjà été retournées." />
+        }
+        else
+        {
+            <div class="catalog-table-scroll" tabindex="0" role="region" aria-label="Lignes retournables de la vente">
+                <table class="catalog-table catalog-table--compact pos-return__table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Choix</th>
+                            <th scope="col">Produit</th>
+                            <th scope="col">Vendue</th>
+                            <th scope="col">Déjà retournée</th>
+                            <th scope="col">Retournable</th>
+                            <th scope="col">Prix historique</th>
+                            <th scope="col">Quantité</th>
+                            <th scope="col">Décision stock</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var selection in Return.Selections)
+                        {
+                            var line = selection.Line;
+                            <tr @key="line.SaleLineId" class="@(selection.IsSelected ? "catalog-row--selected" : null)">
+                                <td>
+                                    <input type="checkbox"
+                                           checked="@selection.IsSelected"
+                                           disabled="@(line.ReturnableQuantity == 0 || Return.IsSubmitting)"
+                                           aria-label="Sélectionner @line.ProductName"
+                                           @onchange="args => SetSelected(selection, args)" />
+                                </td>
+                                <td><strong>@line.ProductName</strong><small>@line.ProductReference.Value</small></td>
+                                <td>@line.SoldQuantity</td>
+                                <td>@line.ReturnedQuantity</td>
+                                <td><strong>@line.ReturnableQuantity</strong></td>
+                                <td>@DemoMoney.Format(line.UnitPrice.Amount)</td>
+                                <td>
+                                    <input class="ui-field__control pos-return__quantity"
+                                           type="number"
+                                           min="1"
+                                           max="@line.ReturnableQuantity"
+                                           value="@selection.Quantity"
+                                           disabled="@(!selection.IsSelected || Return.IsSubmitting)"
+                                           aria-label="Quantité à retourner pour @line.ProductName"
+                                           @oninput="args => SetQuantity(selection, args)" />
+                                </td>
+                                <td>
+                                    <select class="ui-field__control"
+                                            value="@selection.StockDestination"
+                                            disabled="@(!selection.IsSelected || Return.IsSubmitting)"
+                                            aria-label="Décision stock pour @line.ProductName"
+                                            @onchange="args => SetDestination(selection, args)">
+                                        <option value="@ReturnStockDestination.RestockApproved">Réintégrer au lot d’origine</option>
+                                        <option value="@ReturnStockDestination.NotRestockable">Non revendable</option>
+                                    </select>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pos-return__footer">
+                <UiSelect Id="sale-return-refund-method"
+                          Label="Mode de remboursement"
+                          Options="@RefundOptions"
+                          Value="@Return.RefundMethod.ToString()"
+                          ValueChanged="SetRefundMethodAsync"
+                          Disabled="@Return.IsSubmitting"
+                          Required="true" />
+                <div class="pos-return__total">
+                    <span>Remboursement estimé</span>
+                    <strong>@DemoMoney.Format(Return.EstimatedRefund)</strong>
+                    <small>Calculé depuis les prix figés de la vente originale.</small>
+                </div>
+                <UiButton Disabled="@(Return.IsSubmitting || Return.EstimatedRefund <= 0m)" OnClick="ReviewAsync">
+                    Vérifier le retour
+                </UiButton>
+            </div>
+        }
+
+        @if (Return.IsConfirmationVisible)
+        {
+            <div class="pos-confirmation pos-return__confirmation"
+                 role="alertdialog"
+                 aria-modal="true"
+                 aria-labelledby="sale-return-confirm-title"
+                 tabindex="-1">
+                <div>
+                    <p class="pos-kicker">Confirmation sensible</p>
+                    <h2 id="sale-return-confirm-title">Confirmer le retour ?</h2>
+                    <p>@SelectedLineCount ligne(s), remboursement @DemoMoney.Format(Return.EstimatedRefund), mode @RefundLabel(Return.RefundMethod).</p>
+                    <p>La vente originale et ses allocations resteront immuables.</p>
+                </div>
+                <div class="pos-confirmation__actions">
+                    <UiButton Variant="UiButtonVariant.Secondary" Disabled="@Return.IsSubmitting" OnClick="CancelConfirmationAsync">
+                        Corriger
+                    </UiButton>
+                    <UiButton IsLoading="@Return.IsSubmitting" LoadingText="Retour en cours…" OnClick="ConfirmAsync">
+                        Confirmer
+                    </UiButton>
+                </div>
+            </div>
+        }
+
+        @if (preparation.PreviousReturns.Count > 0)
+        {
+            <details class="pos-return__history">
+                <summary>Retours déjà enregistrés (@preparation.PreviousReturns.Count)</summary>
+                <ul>
+                    @foreach (var previous in preparation.PreviousReturns)
+                    {
+                        <li @key="previous.ReturnId">
+                            <strong>@previous.Reference</strong>
+                            <span>@previous.CompletedAtUtc.ToString("dd/MM/yyyy HH:mm") — @DemoMoney.Format(previous.RefundAmount.Amount) — @RefundLabel(previous.RefundMethod)</span>
+                        </li>
+                    }
+                </ul>
+            </details>
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public long SaleId { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback<SaleReturnView> OnCompleted { get; set; }
+
+    private long loadedSaleId;
+
+    private int SelectedLineCount => Return.Selections.Count(selection => selection.IsSelected);
+
+    private IReadOnlyList<UiSelectOption> RefundOptions => Return.AvailableRefundMethods
+        .Select(method => new UiSelectOption(method.ToString(), RefundLabel(method)))
+        .ToArray();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (SaleId > 0 && SaleId != loadedSaleId)
+        {
+            loadedSaleId = SaleId;
+            await Return.LoadAsync(SaleId);
+        }
+    }
+
+    private Task CloseAsync(MouseEventArgs _) => OnClose.InvokeAsync();
+
+    private Task ReloadAsync(MouseEventArgs _) => Return.LoadAsync(SaleId);
+
+    private void SetSelected(SalesReturnLineSelection selection, ChangeEventArgs args) =>
+        Return.SetSelected(selection.Line.SaleLineId, args.Value is true);
+
+    private void SetQuantity(SalesReturnLineSelection selection, ChangeEventArgs args)
+    {
+        _ = int.TryParse(args.Value?.ToString(), out var quantity);
+        Return.SetQuantity(selection.Line.SaleLineId, quantity);
+    }
+
+    private void SetDestination(SalesReturnLineSelection selection, ChangeEventArgs args)
+    {
+        if (Enum.TryParse<ReturnStockDestination>(args.Value?.ToString(), out var destination))
+        {
+            Return.SetStockDestination(selection.Line.SaleLineId, destination);
+        }
+    }
+
+    private Task SetRefundMethodAsync(string? value)
+    {
+        if (Enum.TryParse<ReturnRefundMethod>(value, out var method))
+        {
+            Return.SetRefundMethod(method);
+        }
+        return Task.CompletedTask;
+    }
+
+    private Task ReviewAsync(MouseEventArgs _)
+    {
+        Return.BeginConfirmation();
+        return Task.CompletedTask;
+    }
+
+    private Task CancelConfirmationAsync(MouseEventArgs _)
+    {
+        Return.CancelConfirmation();
+        return Task.CompletedTask;
+    }
+
+    private async Task ConfirmAsync(MouseEventArgs _)
+    {
+        if (await Return.ConfirmAsync() && Return.LastResult is not null)
+        {
+            await OnCompleted.InvokeAsync(Return.LastResult);
+        }
+    }
+
+    private static string RefundLabel(ReturnRefundMethod method) => method switch
+    {
+        ReturnRefundMethod.Cash => "Espèces — sortie de caisse",
+        ReturnRefundMethod.ExternalCardPending => "Carte — confirmation externe à documenter",
+        ReturnRefundMethod.CreditReduction => "Réduction de créance client",
+        _ => "Non défini"
+    };
+}

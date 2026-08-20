@@ -110,6 +110,17 @@ public sealed class SqlSaleFinalizer : ISaleFinalizer
                         return Result<FinalizedSaleView>.Failure(customerResult.Error);
                     }
 
+                    var suspensionResult = await PrepareSuspensionCompletionAsync(
+                        context,
+                        request,
+                        now,
+                        cancellationToken);
+                    if (suspensionResult.IsFailure)
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                        return Result<FinalizedSaleView>.Failure(suspensionResult.Error);
+                    }
+
                     var operation = new SaleOperationEntity
                     {
                         OperationId = request.Preparation.OperationId,
@@ -145,6 +156,14 @@ public sealed class SqlSaleFinalizer : ISaleFinalizer
                     return Result<FinalizedSaleView>.Failure(
                         SalesApplicationErrors.StockConcurrencyConflict);
                 }
+                catch (DbUpdateException exception) when (
+                    !SalesSqlFailure.IsUniqueViolation(exception)
+                    && !SalesSqlFailure.IsDatabaseUnavailable(exception))
+                {
+                    await RollbackQuietlyAsync(transaction, cancellationToken);
+                    return Result<FinalizedSaleView>.Failure(
+                        SalesApplicationErrors.PersistenceFailed);
+                }
             });
         }
         catch (DbUpdateConcurrencyException)
@@ -162,6 +181,10 @@ public sealed class SqlSaleFinalizer : ISaleFinalizer
         catch (Exception exception) when (SalesSqlFailure.IsDatabaseUnavailable(exception))
         {
             return Result<FinalizedSaleView>.Failure(SalesApplicationErrors.DatabaseUnavailable);
+        }
+        catch (DbUpdateException)
+        {
+            return Result<FinalizedSaleView>.Failure(SalesApplicationErrors.PersistenceFailed);
         }
     }
 
@@ -181,9 +204,17 @@ public sealed class SqlSaleFinalizer : ISaleFinalizer
 
     private static Result ValidateRequest(FinalizeSaleRequest request)
     {
+        const decimal maximumSqlMoney = 999_999_999_999_999.9999m;
         if (request.Preparation.OperationId == Guid.Empty)
         {
             return Result.Failure(SalesApplicationErrors.InvalidOperationId);
+        }
+
+        if (request.SuspendedSale is not null
+            && (request.SuspendedSale.SuspendedSaleId <= 0
+                || request.SuspendedSale.RowVersion.Length == 0))
+        {
+            return Result.Failure(SalesApplicationErrors.OperationConflict);
         }
 
         if (request.Preparation.Lines.Count == 0)
@@ -195,15 +226,34 @@ public sealed class SqlSaleFinalizer : ISaleFinalizer
             != request.Preparation.Lines.Count
             || request.Preparation.Lines.Any(line => line.Quantity.Value <= 0
                 || line.UnitPrice.Amount < 0m
+                || line.UnitPrice.Amount > maximumSqlMoney
+                || decimal.Round(line.UnitPrice.Amount, 4) != line.UnitPrice.Amount
                 || line.Subtotal.Amount != line.UnitPrice.Amount * line.Quantity.Value)
             || request.Preparation.Total.Amount != request.Preparation.Lines.Sum(line => line.Subtotal.Amount)
+            || request.Preparation.Total.Amount > maximumSqlMoney
+            || decimal.Round(request.Preparation.Total.Amount, 4) != request.Preparation.Total.Amount
+            || request.Payment.Amount < 0m
+            || request.Payment.Amount > maximumSqlMoney
+            || decimal.Round(request.Payment.Amount, 4) != request.Payment.Amount
+            || request.Payment.TenderedAmount is not null
+                && (request.Payment.TenderedAmount.Value < 0m
+                    || request.Payment.TenderedAmount.Value > maximumSqlMoney
+                    || decimal.Round(request.Payment.TenderedAmount.Value, 4)
+                        != request.Payment.TenderedAmount.Value)
+            || request.Payment.ChangeGiven < 0m
+            || request.Payment.ChangeGiven > maximumSqlMoney
+            || decimal.Round(request.Payment.ChangeGiven, 4) != request.Payment.ChangeGiven
+            || !Enum.IsDefined(request.Payment.Method)
             || request.Payment.Amount + (request.Credit?.Amount ?? 0m) != request.Preparation.Total.Amount)
         {
             return Result.Failure(SalesApplicationErrors.PaymentInvalid);
         }
 
         if (request.Credit is not null
-            && (request.Credit.CustomerId <= 0 || request.Credit.Amount <= 0m))
+            && (request.Credit.CustomerId <= 0
+                || request.Credit.Amount <= 0m
+                || request.Credit.Amount > maximumSqlMoney
+                || decimal.Round(request.Credit.Amount, 4) != request.Credit.Amount))
         {
             return Result.Failure(SalesApplicationErrors.CreditCustomerRequired);
         }
@@ -248,6 +298,35 @@ public sealed class SqlSaleFinalizer : ISaleFinalizer
         return customer.IsActive && customer.CreditAllowed
             ? Result.Success()
             : Result.Failure(SalesApplicationErrors.CreditNotAllowed);
+    }
+
+    private static async Task<Result> PrepareSuspensionCompletionAsync(
+        PharmacyDbContext context,
+        FinalizeSaleRequest request,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        if (request.SuspendedSale is null)
+        {
+            return Result.Success();
+        }
+
+        var completion = request.SuspendedSale;
+        var suspension = await context.SuspendedSales.SingleOrDefaultAsync(
+                sale => sale.Id == completion.SuspendedSaleId,
+                cancellationToken);
+        if (suspension is null
+            || suspension.Status != "Open")
+        {
+            return Result.Failure(SalesApplicationErrors.OperationConflict);
+        }
+
+        context.Entry(suspension)
+            .Property(sale => sale.RowVersion)
+            .OriginalValue = completion.RowVersion;
+        suspension.Status = "Resumed";
+        suspension.UpdatedAtUtc = now;
+        return Result.Success();
     }
 
     private async Task<Result<IReadOnlyList<AllocationPlan>>> BuildPlanAsync(
@@ -538,6 +617,13 @@ public sealed class SqlSaleFinalizer : ISaleFinalizer
             content,
             request.Credit?.CustomerId.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
             request.Credit?.Amount.ToString("G29", CultureInfo.InvariantCulture) ?? string.Empty);
+        content = string.Join(
+            "|",
+            content,
+            request.SuspendedSale?.SuspendedSaleId.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+            request.SuspendedSale is null
+                ? string.Empty
+                : Convert.ToHexString(request.SuspendedSale.RowVersion));
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(content)));
     }
 

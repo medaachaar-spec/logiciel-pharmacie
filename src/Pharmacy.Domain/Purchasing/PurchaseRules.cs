@@ -8,9 +8,15 @@ public static class PurchaseRules
         ? Result.Success()
         : Result.Failure(PurchasingErrors.OrderQuantityInvalid);
 
-    public static Result ValidateUnitPurchasePrice(decimal price) => price >= 0m
+    public static Result ValidateUnitPurchasePrice(decimal price) => price >= 0m && FitsSqlDecimal19Scale4(price)
         ? Result.Success()
         : Result.Failure(PurchasingErrors.ValidationFailed);
+
+    private static bool FitsSqlDecimal19Scale4(decimal value)
+    {
+        var scale = (decimal.GetBits(value)[3] >> 16) & 0x7F;
+        return scale <= 4 && value <= 999_999_999_999_999.9999m;
+    }
 
     public static Result ValidateDraftMutation(PurchaseOrderStatus status) => status == PurchaseOrderStatus.Draft
         ? Result.Success()

@@ -99,6 +99,10 @@ public static class SalesApplicationErrors
         "sales.database.unavailable",
         "Le service de données local est indisponible. Le panier a été conservé.");
 
+    public static Error PersistenceFailed { get; } = new(
+        "sales.persistence.failed",
+        "La vente n’a pas pu être enregistrée. Aucune modification n’a été conservée.");
+
     public static Error SaleNotFound { get; } = new(
         "sales.sale.not_found",
         "La vente finalisée demandée est introuvable.");
@@ -106,4 +110,16 @@ public static class SalesApplicationErrors
     public static Error InvalidSaleQuery { get; } = new(
         "sales.sale.query.invalid",
         "La demande de consultation des ventes est invalide.");
+
+    public static Error ReturnInvalid { get; } = new(
+        "sales.return.invalid",
+        "Le retour contient une ligne, une quantité ou une décision invalide.");
+
+    public static Error ReturnQuantityExceeded { get; } = new(
+        "sales.return.quantity_exceeded",
+        "La quantité demandée dépasse le reliquat retournable de la vente.");
+
+    public static Error ReturnConflict { get; } = new(
+        "sales.return.concurrency_conflict",
+        "La vente a été retournée par une autre opération. Rechargez son détail.");
 }

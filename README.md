@@ -1,5 +1,7 @@
 # Package documentaire Codex - Logiciel Pharmacie
 
+Release Candidate pilote actuelle : `1.0.0-rc.1` (Sprint 18). Packaging Windows self-contained, installation SQL contrôlée et documentation pilote sont disponibles ; SQL Server Express réel et UAT manuelle restent des gates obligatoires. Voir `docs/reports/sprint-18/codex-report.md`.
+
 Version : V0.1  
 Date : 2026-08-02
 
@@ -43,9 +45,9 @@ dotnet test .\Pharmacy.slnx -c Debug --no-build
 dotnet run --project .\src\Pharmacy.Desktop\Pharmacy.Desktop.csproj -c Debug
 ```
 
-Après le lancement, l’application ouvre l’accueil du shell V0.1. `Ventes`, `Catalogue`, `Stock` et `Achats et réceptions` sont fonctionnels ; quatre autres domaines restent provisoires. Catalogue, Stock, Purchasing, ventes, paiements et sorties de stock utilisent SQL Server. Les brouillons/suspensions et l’impression restent locaux au Desktop.
+Après le lancement, l’application ouvre l’accueil du shell V0.1. `Ventes`, `Catalogue`, `Stock` et `Achats et réceptions` sont fonctionnels ; quatre autres domaines restent provisoires. Catalogue, Stock, Purchasing, ventes, paiements, suspensions et sorties de stock utilisent SQL Server. Seuls le brouillon actif avant validation et l’impression restent locaux au Desktop.
 
-Le POS conserve les incidents de code inconnu/disponibilité, la suspension et la reprise contrôlée de paniers, l’abandon du brouillon, la machine d’états du TPE ambigu et l’impression simulée. Depuis le Sprint 13, la validation persiste atomiquement vente, snapshots, paiement, allocations FEFO et mouvements de sortie, puis décrémente les balances. Tous les montants sont `decimal` et aucune donnée bancaire ou réelle n’est collectée. Les brouillons/suspensions et le ticket restent non persistés.
+Le POS conserve les incidents de code inconnu/disponibilité, la suspension et la reprise contrôlée de paniers, l’abandon du brouillon, la machine d’états du TPE ambigu et l’impression simulée. La suspension persiste son snapshot dans SQL sans toucher au stock ; après reprise, la validation persiste atomiquement vente, paiement, allocations FEFO, mouvements de sortie et clôture de la suspension. Tous les montants sont `decimal` et aucune donnée bancaire ou réelle n’est collectée. Le brouillon actif et le ticket restent non persistés.
 
 Le Sprint 6 ajoute un noyau Sales V0.1 indépendant dans `Pharmacy.Domain` (`Money`, identifiants typés, quantité entière, snapshot produit, ligne immuable et agrégat `SaleDraft`) ainsi que trois contrats non implémentés dans `Pharmacy.Application`. Ce noyau n’est pas connecté au POS synthétique : il ne persiste rien, ne finalise aucune vente et ne traite ni stock, lot, paiement, caisse, audit ou impression. Sa conception est décrite dans `docs/domain/SALES_CORE_V0.1.md`.
 

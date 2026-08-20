@@ -25,3 +25,10 @@ public interface ISaleReturnStore
         ReturnSaleRequest request,
         CancellationToken cancellationToken = default);
 }
+
+public interface ISaleReturnReader
+{
+    Task<Result<SaleReturnPreparationView>> GetPreparationAsync(
+        long saleId,
+        CancellationToken cancellationToken = default);
+}

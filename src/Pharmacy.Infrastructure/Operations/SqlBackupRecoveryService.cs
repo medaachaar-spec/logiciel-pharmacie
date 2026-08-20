@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using Microsoft.Data.SqlClient;
@@ -292,7 +293,20 @@ public sealed class SqlBackupRecoveryService : IBackupRecoveryService
     private static SqlBackupType TypeFromName(string name) => name.Contains("TransactionLog", StringComparison.OrdinalIgnoreCase) ? SqlBackupType.TransactionLog : name.Contains("Differential", StringComparison.OrdinalIgnoreCase) ? SqlBackupType.Differential : SqlBackupType.Full;
     private static async Task<string> HashAsync(string path, CancellationToken token) { await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 131072, true); return Convert.ToHexString(await SHA256.HashDataAsync(stream, token)); }
     private static string FailureCode(Exception ex) => ex is IOException or UnauthorizedAccessException ? "backup.file_io" : IsUnavailable(ex) ? "backup.database.unavailable" : "backup.operation.failed";
-    private static bool IsUnavailable(Exception ex) { for (Exception? current = ex; current is not null; current = current.InnerException) if (current is SqlException sql && sql.Number is -2 or 2 or 20 or 40 or 53 or 64 or 233 or 4060 or 10054 or 18456) return true; return false; }
+    private static bool IsUnavailable(Exception ex)
+    {
+        for (Exception? current = ex; current is not null; current = current.InnerException)
+        {
+            if (current is InvalidOperationException or TimeoutException
+                || current is Win32Exception { NativeErrorCode: 258 or 10054 or 10060 }
+                || current is SqlException { Number: -2 or 2 or 20 or 40 or 53 or 64 or 233 or 258 or 4060 or 10054 or 10060 or 18456 })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
     private static async Task<string> ScalarStringAsync(SqlConnection c, string sql, CancellationToken t) { await using var cmd=c.CreateCommand(); cmd.CommandText=sql; return Convert.ToString(await cmd.ExecuteScalarAsync(t), System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty; }
     private static async Task<int> ScalarIntAsync(SqlConnection c, string sql, CancellationToken t) { await using var cmd=c.CreateCommand(); cmd.CommandText=sql; return Convert.ToInt32(await cmd.ExecuteScalarAsync(t), System.Globalization.CultureInfo.InvariantCulture); }
     private async Task AuditFailureQuietlyAsync(string action, Guid operationId, string reasonCode, CancellationToken token) { try { await audit.RecordFailureAsync("backup", "BackupOperation", null, action, operationId, reasonCode, token); } catch { } }

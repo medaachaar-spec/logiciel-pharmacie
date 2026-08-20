@@ -57,10 +57,13 @@ public interface ISecurityAdministrationService
 {
     Task<Result<IReadOnlyList<SecurityUserSummaryView>>> GetUsersAsync(CancellationToken cancellationToken = default);
     Task<Result<IReadOnlyList<SecurityRoleView>>> GetRolesAsync(CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyList<SecurityPermissionView>>> GetPermissionsAsync(CancellationToken cancellationToken = default);
     Task<Result<SecurityUserSummaryView>> CreateUserAsync(CreateSecurityUserRequest request, CancellationToken cancellationToken = default);
     Task<Result<SecurityUserSummaryView>> SetUserActiveAsync(SetUserActiveRequest request, CancellationToken cancellationToken = default);
     Task<Result<SecurityUserSummaryView>> SetUserRolesAsync(SetUserRolesRequest request, CancellationToken cancellationToken = default);
     Task<Result<RecoveryCodeBatchView>> GenerateRecoveryCodesAsync(long userId, Guid operationId, CancellationToken cancellationToken = default);
+    Task<Result<SecurityRoleView>> CreateRoleAsync(CreateSecurityRoleRequest request, CancellationToken cancellationToken = default);
+    Task<Result<SecurityRoleView>> UpdateRoleAsync(UpdateSecurityRoleRequest request, CancellationToken cancellationToken = default);
 }
 
 public interface IAuditReader

@@ -91,19 +91,22 @@ internal sealed class SqlAuthenticationService : IAuthenticationService, ISecuri
         {
             await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
             var user = await context.UserAccounts.SingleOrDefaultAsync(candidate => candidate.Id == current.UserId, cancellationToken);
+            var now = clock.UtcNow;
+            var locked = user?.LockedUntilUtc > now;
             var success = user is not null
                 && user.IsActive
+                && !locked
                 && passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password) != PasswordVerificationResult.Failed;
-            var now = clock.UtcNow;
+            var failureReason = locked ? "locked" : "invalid_credentials";
             context.AuthenticationEvents.Add(SecurityPersistenceSupport.AuthenticationEvent(
                 "Reauthentication", user?.Id, current.Login.ToUpperInvariant(), now, success,
-                success ? null : "invalid_credentials", correlationId));
+                success ? null : failureReason, correlationId));
             context.AuditEvents.Add(SecurityPersistenceSupport.AuditEvent(
                 "Security", "security", "UserAccount", current.UserId.ToString(), "reauthenticate",
                 current.UserId, current.DisplayName, success ? "Success" : "Failure", now, null, correlationId,
-                success ? null : "invalid_credentials"));
+                success ? null : failureReason));
             await context.SaveChangesAsync(cancellationToken);
-            if (!success) return Result.Failure(SecurityErrors.InvalidCredentials);
+            if (!success) return Result.Failure(locked ? SecurityErrors.AccountLocked : SecurityErrors.InvalidCredentials);
             session.MarkReauthenticated(now);
             return Result.Success();
         }
@@ -217,8 +220,12 @@ internal sealed class SqlAuthenticationService : IAuthenticationService, ISecuri
     {
         var policy = SecurityPersistenceSupport.ValidatePassword(request.Password);
         if (policy.IsFailure) return Result<RecoveryCodeBatchView>.Failure(policy.Error);
-        if (request.OperationId == Guid.Empty || string.IsNullOrWhiteSpace(request.Login) || string.IsNullOrWhiteSpace(request.DisplayName))
-            return Result<RecoveryCodeBatchView>.Failure(SecurityErrors.InvalidCredentials);
+        if (request.OperationId == Guid.Empty
+            || !LocalSecurityRules.IsLoginValid(request.Login)
+            || !LocalSecurityRules.IsDisplayNameValid(request.DisplayName))
+        {
+            return Result<RecoveryCodeBatchView>.Failure(SecurityErrors.InvalidUser);
+        }
 
         try
         {
@@ -226,6 +233,18 @@ internal sealed class SqlAuthenticationService : IAuthenticationService, ISecuri
                 contextFactory,
                 async context =>
                 {
+                    await context.Database.ExecuteSqlRawAsync(
+                        """
+                        DECLARE @lockResult int;
+                        EXEC @lockResult = sys.sp_getapplock
+                            @Resource = N'Pharmacy.Security.OwnerBootstrap',
+                            @LockMode = N'Exclusive',
+                            @LockOwner = N'Transaction',
+                            @LockTimeout = 30000;
+                        IF @lockResult < 0
+                            THROW 51000, 'Owner bootstrap lock unavailable.', 1;
+                        """,
+                        cancellationToken);
                     if (await context.UserAccounts.AnyAsync(cancellationToken))
                     {
                         return new SecurityPersistenceSupport.TransactionOutcome<Result<RecoveryCodeBatchView>>(
@@ -265,6 +284,10 @@ internal sealed class SqlAuthenticationService : IAuthenticationService, ISecuri
         {
             return Result<RecoveryCodeBatchView>.Failure(SecurityErrors.LoginAlreadyExists);
         }
+        catch (Exception exception) when (SecurityPersistenceSupport.IsBootstrapLockUnavailable(exception))
+        {
+            return Result<RecoveryCodeBatchView>.Failure(SecurityErrors.ConcurrencyConflict);
+        }
         catch (Exception exception) when (SecurityPersistenceSupport.IsDatabaseUnavailable(exception))
         {
             return Result<RecoveryCodeBatchView>.Failure(SecurityErrors.DatabaseUnavailable);
@@ -290,6 +313,30 @@ internal sealed class SqlAuthenticationService : IAuthenticationService, ISecuri
     }
 
     private async Task<Result<AuthenticationResultView>> AuthenticateAsync(
+        LoginRequest request,
+        string eventType,
+        bool unlocking,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return await AuthenticateAttemptAsync(request, eventType, unlocking, cancellationToken);
+            }
+            catch (DbUpdateConcurrencyException) when (attempt < LocalSecurityRules.MaximumFailedLoginCount)
+            {
+                // A concurrent login changed the rowversion. Rebuild the context and re-evaluate
+                // the persisted lockout state so failed attempts cannot be lost or bypassed.
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Result<AuthenticationResultView>.Failure(SecurityErrors.AccountLocked);
+            }
+        }
+    }
+
+    private async Task<Result<AuthenticationResultView>> AuthenticateAttemptAsync(
         LoginRequest request,
         string eventType,
         bool unlocking,

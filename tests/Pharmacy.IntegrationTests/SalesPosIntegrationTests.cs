@@ -8,6 +8,7 @@ using Pharmacy.Application.Sales.Drafts.Queries;
 using Pharmacy.Application.Sales.Finalization.Commands;
 using Pharmacy.Application.Sales.Finalization.Queries;
 using Pharmacy.Application.Sales.Models;
+using Pharmacy.Application.Sales.Suspensions;
 using Pharmacy.Desktop.Components.Pos;
 using Pharmacy.Domain.Common;
 using Pharmacy.Domain.Sales;
@@ -242,7 +243,7 @@ public sealed class SalesPosIntegrationTests
         Assert.True(await fixture.Coordinator.SuspendCurrentDraftAsync(TestCancellation));
 
         var suspension = Assert.Single(fixture.Coordinator.SuspendedDrafts);
-        Assert.Equal("DEMO-HOLD-0001", suspension.Reference);
+        Assert.StartsWith("HOLD-TEST-", suspension.Reference, StringComparison.Ordinal);
         Assert.Equal(12.50m, suspension.Total.Amount);
         Assert.Single(suspension.Lines);
         Assert.NotEqual(suspendedDraftId, fixture.Coordinator.CurrentDraft!.Id);
@@ -292,7 +293,7 @@ public sealed class SalesPosIntegrationTests
     }
 
     [Fact]
-    public async Task FailedResumeKeepsSuspensionAndDisplayedEmptyDraft()
+    public async Task ResumeRestoresSnapshotEvenWhenCurrentStockBecameUnavailable()
     {
         var stock = new SwitchableStockReader(new InMemoryStockAvailabilityReader());
         var fixture = Fixture.Create(stock);
@@ -300,14 +301,12 @@ public sealed class SalesPosIntegrationTests
         await fixture.Coordinator.AddProductAsync(ProductId.Create(1).Value, TestCancellation);
         await fixture.Coordinator.SuspendCurrentDraftAsync(TestCancellation);
         var reference = Assert.Single(fixture.Coordinator.SuspendedDrafts).Reference;
-        var displayedDraft = fixture.Coordinator.CurrentDraft;
         stock.DeniedProductId = ProductId.Create(1).Value;
 
-        Assert.False(await fixture.Coordinator.ResumeSuspendedDraftAsync(reference, TestCancellation));
+        Assert.True(await fixture.Coordinator.ResumeSuspendedDraftAsync(reference, TestCancellation));
 
-        Assert.Single(fixture.Coordinator.SuspendedDrafts);
-        Assert.Same(displayedDraft, fixture.Coordinator.CurrentDraft);
-        Assert.True(fixture.Coordinator.CurrentDraft!.IsEmpty);
+        Assert.Empty(fixture.Coordinator.SuspendedDrafts);
+        Assert.Equal(1, Assert.Single(fixture.Coordinator.CurrentDraft!.Lines).Quantity.Value);
     }
 
     [Fact]
@@ -330,18 +329,18 @@ public sealed class SalesPosIntegrationTests
     [Fact]
     public async Task DoubleResumeIsBlockedUntilFirstRestorationFinishes()
     {
-        var stock = new BlockingStockReader(new InMemoryStockAvailabilityReader());
-        var fixture = Fixture.Create(stock);
+        var suspendedStore = new BlockingSuspendedSaleStore(new StubSuspendedSaleStore());
+        var fixture = Fixture.Create(suspendedStore: suspendedStore);
         await fixture.Coordinator.InitializeAsync(TestCancellation);
         await fixture.Coordinator.AddProductAsync(ProductId.Create(1).Value, TestCancellation);
         await fixture.Coordinator.SuspendCurrentDraftAsync(TestCancellation);
         var reference = Assert.Single(fixture.Coordinator.SuspendedDrafts).Reference;
-        stock.BlockNextRequest();
+        suspendedStore.BlockNextGetOpen();
 
         var first = fixture.Coordinator.ResumeSuspendedDraftAsync(reference, TestCancellation);
-        await stock.WaitUntilBlockedAsync(TestCancellation);
+        await suspendedStore.WaitUntilBlockedAsync(TestCancellation);
         var second = await fixture.Coordinator.ResumeSuspendedDraftAsync(reference, TestCancellation);
-        stock.Release();
+        suspendedStore.Release();
 
         Assert.True(await first);
         Assert.False(second);
@@ -417,7 +416,7 @@ public sealed class SalesPosIntegrationTests
     {
         var source = DesktopText("SalesServiceCollectionExtensions.cs");
 
-        Assert.Contains("AddSqlCatalogAdaptersFromEnvironment", source, StringComparison.Ordinal);
+        Assert.Contains("AddSqlCatalogAdapters(databaseEndpoint)", source, StringComparison.Ordinal);
         Assert.Contains("ISaleDraftStore, InMemorySaleDraftStore", source, StringComparison.Ordinal);
         Assert.DoesNotContain("InMemoryProductCatalogReader", source, StringComparison.Ordinal);
         Assert.Contains("AddTransient<SearchSellableProductsHandler>", source, StringComparison.Ordinal);
@@ -440,7 +439,15 @@ public sealed class SalesPosIntegrationTests
         var page = DesktopText("Components", "Pages", "DemoPosPage.razor");
 
         Assert.Contains("@inject SalesPosCoordinator", page, StringComparison.Ordinal);
-        Assert.Contains("Ventes SQL V0.1 — suspensions encore locales", page, StringComparison.Ordinal);
+        Assert.Contains("Ventes SQL V0.1 — continuité de vente persistante", page, StringComparison.Ordinal);
+        Assert.Contains("OnAbandon=\"RequestAbandonSuspendedAsync\"", page, StringComparison.Ordinal);
+        Assert.Contains("SuspendedSaleWorkflow", File.ReadAllText(Path.Combine(
+            RepositoryRoot,
+            "src",
+            "Pharmacy.Desktop",
+            "Components",
+            "Pos",
+            "SalesPosCoordinator.cs")), StringComparison.Ordinal);
         Assert.All(razorSources, source =>
         {
             Assert.DoesNotContain("new InMemory", source, StringComparison.Ordinal);
@@ -503,6 +510,162 @@ public sealed class SalesPosIntegrationTests
         Assert.All(routes, route => Assert.Contains(route, navigation, StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task RET001_03_NewCoordinatorAndServicesReloadTheSqlProjection()
+    {
+        var store = new StubSuspendedSaleStore();
+        var firstProcess = Fixture.Create(suspendedStore: store);
+        await firstProcess.Coordinator.InitializeAsync(TestCancellation);
+        await firstProcess.Coordinator.AddProductAsync(ProductId.Create(1).Value, TestCancellation);
+        Assert.True(await firstProcess.Coordinator.SuspendCurrentDraftAsync(TestCancellation));
+        var reference = Assert.Single(firstProcess.Coordinator.SuspendedDrafts).Reference;
+
+        var restartedProcess = Fixture.Create(suspendedStore: store);
+        Assert.True(await restartedProcess.Coordinator.InitializeAsync(TestCancellation));
+
+        Assert.Equal(reference, Assert.Single(restartedProcess.Coordinator.SuspendedDrafts).Reference);
+    }
+
+    [Fact]
+    public async Task RET001_07_08_FinalizingResumedDraftClosesSuspensionAndCreatesOneLogicalSale()
+    {
+        var fixture = Fixture.Create();
+        await fixture.Coordinator.InitializeAsync(TestCancellation);
+        await fixture.Coordinator.AddProductAsync(ProductId.Create(1).Value, TestCancellation);
+        await fixture.Coordinator.SuspendCurrentDraftAsync(TestCancellation);
+        var reference = Assert.Single(fixture.Coordinator.SuspendedDrafts).Reference;
+        Assert.True(await fixture.Coordinator.ResumeSuspendedDraftAsync(reference, TestCancellation));
+        Assert.True(fixture.Coordinator.BeginPayment());
+        fixture.Coordinator.SelectPaymentMethod(DemoPaymentMethod.Cash);
+        Assert.True(fixture.Coordinator.SetReceivedAmount(fixture.Coordinator.Total));
+        Assert.True(fixture.Coordinator.TryBeginCompletion());
+
+        Assert.True(await fixture.Coordinator.FinalizeSaleAsync(TestCancellation));
+        Assert.True(await fixture.Coordinator.LoadSuspendedSalesAsync(TestCancellation));
+
+        Assert.Empty(fixture.Coordinator.SuspendedDrafts);
+        Assert.Single(fixture.Coordinator.RecentSales);
+    }
+
+    [Fact]
+    public async Task RET001_ResuspendingAnActiveSuspensionCannotCreateADuplicate()
+    {
+        var fixture = Fixture.Create();
+        await fixture.Coordinator.InitializeAsync(TestCancellation);
+        await fixture.Coordinator.AddProductAsync(ProductId.Create(1).Value, TestCancellation);
+        await fixture.Coordinator.SuspendCurrentDraftAsync(TestCancellation);
+        var reference = Assert.Single(fixture.Coordinator.SuspendedDrafts).Reference;
+        Assert.True(await fixture.Coordinator.ResumeSuspendedDraftAsync(reference, TestCancellation));
+
+        Assert.False(fixture.Coordinator.CanSuspend);
+        Assert.False(await fixture.Coordinator.SuspendCurrentDraftAsync(TestCancellation));
+        Assert.Single((await fixture.SuspendedStore.GetOpenAsync(TestCancellation)).Value);
+    }
+
+    [Fact]
+    public async Task RET001_09_SameSuspendOperationCreatesOneLogicalSuspension()
+    {
+        var store = new StubSuspendedSaleStore();
+        var request = SuspensionRequest(Guid.NewGuid(), quantity: 2, unitPrice: 12.50m);
+
+        var first = await store.SuspendAsync(request, TestCancellation);
+        var replay = await store.SuspendAsync(request, TestCancellation);
+
+        Assert.Equal(first.Value.SuspendedSaleId, replay.Value.SuspendedSaleId);
+        Assert.Single((await store.GetOpenAsync(TestCancellation)).Value);
+    }
+
+    [Fact]
+    public async Task RET001_10_AbandonIsTraceableAndStaleSecondAttemptIsRejectedSafely()
+    {
+        var store = new StubSuspendedSaleStore();
+        var suspended = await store.SuspendAsync(SuspensionRequest(Guid.NewGuid()), TestCancellation);
+
+        Assert.True((await store.AbandonAsync(
+            Guid.NewGuid(), suspended.Value.SuspendedSaleId, suspended.Value.RowVersion, TestCancellation)).IsSuccess);
+        var stale = await store.AbandonAsync(
+            Guid.NewGuid(), suspended.Value.SuspendedSaleId, suspended.Value.RowVersion, TestCancellation);
+
+        Assert.Equal("sales.operation.conflict", stale.Error.Code);
+        Assert.Empty((await store.GetOpenAsync(TestCancellation)).Value);
+    }
+
+    [Fact]
+    public async Task RET001_12_RestoreUsesPersistedPriceSnapshotWithoutCatalogOrStockLookup()
+    {
+        var store = new StubSuspendedSaleStore();
+        var suspended = await store.SuspendAsync(
+            SuspensionRequest(Guid.NewGuid(), quantity: 3, unitPrice: 9.75m),
+            TestCancellation);
+        var drafts = new InMemorySaleDraftStore();
+
+        var restored = await new RestoreSuspendedSaleDraftHandler(
+            new InMemorySaleDraftIdGenerator(), drafts).HandleAsync(suspended.Value, TestCancellation);
+
+        Assert.True(restored.IsSuccess);
+        var line = Assert.Single(restored.Value.Lines);
+        Assert.Equal(3, line.Quantity.Value);
+        Assert.Equal(9.75m, line.UnitPrice.Amount);
+    }
+
+    [Fact]
+    public async Task RET001_SqlUnavailableDoesNotCreateALocalFallbackSuspension()
+    {
+        var fixture = Fixture.Create(suspendedStore: new UnavailableSuspendedSaleStore());
+
+        Assert.False(await fixture.Coordinator.InitializeAsync(TestCancellation));
+
+        Assert.Empty(fixture.Coordinator.SuspendedDrafts);
+        Assert.Equal("sales.database.unavailable", fixture.Coordinator.LastErrorCode);
+    }
+
+    [Fact]
+    public async Task RET001_BackendPermissionDeniesSuspensionBeforeStoreMutation()
+    {
+        var store = new StubSuspendedSaleStore();
+        var workflow = new SuspendedSaleWorkflow(store, new DenyPermissionAuthorizer());
+
+        var result = await workflow.SuspendAsync(SuspensionRequest(Guid.NewGuid()), TestCancellation);
+
+        Assert.Equal("security.authorization.denied", result.Error.Code);
+        Assert.Empty((await store.GetOpenAsync(TestCancellation)).Value);
+    }
+
+    [Fact]
+    public async Task RET001_SuspendAndAbandonRecordBusinessAuditEvents()
+    {
+        var store = new StubSuspendedSaleStore();
+        var audit = new RecordingBusinessAudit();
+        var workflow = new SuspendedSaleWorkflow(store, audit: audit);
+        var suspended = await workflow.SuspendAsync(SuspensionRequest(Guid.NewGuid()), TestCancellation);
+
+        Assert.True((await workflow.AbandonAsync(
+            Guid.NewGuid(),
+            suspended.Value.SuspendedSaleId,
+            suspended.Value.RowVersion,
+            TestCancellation)).IsSuccess);
+
+        Assert.Equal(new[] { "sale.suspend", "sale.abandon" }, audit.Actions);
+    }
+
+    private static SuspendSaleRequest SuspensionRequest(
+        Guid operationId,
+        int quantity = 1,
+        decimal unitPrice = 12.50m) =>
+        new(
+            operationId,
+            null,
+            new[]
+            {
+                new SuspendSaleLineRequest(
+                    1,
+                    "DEMO-000001",
+                    "Produit Démo A",
+                    "Boîte",
+                    unitPrice,
+                    quantity)
+            });
+
     private static int CountOccurrences(string source, string value)
     {
         return source.Split(value, StringSplitOptions.None).Length - 1;
@@ -544,11 +707,13 @@ public sealed class SalesPosIntegrationTests
             InMemorySaleDraftStore store,
             IProductCatalogReader catalog,
             IStockAvailabilityReader stock,
+            ISuspendedSaleStore suspendedStore,
             SalesPosCoordinator coordinator)
         {
             Store = store;
             Catalog = catalog;
             Stock = stock;
+            SuspendedStore = suspendedStore;
             Coordinator = coordinator;
         }
 
@@ -558,14 +723,19 @@ public sealed class SalesPosIntegrationTests
 
         public IStockAvailabilityReader Stock { get; }
 
+        public ISuspendedSaleStore SuspendedStore { get; }
+
         public SalesPosCoordinator Coordinator { get; }
 
-        public static Fixture Create(IStockAvailabilityReader? stock = null)
+        public static Fixture Create(
+            IStockAvailabilityReader? stock = null,
+            ISuspendedSaleStore? suspendedStore = null)
         {
             var store = new InMemorySaleDraftStore();
             var catalog = new InMemoryProductCatalogReader();
             var availability = stock ?? new InMemoryStockAvailabilityReader();
-            var persistence = new StubSalesPersistence();
+            var suspensionPersistence = suspendedStore ?? new StubSuspendedSaleStore();
+            var persistence = new StubSalesPersistence(suspensionPersistence);
             var preparation = new PrepareSaleFinalizationHandler(
                 store,
                 availability,
@@ -579,17 +749,25 @@ public sealed class SalesPosIntegrationTests
                 new RemoveSaleItemHandler(store),
                 new ClearSaleDraftHandler(store),
                 new GetSaleDraftHandler(store),
+                new RestoreSuspendedSaleDraftHandler(new InMemorySaleDraftIdGenerator(), store),
                 new FinalizeSaleHandler(preparation, persistence),
                 new GetRecentSalesHandler(persistence),
-                new DemoTicketPrintService());
-            return new Fixture(store, catalog, availability, coordinator);
+                new DemoTicketPrintService(),
+                new SuspendedSaleWorkflow(suspensionPersistence));
+            return new Fixture(store, catalog, availability, suspensionPersistence, coordinator);
         }
     }
 
     private sealed class StubSalesPersistence : ISaleFinalizer, ISalesReader
     {
         private readonly Dictionary<Guid, FinalizedSaleView> salesByOperation = new();
+        private readonly ISuspendedSaleStore suspendedSaleStore;
         private long nextSaleId;
+
+        public StubSalesPersistence(ISuspendedSaleStore suspendedSaleStore)
+        {
+            this.suspendedSaleStore = suspendedSaleStore;
+        }
 
         public Task<Result<FinalizedSaleView>> FinalizeAsync(
             FinalizeSaleRequest request,
@@ -640,6 +818,10 @@ public sealed class SalesPosIntegrationTests
                 lines,
                 payment);
             salesByOperation.Add(request.Preparation.OperationId, sale);
+            if (request.SuspendedSale is not null && suspendedSaleStore is StubSuspendedSaleStore stub)
+            {
+                stub.MarkResumed(request.SuspendedSale.SuspendedSaleId, request.SuspendedSale.RowVersion);
+            }
             return Task.FromResult(Result<FinalizedSaleView>.Success(sale));
         }
 
@@ -673,6 +855,190 @@ public sealed class SalesPosIntegrationTests
                 .ToArray();
             return Task.FromResult(Result<IReadOnlyList<FinalizedSaleSummaryView>>.Success(
                 Array.AsReadOnly(rows)));
+        }
+    }
+
+    private sealed class StubSuspendedSaleStore : ISuspendedSaleStore
+    {
+        private readonly List<SuspendedSaleSummaryView> sales = new();
+        private readonly object syncRoot = new();
+        private long nextId;
+
+        public Task<Result<SuspendedSaleSummaryView>> SuspendAsync(
+            SuspendSaleRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (syncRoot)
+            {
+                var replay = sales.SingleOrDefault(sale => sale.OperationId == request.OperationId);
+                if (replay is not null)
+                {
+                    return Task.FromResult(Result<SuspendedSaleSummaryView>.Success(replay));
+                }
+
+                var id = ++nextId;
+                var lines = request.Lines.Select(line => new SuspendedSaleLineView(
+                    ProductId.Create(line.ProductId).Value,
+                    ProductReference.Create(line.ProductReference).Value,
+                    line.ProductName,
+                    line.Presentation,
+                    Money.Create(line.UnitPrice).Value,
+                    SaleQuantity.Create(line.Quantity).Value,
+                    Money.Create(line.UnitPrice * line.Quantity).Value)).ToArray();
+                var sale = new SuspendedSaleSummaryView(
+                    id,
+                    request.OperationId,
+                    $"HOLD-TEST-{id:0000}",
+                    request.CustomerId,
+                    null,
+                    Money.Create(request.Lines.Sum(line => line.UnitPrice * line.Quantity)).Value,
+                    lines.Length,
+                    new DateTime(2026, 8, 16, 10, 0, 0, DateTimeKind.Utc).AddMinutes(id),
+                    "Open",
+                    BitConverter.GetBytes(1L),
+                    Array.AsReadOnly(lines));
+                sales.Insert(0, sale);
+                return Task.FromResult(Result<SuspendedSaleSummaryView>.Success(sale));
+            }
+        }
+
+        public Task<Result<IReadOnlyList<SuspendedSaleSummaryView>>> GetOpenAsync(
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (syncRoot)
+            {
+                IReadOnlyList<SuspendedSaleSummaryView> open = Array.AsReadOnly(sales
+                    .Where(sale => sale.Status == "Open")
+                    .ToArray());
+                return Task.FromResult(Result<IReadOnlyList<SuspendedSaleSummaryView>>.Success(open));
+            }
+        }
+
+        public Task<Result> AbandonAsync(
+            Guid operationId,
+            long suspendedSaleId,
+            byte[] rowVersion,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (syncRoot)
+            {
+                var index = sales.FindIndex(sale => sale.SuspendedSaleId == suspendedSaleId);
+                if (index < 0)
+                {
+                    return Task.FromResult(Result.Failure(Pharmacy.Application.Sales.Errors.SalesApplicationErrors.SaleNotFound));
+                }
+
+                var sale = sales[index];
+                if (sale.Status != "Open" || !sale.RowVersion.AsSpan().SequenceEqual(rowVersion))
+                {
+                    return Task.FromResult(Result.Failure(Pharmacy.Application.Sales.Errors.SalesApplicationErrors.OperationConflict));
+                }
+
+                sales[index] = sale with { Status = "Abandoned", RowVersion = BitConverter.GetBytes(2L) };
+                return Task.FromResult(Result.Success());
+            }
+        }
+
+        public void MarkResumed(long suspendedSaleId, byte[] rowVersion)
+        {
+            lock (syncRoot)
+            {
+                var index = sales.FindIndex(sale => sale.SuspendedSaleId == suspendedSaleId);
+                if (index >= 0
+                    && sales[index].Status == "Open"
+                    && sales[index].RowVersion.AsSpan().SequenceEqual(rowVersion))
+                {
+                    sales[index] = sales[index] with { Status = "Resumed", RowVersion = BitConverter.GetBytes(2L) };
+                }
+            }
+        }
+    }
+
+    private sealed class BlockingSuspendedSaleStore : ISuspendedSaleStore
+    {
+        private readonly ISuspendedSaleStore inner;
+        private readonly TaskCompletionSource blocked = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource released = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int blockNext;
+
+        public BlockingSuspendedSaleStore(ISuspendedSaleStore inner) => this.inner = inner;
+
+        public void BlockNextGetOpen() => Volatile.Write(ref blockNext, 1);
+
+        public Task WaitUntilBlockedAsync(CancellationToken cancellationToken) =>
+            blocked.Task.WaitAsync(cancellationToken);
+
+        public void Release() => released.TrySetResult();
+
+        public Task<Result<SuspendedSaleSummaryView>> SuspendAsync(
+            SuspendSaleRequest request,
+            CancellationToken cancellationToken = default) => inner.SuspendAsync(request, cancellationToken);
+
+        public async Task<Result<IReadOnlyList<SuspendedSaleSummaryView>>> GetOpenAsync(
+            CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Exchange(ref blockNext, 0) == 1)
+            {
+                blocked.TrySetResult();
+                await released.Task.WaitAsync(cancellationToken);
+            }
+
+            return await inner.GetOpenAsync(cancellationToken);
+        }
+
+        public Task<Result> AbandonAsync(
+            Guid operationId,
+            long suspendedSaleId,
+            byte[] rowVersion,
+            CancellationToken cancellationToken = default) =>
+            inner.AbandonAsync(operationId, suspendedSaleId, rowVersion, cancellationToken);
+    }
+
+    private sealed class UnavailableSuspendedSaleStore : ISuspendedSaleStore
+    {
+        public Task<Result<SuspendedSaleSummaryView>> SuspendAsync(
+            SuspendSaleRequest request,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(Result<SuspendedSaleSummaryView>.Failure(
+                Pharmacy.Application.Sales.Errors.SalesApplicationErrors.DatabaseUnavailable));
+
+        public Task<Result<IReadOnlyList<SuspendedSaleSummaryView>>> GetOpenAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(Result<IReadOnlyList<SuspendedSaleSummaryView>>.Failure(
+                Pharmacy.Application.Sales.Errors.SalesApplicationErrors.DatabaseUnavailable));
+
+        public Task<Result> AbandonAsync(
+            Guid operationId,
+            long suspendedSaleId,
+            byte[] rowVersion,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(Result.Failure(
+                Pharmacy.Application.Sales.Errors.SalesApplicationErrors.DatabaseUnavailable));
+    }
+
+    private sealed class DenyPermissionAuthorizer : Pharmacy.Application.Security.Contracts.IPermissionAuthorizer
+    {
+        public Result Authorize(string permission, bool requireRecentReauthentication = false) =>
+            Result.Failure(Pharmacy.Application.Security.Errors.SecurityErrors.PermissionDenied);
+    }
+
+    private sealed class RecordingBusinessAudit : Pharmacy.Application.Security.Contracts.IBusinessAuditRecorder
+    {
+        public List<string> Actions { get; } = new();
+
+        public Task RecordSuccessAsync(
+            string module,
+            string entityType,
+            string? entityId,
+            string action,
+            Guid? operationId,
+            CancellationToken cancellationToken = default)
+        {
+            Actions.Add(action);
+            return Task.CompletedTask;
         }
     }
 

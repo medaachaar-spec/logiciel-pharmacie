@@ -17,7 +17,8 @@ public sealed record FinalizeSaleCommand(
     decimal? TenderedAmount,
     bool ExternalCardConfirmed,
     long? CustomerId = null,
-    decimal CreditAmount = 0m);
+    decimal CreditAmount = 0m,
+    SuspendedSaleCompletionRequest? SuspendedSale = null);
 
 public sealed class FinalizeSaleHandler
 {
@@ -95,11 +96,23 @@ public sealed class FinalizeSaleHandler
             ? null
             : new SaleCreditRequest(command.CustomerId!.Value, command.CreditAmount);
         var finalized = await finalizer.FinalizeAsync(
-            new FinalizeSaleRequest(preparation.Value, payment.Value, credit),
+            new FinalizeSaleRequest(preparation.Value, payment.Value, credit, command.SuspendedSale),
             cancellationToken);
         if (finalized.IsSuccess && audit is not null)
+        {
             await audit.RecordSuccessAsync("sales", "Sale", finalized.Value.SaleId.ToString(),
                 "sale.finalize", command.OperationId, cancellationToken);
+            if (command.SuspendedSale is not null)
+            {
+                await audit.RecordSuccessAsync(
+                    "sales",
+                    "SuspendedSale",
+                    command.SuspendedSale.SuspendedSaleId.ToString(),
+                    "sale.resume",
+                    command.OperationId,
+                    cancellationToken);
+            }
+        }
         return finalized;
     }
 
@@ -153,6 +166,7 @@ public sealed class FinalizeSaleHandler
 
         if (command.CreditAmount < 0m
             || command.CreditAmount > total.Amount
+            || decimal.Round(command.CreditAmount, 4) != command.CreditAmount
             || command.CustomerId is null
             || command.CustomerId.Value <= 0)
         {

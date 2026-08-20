@@ -41,9 +41,16 @@ public sealed class CustomerCommandHandlers
         if (request.OperationId == Guid.Empty)
             return Result<CustomerDetailView>.Failure(CustomerApplicationErrors.InvalidOperationId);
         var created = await customers.CreateAsync(request, cancellationToken);
-        if (created.IsSuccess && request.CreditAllowed && audit is not null)
+        if (created.IsSuccess && audit is not null)
+        {
             await audit.RecordSuccessAsync("customers", "Customer", created.Value.CustomerId.ToString(),
-                "credit.allow", request.OperationId, cancellationToken);
+                "customer.create", request.OperationId, cancellationToken);
+            if (request.CreditAllowed)
+            {
+                await audit.RecordSuccessAsync("customers", "Customer", created.Value.CustomerId.ToString(),
+                    "credit.allow", request.OperationId, cancellationToken);
+            }
+        }
         return created;
     }
 
@@ -56,8 +63,12 @@ public sealed class CustomerCommandHandlers
         if (denied is not null) return denied;
         var updated = await customers.UpdateAsync(request, cancellationToken);
         if (updated.IsSuccess && audit is not null)
+        {
+            await audit.RecordSuccessAsync("customers", "Customer", updated.Value.CustomerId.ToString(),
+                "customer.update", null, cancellationToken);
             await audit.RecordSuccessAsync("customers", "Customer", updated.Value.CustomerId.ToString(),
                 request.CreditAllowed ? "credit.allow" : "credit.disallow", null, cancellationToken);
+        }
         return updated;
     }
 
@@ -70,6 +81,16 @@ public sealed class CustomerCommandHandlers
         if (denied is not null) return denied;
         if (request.OperationId == Guid.Empty)
             return Result<CustomerDetailView>.Failure(CustomerApplicationErrors.InvalidOperationId);
+        if (request.CustomerId <= 0
+            || request.Amount <= 0m
+            || !Enum.IsDefined(request.PaymentMethod)
+            || request.PaymentMethod == Application.Sales.Models.SalePaymentMethod.Cash
+                && request.ExternalCardConfirmed
+            || request.PaymentMethod == Application.Sales.Models.SalePaymentMethod.ExternalCard
+                && !request.ExternalCardConfirmed)
+        {
+            return Result<CustomerDetailView>.Failure(CustomerApplicationErrors.InvalidCreditPayment);
+        }
         var payment = await creditPayments.RegisterPaymentAsync(request, cancellationToken);
         if (payment.IsSuccess && audit is not null)
             await audit.RecordSuccessAsync("customers", "Customer", payment.Value.CustomerId.ToString(),

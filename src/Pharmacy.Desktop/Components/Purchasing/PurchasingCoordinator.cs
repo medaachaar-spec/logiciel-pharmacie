@@ -13,6 +13,7 @@ public sealed class PurchasingCoordinator
     private readonly PurchasingQueryHandlers queries;
     private readonly PurchasingCommandHandlers commands;
     private readonly InventoryQueryHandlers inventory;
+    private int operationInProgress;
 
     public PurchasingCoordinator(PurchasingQueryHandlers queries, PurchasingCommandHandlers commands, InventoryQueryHandlers inventory)
     {
@@ -27,7 +28,7 @@ public sealed class PurchasingCoordinator
     public SupplierView? SelectedSupplier { get; private set; }
     public PurchaseOrderView? SelectedOrder { get; private set; }
     public GoodsReceiptView? SelectedReceipt { get; private set; }
-    public bool IsBusy { get; private set; }
+    public bool IsBusy => Volatile.Read(ref operationInProgress) != 0;
     public string? Message { get; private set; }
     public string? ErrorCode { get; private set; }
 
@@ -82,6 +83,6 @@ public sealed class PurchasingCoordinator
     private void ReplaceOrder(PurchaseOrderView value) => Orders = Orders.Select(x => x.OrderId == value.OrderId ? value : x).ToArray();
     private bool Apply<T>(Result<T> result) { if (result.IsSuccess) return true; SetError(result.Error); return false; }
     private void SetError(Error error) { ErrorCode = error.Code; Message = error.Code switch { "purchasing.receipt.database_unavailable" => "SQL Purchasing est indisponible. Aucun fallback synthétique n’est utilisé.", "purchasing.supplier.concurrency_conflict" or "purchasing.order.concurrency_conflict" or "purchasing.receipt.concurrency_conflict" => "Les données ont changé. Rechargez avant de recommencer.", "purchasing.receipt.duplicate_delivery_note" => "Ce numéro de bon de livraison existe déjà pour ce fournisseur.", "purchasing.receipt.quantity_exceeds_order" => "La quantité dépasse le reliquat de la commande. Aucune écriture n’a été conservée.", "purchasing.receipt.operation_conflict" => "Cette opération a déjà été utilisée avec un contenu différent.", "purchasing.receipt.invalid_lot" => "Le lot est absent ou incompatible avec le produit.", "purchasing.receipt.invalid_expiry" => "La péremption est requise et doit être valide à la réception.", _ => error.Message }; }
-    private async Task RunAsync(Func<Task> action) { if (IsBusy) return; IsBusy = true; ErrorCode = null; Message = null; try { await action(); } finally { IsBusy = false; } }
+    private async Task RunAsync(Func<Task> action) { if (Interlocked.CompareExchange(ref operationInProgress, 1, 0) != 0) return; ErrorCode = null; Message = null; try { await action(); } finally { Interlocked.Exchange(ref operationInProgress, 0); } }
     private Task MutateAsync<T>(Func<Task<Result<T>>> action, Func<T, Task> success) => RunAsync(async () => { var result = await action(); if (!Apply(result)) return; await success(result.Value); });
 }

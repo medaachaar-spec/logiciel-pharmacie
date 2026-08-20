@@ -3,6 +3,9 @@ using Pharmacy.Application.Security.Models;
 using Pharmacy.Application.Security.Services;
 using Pharmacy.Domain.Security;
 using Pharmacy.Application.Security.Contracts;
+using Pharmacy.Application.Inventory.Commands;
+using Pharmacy.Application.Inventory.Contracts;
+using Pharmacy.Application.Inventory.Models;
 using Pharmacy.Application.Sales.Contracts;
 using Pharmacy.Application.Sales.Finalization.Commands;
 using Pharmacy.Application.Sales.Models;
@@ -25,6 +28,17 @@ public sealed class SecurityCoreTests
         Assert.Equal("OWNER.LOCAL", LocalSecurityRules.NormalizeLogin(" owner.local "));
         Assert.Equal(5, LocalSecurityRules.MaximumFailedLoginCount);
         Assert.Equal(TimeSpan.FromMinutes(5), LocalSecurityRules.AccountLockoutDuration);
+    }
+
+    [Fact]
+    public void LocalRoleCodesAreNormalizedAndStrictlyValidated()
+    {
+        Assert.Equal("ROLE-QA-LIMITE", LocalSecurityRules.NormalizeRoleCode(" role-qa-limite "));
+        Assert.True(LocalSecurityRules.IsRoleCodeValid("ROLE-QA.LIMITE_2"));
+        Assert.False(LocalSecurityRules.IsRoleCodeValid("2-ROLE"));
+        Assert.False(LocalSecurityRules.IsRoleCodeValid("ROLE QA"));
+        Assert.False(LocalSecurityRules.IsRoleCodeValid(new string('R', LocalSecurityRules.MaximumRoleCodeLength + 1)));
+        Assert.True(LocalSecurityRules.IsRoleNameValid("QA limité"));
     }
 
     [Fact]
@@ -69,6 +83,28 @@ public sealed class SecurityCoreTests
         Assert.Equal("security.authorization.reauthentication_required", result.Error.Code);
     }
 
+    [Fact]
+    public async Task LimitedUserIsDeniedByDirectInventoryBackendCalls()
+    {
+        var session = new CurrentSecuritySession();
+        session.Establish(User(
+            SecurityPermissions.SalesCreate,
+            SecurityPermissions.CatalogView,
+            SecurityPermissions.InventoryView), Now);
+        var authorizer = new PermissionAuthorizer(session, new FixedClock(Now));
+        var handlers = new InventoryCommandHandlers(new NeverCalledInventoryStore(), new FixedInventoryDate(), authorizer);
+
+        var adjust = await handlers.CreateLocationAsync(
+            new CreateStockLocationCommand(Guid.NewGuid(), "QA", "QA"),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal("security.authorization.denied", adjust.Error.Code);
+        Assert.Equal("security.authorization.denied", authorizer.Authorize(SecurityPermissions.InventoryFinalizeCount, true).Error.Code);
+        Assert.Equal("security.authorization.denied", authorizer.Authorize(SecurityPermissions.ReportsView).Error.Code);
+        Assert.Equal("security.authorization.denied", authorizer.Authorize(SecurityPermissions.SecurityManageUsers).Error.Code);
+        Assert.Equal("security.authorization.denied", authorizer.Authorize(SecurityPermissions.SecurityManageRoles).Error.Code);
+    }
+
     private static UserSessionView User(params string[] permissions) => new(
         1, "owner", "Propriétaire", new[] { "OWNER" }, permissions.ToHashSet(StringComparer.Ordinal),
         Now.AddMinutes(-6), Now.AddMinutes(-6));
@@ -82,6 +118,26 @@ public sealed class SecurityCoreTests
     {
         public Task<Result<SaleReturnView>> ReturnAsync(ReturnSaleRequest request, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("Le store ne doit pas être appelé après un refus RBAC.");
+    }
+
+    private sealed class FixedInventoryDate : IInventoryDateProvider
+    {
+        public DateOnly CurrentDate { get; } = new(2026, 8, 10);
+    }
+
+    private sealed class NeverCalledInventoryStore : IInventoryStore
+    {
+        private static Task<Result<T>> Unexpected<T>() => throw new InvalidOperationException("Le store ne doit pas être appelé après un refus RBAC.");
+
+        public Task<Result<StockLocationView>> CreateLocationAsync(CreateStockLocationCommand command, CancellationToken cancellationToken = default) => Unexpected<StockLocationView>();
+        public Task<Result<StockLocationView>> SetLocationActivationAsync(SetStockLocationActivationCommand command, CancellationToken cancellationToken = default) => Unexpected<StockLocationView>();
+        public Task<Result<StockBatchView>> CreateBatchAsync(CreateStockBatchCommand command, DateOnly currentDate, CancellationToken cancellationToken = default) => Unexpected<StockBatchView>();
+        public Task<Result<StockMovementView>> RecordMovementAsync(RecordStockMovementCommand command, DateOnly currentDate, CancellationToken cancellationToken = default) => Unexpected<StockMovementView>();
+        public Task<Result<InventorySessionView>> CreateSessionAsync(CreateInventorySessionCommand command, CancellationToken cancellationToken = default) => Unexpected<InventorySessionView>();
+        public Task<Result<InventorySessionView>> StartSessionAsync(StartInventorySessionCommand command, CancellationToken cancellationToken = default) => Unexpected<InventorySessionView>();
+        public Task<Result<InventorySessionView>> SaveCountLineAsync(SaveInventoryCountLineCommand command, CancellationToken cancellationToken = default) => Unexpected<InventorySessionView>();
+        public Task<Result<InventorySessionView>> FinalizeSessionAsync(FinalizeInventorySessionCommand command, CancellationToken cancellationToken = default) => Unexpected<InventorySessionView>();
+        public Task<Result<InventorySessionView>> CancelSessionAsync(CancelInventorySessionCommand command, CancellationToken cancellationToken = default) => Unexpected<InventorySessionView>();
     }
 
     private sealed class NoOpAuditRecorder : IBusinessAuditRecorder

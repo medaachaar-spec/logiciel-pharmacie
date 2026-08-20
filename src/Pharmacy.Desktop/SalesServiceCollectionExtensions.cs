@@ -13,6 +13,7 @@ using Pharmacy.Application.Sales.Drafts.Commands;
 using Pharmacy.Application.Sales.Drafts.Queries;
 using Pharmacy.Application.Sales.Finalization.Commands;
 using Pharmacy.Application.Sales.Finalization.Queries;
+using Pharmacy.Application.Sales.Suspensions;
 using Pharmacy.Desktop.Components.Pos;
 using Pharmacy.Desktop.Components.Catalog;
 using Pharmacy.Desktop.Components.Customers;
@@ -34,11 +35,11 @@ namespace Pharmacy.Desktop;
 
 public static class SalesServiceCollectionExtensions
 {
-    public static IServiceCollection AddCatalogBackedSales(this IServiceCollection services)
+    public static IServiceCollection AddCatalogBackedSales(this IServiceCollection services, string? databaseEndpoint = null)
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.AddSqlCatalogAdaptersFromEnvironment();
+        services.AddSqlCatalogAdapters(databaseEndpoint);
         services.AddSqlInventoryAdapters();
         services.AddSqlPurchasingAdapters();
         services.AddSqlSalesAdapters();
@@ -58,11 +59,14 @@ public static class SalesServiceCollectionExtensions
         services.AddTransient<ChangeSaleItemQuantityHandler>();
         services.AddTransient<RemoveSaleItemHandler>();
         services.AddTransient<ClearSaleDraftHandler>();
+        services.AddTransient<RestoreSuspendedSaleDraftHandler>();
         services.AddTransient<PrepareSaleFinalizationHandler>();
         services.AddTransient<FinalizeSaleHandler>();
         services.AddTransient<GetSaleByIdHandler>();
         services.AddTransient<GetRecentSalesHandler>();
+        services.AddTransient<GetSaleReturnPreparationHandler>();
         services.AddTransient<ReturnSaleHandler>();
+        services.AddTransient<SuspendedSaleWorkflow>();
 
         services.AddTransient<SearchCatalogProductsHandler>();
         services.AddTransient<GetCatalogProductByIdHandler>();
@@ -87,6 +91,7 @@ public static class SalesServiceCollectionExtensions
 
         services.AddScoped<DemoTicketPrintService>();
         services.AddScoped<SalesPosCoordinator>();
+        services.AddScoped<SalesReturnCoordinator>();
         services.AddScoped<CatalogCoordinator>();
         services.AddScoped<InventoryCoordinator>();
         services.AddScoped<PurchasingCoordinator>();

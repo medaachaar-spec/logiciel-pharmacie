@@ -159,6 +159,7 @@ public sealed class UiFoundationTests
             ["Pharmacy.Application"] = new[] { "Pharmacy.Domain" },
             ["Pharmacy.Infrastructure"] = new[] { "Pharmacy.Application", "Pharmacy.Domain" },
             ["Pharmacy.Desktop"] = new[] { "Pharmacy.Application", "Pharmacy.Infrastructure" },
+            ["Pharmacy.Deployment"] = new[] { "Pharmacy.Infrastructure" },
             ["Pharmacy.UnitTests"] = new[] { "Pharmacy.Application", "Pharmacy.Domain" },
             ["Pharmacy.IntegrationTests"] = new[]
             {

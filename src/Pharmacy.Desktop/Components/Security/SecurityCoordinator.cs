@@ -3,6 +3,14 @@ using Pharmacy.Application.Security.Models;
 
 namespace Pharmacy.Desktop.Components.Security;
 
+public enum SecurityEntryMode
+{
+    Checking,
+    BootstrapRequired,
+    LoginRequired,
+    Unavailable
+}
+
 public sealed class SecurityCoordinator
 {
     private readonly IAuthenticationService authentication;
@@ -10,6 +18,7 @@ public sealed class SecurityCoordinator
     private readonly ISecurityAdministrationService administration;
     private readonly IAuditReader auditReader;
     private readonly ICurrentSecuritySession session;
+    private int operationInProgress;
 
     public SecurityCoordinator(
         IAuthenticationService authentication,
@@ -25,34 +34,70 @@ public sealed class SecurityCoordinator
         this.session = session;
     }
 
-    public bool IsInitialized { get; private set; }
-    public bool RequiresBootstrap { get; private set; }
+    public SecurityEntryMode EntryMode { get; private set; } = SecurityEntryMode.Checking;
+    public bool IsInitialized => EntryMode != SecurityEntryMode.Checking;
+    public bool RequiresBootstrap => EntryMode == SecurityEntryMode.BootstrapRequired;
+    public bool IsUnavailable => EntryMode == SecurityEntryMode.Unavailable;
     public bool IsBusy { get; private set; }
     public bool MustChangePassword { get; private set; }
     public string? Message { get; private set; }
     public IReadOnlyList<string> RecoveryCodes { get; private set; } = Array.Empty<string>();
     public IReadOnlyList<SecurityUserSummaryView> Users { get; private set; } = Array.Empty<SecurityUserSummaryView>();
     public IReadOnlyList<SecurityRoleView> Roles { get; private set; } = Array.Empty<SecurityRoleView>();
+    public IReadOnlyList<SecurityPermissionView> Permissions { get; private set; } = Array.Empty<SecurityPermissionView>();
     public IReadOnlyList<AuditEventView> AuditEvents { get; private set; } = Array.Empty<AuditEventView>();
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        if (IsInitialized) return;
+        if (EntryMode != SecurityEntryMode.Checking) return;
+        await DetectEntryModeAsync(cancellationToken);
+    }
+
+    public async Task RetryInitializationAsync(CancellationToken cancellationToken = default)
+    {
+        if (!IsUnavailable) return;
+        await RunAsync(async () =>
+        {
+            EntryMode = SecurityEntryMode.Checking;
+            await DetectEntryModeAsync(cancellationToken);
+        });
+    }
+
+    private async Task DetectEntryModeAsync(CancellationToken cancellationToken)
+    {
         var result = await authentication.HasUsersAsync(cancellationToken);
-        RequiresBootstrap = result.IsSuccess && !result.Value;
-        Message = result.IsFailure ? result.Error.Message : null;
-        IsInitialized = true;
+        if (result.IsFailure)
+        {
+            EntryMode = SecurityEntryMode.Unavailable;
+            Message = result.Error.Message;
+            return;
+        }
+
+        EntryMode = result.Value
+            ? SecurityEntryMode.LoginRequired
+            : SecurityEntryMode.BootstrapRequired;
+        Message = null;
     }
 
     public async Task BootstrapAsync(string login, string displayName, string password, CancellationToken cancellationToken = default)
     {
+        if (!RequiresBootstrap) return;
         await RunAsync(async () =>
         {
+            if (!RequiresBootstrap) return;
             var result = await bootstrap.BootstrapOwnerAsync(
                 new BootstrapOwnerRequest(Guid.NewGuid(), login, displayName, password), cancellationToken);
-            if (result.IsFailure) { Message = result.Error.Message; return; }
+            if (result.IsFailure)
+            {
+                if (result.Error.Code == "security.bootstrap.already_completed")
+                {
+                    await DetectEntryModeAsync(cancellationToken);
+                }
+                Message = result.Error.Message;
+                return;
+            }
             RecoveryCodes = result.Value.Codes;
-            RequiresBootstrap = false;
+            EntryMode = SecurityEntryMode.LoginRequired;
             Message = "Compte propriétaire créé. Conservez les codes hors de l’application puis connectez-vous.";
         });
     }
@@ -125,10 +170,13 @@ public sealed class SecurityCoordinator
         {
             var users = await administration.GetUsersAsync(cancellationToken);
             var roles = await administration.GetRolesAsync(cancellationToken);
+            var permissions = await administration.GetPermissionsAsync(cancellationToken);
             if (users.IsFailure) { Message = users.Error.Message; return; }
             if (roles.IsFailure) { Message = roles.Error.Message; return; }
+            if (permissions.IsFailure) { Message = permissions.Error.Message; return; }
             Users = users.Value;
             Roles = roles.Value;
+            Permissions = permissions.Value;
         });
     }
 
@@ -194,19 +242,64 @@ public sealed class SecurityCoordinator
         });
     }
 
+    public async Task<bool> CreateRoleAsync(
+        string code,
+        string name,
+        IReadOnlyList<long> permissionIds,
+        CancellationToken cancellationToken = default)
+    {
+        var succeeded = false;
+        await RunAsync(async () =>
+        {
+            var result = await administration.CreateRoleAsync(
+                new CreateSecurityRoleRequest(Guid.NewGuid(), code, name, permissionIds), cancellationToken);
+            if (result.IsFailure) { Message = result.Error.Message; return; }
+            Message = $"Rôle {result.Value.Code} créé avec {result.Value.Permissions.Count} permission(s).";
+            await RefreshAdministrationCoreAsync(cancellationToken);
+            succeeded = true;
+        });
+        return succeeded;
+    }
+
+    public async Task<bool> UpdateRoleAsync(
+        SecurityRoleView role,
+        string name,
+        IReadOnlyList<long> permissionIds,
+        CancellationToken cancellationToken = default)
+    {
+        var succeeded = false;
+        await RunAsync(async () =>
+        {
+            var result = await administration.UpdateRoleAsync(
+                new UpdateSecurityRoleRequest(Guid.NewGuid(), role.RoleId, name, permissionIds, role.RowVersion), cancellationToken);
+            if (result.IsFailure) { Message = result.Error.Message; return; }
+            Message = $"Rôle {result.Value.Code} mis à jour avec {result.Value.Permissions.Count} permission(s).";
+            await RefreshAdministrationCoreAsync(cancellationToken);
+            succeeded = true;
+        });
+        return succeeded;
+    }
+
     private async Task RefreshAdministrationCoreAsync(CancellationToken cancellationToken)
     {
         var users = await administration.GetUsersAsync(cancellationToken);
         var roles = await administration.GetRolesAsync(cancellationToken);
+        var permissions = await administration.GetPermissionsAsync(cancellationToken);
         if (users.IsSuccess) Users = users.Value;
         if (roles.IsSuccess) Roles = roles.Value;
+        if (permissions.IsSuccess) Permissions = permissions.Value;
     }
 
     private async Task RunAsync(Func<Task> operation)
     {
+        if (Interlocked.CompareExchange(ref operationInProgress, 1, 0) != 0) return;
         IsBusy = true;
         Message = null;
         try { await operation(); }
-        finally { IsBusy = false; }
+        finally
+        {
+            IsBusy = false;
+            Interlocked.Exchange(ref operationInProgress, 0);
+        }
     }
 }

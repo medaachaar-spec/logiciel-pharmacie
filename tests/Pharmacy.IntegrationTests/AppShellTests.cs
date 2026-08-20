@@ -188,7 +188,7 @@ public sealed class AppShellTests
         var source = DesktopText("Components", "Layout", "AppStatusBar.razor");
 
         Assert.Contains("Local", source, StringComparison.Ordinal);
-        Assert.Contains("Données de démonstration", source, StringComparison.Ordinal);
+        Assert.Contains("Version @ReleaseVersion", source, StringComparison.Ordinal);
         Assert.Contains("Catalogue SQL : voir Diagnostic", source, StringComparison.Ordinal);
         Assert.Contains("BuildConfiguration", source, StringComparison.Ordinal);
         Assert.Contains("Shell : prêt pour revue", source, StringComparison.Ordinal);

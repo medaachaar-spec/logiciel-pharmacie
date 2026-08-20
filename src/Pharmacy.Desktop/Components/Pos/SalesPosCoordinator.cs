@@ -8,6 +8,7 @@ using Pharmacy.Application.Sales.Drafts.Queries;
 using Pharmacy.Application.Sales.Finalization.Commands;
 using Pharmacy.Application.Sales.Finalization.Queries;
 using Pharmacy.Application.Sales.Models;
+using Pharmacy.Application.Sales.Suspensions;
 using Pharmacy.Domain.Common;
 using Pharmacy.Domain.Sales;
 
@@ -16,20 +17,37 @@ namespace Pharmacy.Desktop.Components.Pos;
 public sealed class SalesPosSuspendedDraft
 {
     public SalesPosSuspendedDraft(
-        string reference,
-        DateTimeOffset suspendedAtLocal,
-        SaleDraftView draft)
+        SuspendedSaleSummaryView suspension)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(reference);
-        ArgumentNullException.ThrowIfNull(draft);
-
-        Reference = reference;
-        SuspendedAtLocal = suspendedAtLocal;
-        Lines = Array.AsReadOnly(draft.Lines.ToArray());
-        LineCount = draft.LineCount;
-        TotalQuantity = draft.TotalQuantity;
-        Total = draft.Total;
+        ArgumentNullException.ThrowIfNull(suspension);
+        SuspendedSaleId = suspension.SuspendedSaleId;
+        OperationId = suspension.OperationId;
+        CustomerId = suspension.CustomerId;
+        CustomerName = suspension.CustomerName;
+        Reference = suspension.Reference;
+        SuspendedAtLocal = new DateTimeOffset(
+            DateTime.SpecifyKind(suspension.SuspendedAtUtc, DateTimeKind.Utc)).ToLocalTime();
+        Lines = Array.AsReadOnly(suspension.Lines.Select(line => new SaleDraftLineView(
+            line.ProductId,
+            line.ProductReference,
+            line.ProductName,
+            line.Presentation,
+            line.UnitPrice,
+            line.Quantity,
+            line.LineTotal)).ToArray());
+        LineCount = suspension.LineCount;
+        TotalQuantity = suspension.Lines.Sum(line => (long)line.Quantity.Value);
+        Total = suspension.Total;
+        RowVersion = suspension.RowVersion.ToArray();
     }
+
+    public long SuspendedSaleId { get; }
+
+    public Guid OperationId { get; }
+
+    public long? CustomerId { get; }
+
+    public string? CustomerName { get; }
 
     public string Reference { get; }
 
@@ -42,6 +60,8 @@ public sealed class SalesPosSuspendedDraft
     public long TotalQuantity { get; }
 
     public Money Total { get; }
+
+    public byte[] RowVersion { get; }
 }
 
 public sealed class SalesPosCompletedSale
@@ -98,9 +118,11 @@ public sealed class SalesPosCoordinator
     private readonly RemoveSaleItemHandler removeItemHandler;
     private readonly ClearSaleDraftHandler clearDraftHandler;
     private readonly GetSaleDraftHandler getDraftHandler;
+    private readonly RestoreSuspendedSaleDraftHandler restoreSuspendedDraftHandler;
     private readonly FinalizeSaleHandler finalizeSaleHandler;
     private readonly GetRecentSalesHandler getRecentSalesHandler;
     private readonly DemoTicketPrintService ticketPrintService;
+    private readonly SuspendedSaleWorkflow suspendedSaleWorkflow;
     private readonly List<SalesPosSuspendedDraft> suspendedDrafts = new();
     private readonly ReadOnlyCollection<SalesPosSuspendedDraft> readOnlySuspendedDrafts;
     private readonly SemaphoreSlim continuityGate = new(1, 1);
@@ -108,11 +130,12 @@ public sealed class SalesPosCoordinator
     private IReadOnlyList<FinalizedSaleSummaryView> recentSales = Array.Empty<FinalizedSaleSummaryView>();
     private int cartMutationInProgress;
     private int searchSequence;
-    private int suspensionCounter;
     private bool initialized;
     private bool completionInProgress;
     private bool hasPreparedNextDraft;
     private Guid pendingOperationId;
+    private Guid pendingSuspensionOperationId;
+    private SalesPosSuspendedDraft? activeSuspension;
 
     public SalesPosCoordinator(
         CreateSaleDraftHandler createDraftHandler,
@@ -123,9 +146,11 @@ public sealed class SalesPosCoordinator
         RemoveSaleItemHandler removeItemHandler,
         ClearSaleDraftHandler clearDraftHandler,
         GetSaleDraftHandler getDraftHandler,
+        RestoreSuspendedSaleDraftHandler restoreSuspendedDraftHandler,
         FinalizeSaleHandler finalizeSaleHandler,
         GetRecentSalesHandler getRecentSalesHandler,
-        DemoTicketPrintService ticketPrintService)
+        DemoTicketPrintService ticketPrintService,
+        SuspendedSaleWorkflow suspendedSaleWorkflow)
     {
         this.createDraftHandler = createDraftHandler ?? throw new ArgumentNullException(nameof(createDraftHandler));
         this.searchProductsHandler = searchProductsHandler ?? throw new ArgumentNullException(nameof(searchProductsHandler));
@@ -135,9 +160,13 @@ public sealed class SalesPosCoordinator
         this.removeItemHandler = removeItemHandler ?? throw new ArgumentNullException(nameof(removeItemHandler));
         this.clearDraftHandler = clearDraftHandler ?? throw new ArgumentNullException(nameof(clearDraftHandler));
         this.getDraftHandler = getDraftHandler ?? throw new ArgumentNullException(nameof(getDraftHandler));
+        this.restoreSuspendedDraftHandler = restoreSuspendedDraftHandler
+            ?? throw new ArgumentNullException(nameof(restoreSuspendedDraftHandler));
         this.finalizeSaleHandler = finalizeSaleHandler ?? throw new ArgumentNullException(nameof(finalizeSaleHandler));
         this.getRecentSalesHandler = getRecentSalesHandler ?? throw new ArgumentNullException(nameof(getRecentSalesHandler));
         this.ticketPrintService = ticketPrintService ?? throw new ArgumentNullException(nameof(ticketPrintService));
+        this.suspendedSaleWorkflow = suspendedSaleWorkflow
+            ?? throw new ArgumentNullException(nameof(suspendedSaleWorkflow));
         readOnlySuspendedDrafts = suspendedDrafts.AsReadOnly();
     }
 
@@ -206,6 +235,7 @@ public sealed class SalesPosCoordinator
     public bool HasDraft => Step != DemoPosStep.Success && CurrentDraft?.IsEmpty == false;
 
     public bool CanSuspend => HasDraft
+        && activeSuspension is null
         && !completionInProgress
         && !IsCartMutationInProgress
         && !IsContinuityActionInProgress;
@@ -254,8 +284,13 @@ public sealed class SalesPosCoordinator
                 return false;
             }
 
+            if (!await LoadSuspendedSalesCoreAsync(cancellationToken))
+            {
+                return false;
+            }
+
             initialized = true;
-            Trace.TraceInformation("Sales POS initialized with SQL catalog, inventory and persistent sales history.");
+            Trace.TraceInformation("Sales POS initialized with SQL catalog, inventory, sales history and suspended sales.");
             return true;
         }
         catch (OperationCanceledException)
@@ -547,24 +582,49 @@ public sealed class SalesPosCoordinator
                 return false;
             }
 
+            if (activeSuspension is not null)
+            {
+                UserMessage = "Cette vente est déjà persistée comme suspension. Finalisez-la ou abandonnez-la avant d’en reprendre une autre.";
+                return false;
+            }
+
             var snapshot = CurrentDraft;
             var nextDraft = await createDraftHandler.HandleAsync(cancellationToken);
-
             if (nextDraft.IsFailure)
             {
                 return await HandleFailureAsync(nextDraft.Error, null, cancellationToken);
             }
 
-            suspensionCounter++;
-            var suspension = new SalesPosSuspendedDraft(
-                $"DEMO-HOLD-{suspensionCounter:0000}",
-                DateTimeOffset.Now,
-                snapshot);
+            pendingSuspensionOperationId = pendingSuspensionOperationId == Guid.Empty
+                ? Guid.NewGuid()
+                : pendingSuspensionOperationId;
+            var persisted = await suspendedSaleWorkflow.SuspendAsync(
+                new SuspendSaleRequest(
+                    pendingSuspensionOperationId,
+                    CreditCustomerId,
+                    snapshot.Lines.Select(line => new SuspendSaleLineRequest(
+                        line.ProductId.Value,
+                        line.Reference.Value,
+                        line.DisplayName,
+                        line.Presentation,
+                        line.UnitPrice.Amount,
+                        line.Quantity.Value)).ToArray()),
+                cancellationToken);
+            if (persisted.IsFailure)
+            {
+                ApplyFailure(persisted.Error);
+                return false;
+            }
+
+            var suspension = new SalesPosSuspendedDraft(persisted.Value);
+            suspendedDrafts.RemoveAll(candidate => candidate.SuspendedSaleId == suspension.SuspendedSaleId);
             suspendedDrafts.Insert(0, suspension);
             CurrentDraft = nextDraft.Value;
+            activeSuspension = null;
+            pendingSuspensionOperationId = Guid.Empty;
             ResetDraftPresentationState();
-            UserMessage = $"Vente suspendue sous {suspension.Reference}. Temporaire en mémoire : elle disparaîtra à la fermeture.";
-            Trace.TraceInformation("Sales POS draft suspended in desktop memory.");
+            UserMessage = $"Vente suspendue sous {suspension.Reference}. Elle restera disponible après redémarrage.";
+            Trace.TraceInformation("Sales POS draft suspended in SQL persistence.");
             return true;
         }
         catch (OperationCanceledException)
@@ -603,6 +663,11 @@ public sealed class SalesPosCoordinator
                 return false;
             }
 
+            if (!await LoadSuspendedSalesCoreAsync(cancellationToken))
+            {
+                return false;
+            }
+
             var suspension = suspendedDrafts.FirstOrDefault(candidate =>
                 string.Equals(candidate.Reference, reference, StringComparison.Ordinal));
 
@@ -612,39 +677,17 @@ public sealed class SalesPosCoordinator
                 return false;
             }
 
-            var created = await createDraftHandler.HandleAsync(cancellationToken);
-
-            if (created.IsFailure)
+            var restoredResult = await restoreSuspendedDraftHandler.HandleAsync(
+                ToApplicationView(suspension),
+                cancellationToken);
+            if (restoredResult.IsFailure)
             {
-                return await HandleFailureAsync(created.Error, null, cancellationToken);
+                Trace.TraceWarning("Sales POS suspension restoration failed; the SQL suspension was retained.");
+                return await HandleFailureAsync(restoredResult.Error, null, cancellationToken);
             }
 
-            var restored = created.Value;
-
-            foreach (var line in suspension.Lines)
-            {
-                var added = await addProductHandler.HandleAsync(
-                    new AddProductToSaleDraftCommand(
-                        restored.Id,
-                        SellableProductLookup.ByProductId(line.ProductId),
-                        line.Quantity,
-                        restored.Version),
-                    cancellationToken);
-
-                if (added.IsFailure)
-                {
-                    Trace.TraceWarning("Sales POS suspension restoration failed; the desktop snapshot was retained.");
-                    return await HandleFailureAsync(
-                        added.Error,
-                        line.DisplayName,
-                        cancellationToken,
-                        line.Quantity.Value);
-                }
-
-                restored = added.Value;
-            }
-
-            CurrentDraft = restored;
+            CurrentDraft = restoredResult.Value;
+            activeSuspension = suspension;
             suspendedDrafts.Remove(suspension);
             ResetDraftPresentationState();
             UserMessage = $"Vente suspendue {reference} reprise. Le paiement doit être choisi à nouveau.";
@@ -667,6 +710,29 @@ public sealed class SalesPosCoordinator
     public async Task<bool> AbandonCurrentDraftAsync(CancellationToken cancellationToken = default)
     {
         var success = await ClearAsync(cancellationToken);
+
+        if (!success)
+        {
+            return false;
+        }
+
+        if (activeSuspension is not null)
+        {
+            var abandoned = await suspendedSaleWorkflow.AbandonAsync(
+                Guid.NewGuid(),
+                activeSuspension.SuspendedSaleId,
+                activeSuspension.RowVersion,
+                cancellationToken);
+            if (abandoned.IsFailure)
+            {
+                ApplyFailure(abandoned.Error);
+                await LoadSuspendedSalesCoreAsync(cancellationToken, preserveFeedback: true);
+                return false;
+            }
+
+            activeSuspension = null;
+            await LoadSuspendedSalesCoreAsync(cancellationToken, preserveFeedback: true);
+        }
 
         if (success)
         {
@@ -704,17 +770,53 @@ public sealed class SalesPosCoordinator
         }
     }
 
-    public bool DeleteSuspended(string reference)
+    public async Task<bool> AbandonSuspendedDraftAsync(
+        string reference,
+        CancellationToken cancellationToken = default)
     {
-        if (IsContinuityActionInProgress)
+        ArgumentException.ThrowIfNullOrWhiteSpace(reference);
+        if (!await continuityGate.WaitAsync(0, cancellationToken))
         {
+            ApplyBusyMessage();
             return false;
         }
 
-        var suspension = suspendedDrafts.FirstOrDefault(candidate =>
-            string.Equals(candidate.Reference, reference, StringComparison.Ordinal));
+        ClearFeedback();
+        try
+        {
+            if (!await LoadSuspendedSalesCoreAsync(cancellationToken))
+            {
+                return false;
+            }
 
-        return suspension is not null && suspendedDrafts.Remove(suspension);
+            var suspension = suspendedDrafts.FirstOrDefault(candidate =>
+                string.Equals(candidate.Reference, reference, StringComparison.Ordinal));
+            if (suspension is null)
+            {
+                UserMessage = "La vente suspendue n’est plus disponible.";
+                return false;
+            }
+
+            var result = await suspendedSaleWorkflow.AbandonAsync(
+                Guid.NewGuid(),
+                suspension.SuspendedSaleId,
+                suspension.RowVersion,
+                cancellationToken);
+            if (result.IsFailure)
+            {
+                ApplyFailure(result.Error);
+                await LoadSuspendedSalesCoreAsync(cancellationToken, preserveFeedback: true);
+                return false;
+            }
+
+            suspendedDrafts.Remove(suspension);
+            UserMessage = $"Vente suspendue {reference} abandonnée. Aucune vente, aucun paiement et aucun mouvement de stock n’a été créé.";
+            return true;
+        }
+        finally
+        {
+            continuityGate.Release();
+        }
     }
 
     public bool BeginPayment()
@@ -767,7 +869,9 @@ public sealed class SalesPosCoordinator
 
     public bool SetCredit(long? customerId, decimal amount)
     {
-        if (amount < 0m || amount > Total || customerId is not null && customerId.Value <= 0)
+        if (amount < 0m
+            || amount > Total
+            || amount > 0m && (customerId is null || customerId.Value <= 0))
         {
             CreditCustomerId = null;
             CreditAmount = 0m;
@@ -863,7 +967,12 @@ public sealed class SalesPosCoordinator
                     ReceivedAmount,
                     CardPaymentStatus == DemoCardPaymentStatus.Confirmed,
                     CreditCustomerId,
-                    CreditAmount),
+                    CreditAmount,
+                    activeSuspension is null
+                        ? null
+                        : new SuspendedSaleCompletionRequest(
+                            activeSuspension.SuspendedSaleId,
+                            activeSuspension.RowVersion)),
                 cancellationToken);
 
             if (finalized.IsFailure)
@@ -874,11 +983,13 @@ public sealed class SalesPosCoordinator
             }
 
             Result = new SalesPosCompletedSale(finalized.Value);
+            activeSuspension = null;
             Step = DemoPosStep.Success;
             completionInProgress = false;
             ticketPrintService.PrepareForSale(Result.Reference);
             await PrepareNextDraftAsync(cancellationToken);
             await LoadRecentSalesCoreAsync(cancellationToken, preserveFeedback: true);
+            await LoadSuspendedSalesCoreAsync(cancellationToken, preserveFeedback: true);
             pendingOperationId = Guid.Empty;
             return true;
         }
@@ -932,6 +1043,38 @@ public sealed class SalesPosCoordinator
         LastErrorCode = null;
         UserMessage = null;
         AvailabilityIncident = null;
+    }
+
+    public async Task<bool> LoadSuspendedSalesAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await LoadSuspendedSalesCoreAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            return HandleUnexpectedFailure("suspended-sales-load", exception);
+        }
+    }
+
+    public async Task<bool> LoadRecentSalesAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await LoadRecentSalesCoreAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            return HandleUnexpectedFailure("recent-sales-load", exception);
+        }
     }
 
     public void ReportUnexpectedFailure(string operation, Exception exception)
@@ -1041,6 +1184,52 @@ public sealed class SalesPosCoordinator
 
         recentSales = Array.AsReadOnly(result.Value.ToArray());
         return true;
+    }
+
+    private async Task<bool> LoadSuspendedSalesCoreAsync(
+        CancellationToken cancellationToken,
+        bool preserveFeedback = false)
+    {
+        var result = await suspendedSaleWorkflow.GetOpenAsync(cancellationToken);
+        if (result.IsFailure)
+        {
+            if (!preserveFeedback)
+            {
+                ApplyFailure(result.Error);
+            }
+
+            return false;
+        }
+
+        suspendedDrafts.Clear();
+        suspendedDrafts.AddRange(result.Value
+            .Where(sale => activeSuspension is null
+                || sale.SuspendedSaleId != activeSuspension.SuspendedSaleId)
+            .Select(sale => new SalesPosSuspendedDraft(sale)));
+        return true;
+    }
+
+    private static SuspendedSaleSummaryView ToApplicationView(SalesPosSuspendedDraft suspension)
+    {
+        return new SuspendedSaleSummaryView(
+            suspension.SuspendedSaleId,
+            suspension.OperationId,
+            suspension.Reference,
+            suspension.CustomerId,
+            suspension.CustomerName,
+            suspension.Total,
+            suspension.LineCount,
+            suspension.SuspendedAtLocal.UtcDateTime,
+            "Open",
+            suspension.RowVersion,
+            Array.AsReadOnly(suspension.Lines.Select(line => new SuspendedSaleLineView(
+                line.ProductId,
+                line.Reference,
+                line.DisplayName,
+                line.Presentation,
+                line.UnitPrice,
+                line.Quantity,
+                line.Subtotal)).ToArray()));
     }
 
     private async Task<bool> StartNewDraftCoreAsync(CancellationToken cancellationToken)

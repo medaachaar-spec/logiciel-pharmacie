@@ -34,7 +34,7 @@ public sealed class CatalogArchitectureTests
             "src", "Pharmacy.Desktop", "SalesServiceCollectionExtensions.cs"));
 
         Assert.DoesNotContain("DbContext", desktop, StringComparison.Ordinal);
-        Assert.Contains("AddSqlCatalogAdaptersFromEnvironment", composition, StringComparison.Ordinal);
+        Assert.Contains("AddSqlCatalogAdapters(databaseEndpoint)", composition, StringComparison.Ordinal);
         Assert.Contains("AddSqlInventoryAdapters", composition, StringComparison.Ordinal);
         Assert.DoesNotContain("InMemoryProductCatalogReader", composition, StringComparison.Ordinal);
         Assert.DoesNotContain("SyntheticCatalogStockAvailabilityReader", composition, StringComparison.Ordinal);

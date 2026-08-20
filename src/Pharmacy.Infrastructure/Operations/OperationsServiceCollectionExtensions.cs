@@ -12,7 +12,7 @@ public static class OperationsServiceCollectionExtensions
         services.AddTransient<IBackupRecoveryService>(p => p.GetRequiredService<SqlBackupRecoveryService>());
         services.AddTransient<SqlControlledImportService>();
         services.AddTransient<IControlledImportService>(p => p.GetRequiredService<SqlControlledImportService>());
-        services.AddSingleton<IReceiptPrinter, SimulatedReceiptPrinter>();
+        services.AddScoped<IReceiptPrinter, SimulatedReceiptPrinter>();
         services.AddSingleton<IManualPaymentTerminal, ManualPaymentTerminal>();
         services.AddTransient<IDeviceDiagnostics, LocalDeviceDiagnostics>();
         return services;

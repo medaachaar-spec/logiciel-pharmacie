@@ -14,9 +14,9 @@
         </div>
     </header>
 
-    <UiAlert Title="Ventes SQL V0.1 — suspensions encore locales"
+    <UiAlert Title="Ventes SQL V0.1 — continuité de vente persistante"
              Variant="UiAlertVariant.Information">
-        Le panier reste en mémoire avant validation. Le commit SQL enregistre ensuite vente, paiement, allocations FEFO et sorties de stock dans une transaction unique. Les suspensions et l’impression restent locales au processus.
+        Le panier actif reste un brouillon local avant validation. Les suspensions sont persistées dans SQL Server; la finalisation enregistre ensuite vente, paiement, allocations FEFO, sorties de stock et clôture de la suspension dans une transaction unique.
     </UiAlert>
 
     @if (Session.IsInitializing)
@@ -116,10 +116,10 @@
                         {
                             <UiButton Variant="UiButtonVariant.Danger" OnClick="ConfirmAbandonAsync">Confirmer l’abandon</UiButton>
                         }
-                        else if (confirmationKind == ConfirmationKind.DeleteSuspended)
+                        else if (confirmationKind == ConfirmationKind.AbandonSuspended)
                         {
-                            <UiButton Variant="UiButtonVariant.Danger" OnClick="ConfirmDeleteSuspendedAsync">
-                                Confirmer la suppression
+                            <UiButton Variant="UiButtonVariant.Danger" OnClick="ConfirmAbandonSuspendedAsync">
+                                Confirmer l’abandon
                             </UiButton>
                         }
                         else if (confirmationKind == ConfirmationKind.ResolveCardConfirmed)
@@ -164,7 +164,7 @@
             <div id="demo-suspended-sales">
                 <DemoSuspendedSalesPanel Sales="Session.SuspendedDrafts"
                                          OnResume="ResumeSuspendedAsync"
-                                         OnDelete="RequestDeleteSuspendedAsync" />
+                                         OnAbandon="RequestAbandonSuspendedAsync" />
             </div>
         }
 
@@ -290,6 +290,7 @@
                                         <th>Total</th>
                                         <th>Paiement</th>
                                         <th>Statut</th>
+                                        <th>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -302,6 +303,13 @@
                                             <td>@DemoMoney.Format(sale.Total.Amount)</td>
                                             <td>@PaymentLabel(sale.PaymentMethod)</td>
                                             <td><UiBadge Text="Finalisée" Variant="UiBadgeVariant.Success" /></td>
+                                            <td>
+                                                <UiButton Size="UiButtonSize.Small"
+                                                          Variant="UiButtonVariant.Secondary"
+                                                          OnClick="@(_ => OpenReturnAsync(sale.SaleId))">
+                                                    Retour
+                                                </UiButton>
+                                            </td>
                                         </tr>
                                     }
                                 </tbody>
@@ -310,6 +318,13 @@
                     }
                 </div>
             </details>
+
+            @if (returnSaleId is not null)
+            {
+                <SaleReturnPanel SaleId="@returnSaleId.Value"
+                                 OnClose="CloseReturnAsync"
+                                 OnCompleted="HandleReturnCompletedAsync" />
+            }
         }
     }
 </div>
@@ -324,6 +339,7 @@
     private string? pendingSuspendedReference;
     private bool showSuspendedSales;
     private bool isCompleting;
+    private long? returnSaleId;
     private ConfirmationKind confirmationKind;
     private FocusTarget requestedFocus = FocusTarget.Search;
 
@@ -338,7 +354,7 @@
         ConfirmationKind.Suspend => "Suspendre la vente courante ?",
         ConfirmationKind.Clear => "Vider le panier ?",
         ConfirmationKind.Abandon => "Abandonner le brouillon ?",
-        ConfirmationKind.DeleteSuspended => $"Supprimer {pendingSuspendedReference} ?",
+        ConfirmationKind.AbandonSuspended => $"Abandonner {pendingSuspendedReference} ?",
         ConfirmationKind.ResumeConflict => "Un panier est déjà en cours",
         ConfirmationKind.ResolveCardConfirmed => "Confirmer le résultat du TPE ?",
         ConfirmationKind.ResolveCardNotCompleted => "Déclarer le paiement non réalisé ?",
@@ -349,13 +365,13 @@
     private string ConfirmationMessage => confirmationKind switch
     {
         ConfirmationKind.Suspend =>
-            "Un instantané Application immuable sera conservé en mémoire Desktop. Le paiement courant sera perdu et un nouveau brouillon Application sera créé.",
+            "Un instantané Application immuable sera persisté dans SQL Server sans modifier le stock. Le paiement courant sera réinitialisé et un nouveau brouillon Application sera créé.",
         ConfirmationKind.Clear =>
             "Toutes les lignes seront retirées via Application. Tout paiement incomplet sera réinitialisé.",
         ConfirmationKind.Abandon =>
             "Toutes les lignes et tout paiement incomplet du brouillon courant seront supprimés. Les suspensions existantes resteront disponibles.",
-        ConfirmationKind.DeleteSuspended =>
-            "Cette suspension en mémoire Desktop sera supprimée définitivement de la session de démonstration.",
+        ConfirmationKind.AbandonSuspended =>
+            "Cette suspension sera marquée abandonnée de façon traçable. Aucune vente, aucun paiement et aucun mouvement de stock ne sera créé.",
         ConfirmationKind.ResumeConflict =>
             $"La reprise de {pendingSuspendedReference} ne doit pas écraser le panier courant. Choisissez explicitement de le suspendre ou de l’abandonner.",
         ConfirmationKind.ResolveCardConfirmed =>
@@ -558,10 +574,15 @@
         }
     }
 
-    private Task ToggleSuspendedSalesAsync(MouseEventArgs _)
+    private async Task ToggleSuspendedSalesAsync(MouseEventArgs _)
     {
         showSuspendedSales = !showSuspendedSales;
-        return InvokeAsync(StateHasChanged);
+        if (showSuspendedSales)
+        {
+            await Session.LoadSuspendedSalesAsync(CancellationToken);
+        }
+
+        await InvokeAsync(StateHasChanged);
     }
 
     private Task ResumeSuspendedAsync(string reference)
@@ -607,23 +628,22 @@
         }
     }
 
-    private Task RequestDeleteSuspendedAsync(string reference)
+    private Task RequestAbandonSuspendedAsync(string reference)
     {
         pendingSuspendedReference = reference;
-        return ShowConfirmationAsync(ConfirmationKind.DeleteSuspended);
+        return ShowConfirmationAsync(ConfirmationKind.AbandonSuspended);
     }
 
-    private Task ConfirmDeleteSuspendedAsync(MouseEventArgs _)
+    private async Task ConfirmAbandonSuspendedAsync(MouseEventArgs _)
     {
         var reference = pendingSuspendedReference;
+        CloseConfirmation();
         if (reference is not null)
         {
-            Session.DeleteSuspended(reference);
+            await Session.AbandonSuspendedDraftAsync(reference, CancellationToken);
         }
-        CloseConfirmation();
-        Session.ClearFeedback();
         requestedFocus = Session.Step == DemoPosStep.Shopping ? FocusTarget.Search : FocusTarget.Payment;
-        return InvokeAsync(StateHasChanged);
+        await InvokeAsync(StateHasChanged);
     }
 
     private Task RequestResolveCardConfirmedAsync() => ShowConfirmationAsync(ConfirmationKind.ResolveCardConfirmed);
@@ -709,6 +729,26 @@
         }
     }
 
+    private Task OpenReturnAsync(long saleId)
+    {
+        returnSaleId = saleId;
+        Session.ClearFeedback();
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task CloseReturnAsync()
+    {
+        returnSaleId = null;
+        requestedFocus = FocusTarget.Search;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HandleReturnCompletedAsync(SaleReturnView _)
+    {
+        await Session.LoadRecentSalesAsync(CancellationToken);
+        await InvokeAsync(StateHasChanged);
+    }
+
     private async Task ReturnHomeAsync()
     {
         await Session.StartNewDraftAsync(CancellationToken);
@@ -749,7 +789,7 @@
         Suspend,
         Clear,
         Abandon,
-        DeleteSuspended,
+        AbandonSuspended,
         ResumeConflict,
         ResolveCardConfirmed,
         ResolveCardNotCompleted,

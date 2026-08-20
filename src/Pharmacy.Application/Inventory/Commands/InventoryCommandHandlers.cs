@@ -117,19 +117,23 @@ public sealed class InventoryCommandHandlers
                 cancellationToken);
     }
 
-    public Task<Result<InventorySessionView>> CreateSessionAsync(
+    public async Task<Result<InventorySessionView>> CreateSessionAsync(
         CreateInventorySessionCommand command,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
         var denied = SecurityCommandGuard.Denied<InventorySessionView>(authorizer, SecurityPermissions.InventoryAdjust);
-        if (denied is not null) return Task.FromResult(denied);
-        return !ValidOperation(command.OperationId) || !ValidText(command.Reference, 64)
-            || command.LocationId <= 0 || command.Notes?.Trim().Length > 512
-            ? Task.FromResult(Result<InventorySessionView>.Failure(InventoryErrors.InvalidOperation))
-            : store.CreateSessionAsync(
-                command with { Reference = command.Reference.Trim(), Notes = Normalize(command.Notes) },
-                cancellationToken);
+        if (denied is not null) return denied;
+        if (!ValidOperation(command.OperationId) || !ValidText(command.Reference, 64)
+            || command.LocationId <= 0 || command.Notes?.Trim().Length > 512)
+            return Result<InventorySessionView>.Failure(InventoryErrors.InvalidOperation);
+        var created = await store.CreateSessionAsync(
+            command with { Reference = command.Reference.Trim(), Notes = Normalize(command.Notes) },
+            cancellationToken);
+        if (created.IsSuccess && audit is not null)
+            await audit.RecordSuccessAsync("inventory", "InventorySession", created.Value.SessionId.ToString(),
+                "inventory.create", command.OperationId, cancellationToken);
+        return created;
     }
 
     public Task<Result<InventorySessionView>> StartSessionAsync(
@@ -173,16 +177,20 @@ public sealed class InventoryCommandHandlers
         return finalized;
     }
 
-    public Task<Result<InventorySessionView>> CancelSessionAsync(
+    public async Task<Result<InventorySessionView>> CancelSessionAsync(
         CancelInventorySessionCommand command,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
         var denied = SecurityCommandGuard.Denied<InventorySessionView>(authorizer, SecurityPermissions.InventoryAdjust);
-        if (denied is not null) return Task.FromResult(denied);
-        return !ValidSessionMutation(command.OperationId, command.SessionId, command.SessionRowVersion)
-            ? Task.FromResult(Result<InventorySessionView>.Failure(InventoryErrors.InvalidOperation))
-            : store.CancelSessionAsync(command, cancellationToken);
+        if (denied is not null) return denied;
+        if (!ValidSessionMutation(command.OperationId, command.SessionId, command.SessionRowVersion))
+            return Result<InventorySessionView>.Failure(InventoryErrors.InvalidOperation);
+        var cancelled = await store.CancelSessionAsync(command, cancellationToken);
+        if (cancelled.IsSuccess && audit is not null)
+            await audit.RecordSuccessAsync("inventory", "InventorySession", cancelled.Value.SessionId.ToString(),
+                "inventory.cancel", command.OperationId, cancellationToken);
+        return cancelled;
     }
 
     private static bool ValidSessionMutation(Guid operationId, long sessionId, string rowVersion) =>

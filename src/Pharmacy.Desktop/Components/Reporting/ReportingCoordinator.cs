@@ -33,6 +33,7 @@ public sealed class ReportingCoordinator
             var result = await service.GetSnapshotAsync(Query(), cancellationToken);
             if (result.IsFailure)
             {
+                Snapshot = null;
                 ErrorCode = result.Error.Code;
                 Message = result.Error.Message;
                 return;
@@ -42,6 +43,7 @@ public sealed class ReportingCoordinator
         }
         catch (Exception)
         {
+            Snapshot = null;
             ErrorCode = "reporting.unexpected";
             Message = "Le rapport n’a pas pu être chargé. Réessayez ou consultez le diagnostic SQL.";
         }

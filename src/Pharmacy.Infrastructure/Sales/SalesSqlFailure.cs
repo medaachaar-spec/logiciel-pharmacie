@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Microsoft.Data.SqlClient;
 
 namespace Pharmacy.Infrastructure.Sales;
@@ -14,7 +15,24 @@ internal static class SalesSqlFailure
     {
         var sql = FindSqlException(exception);
         return exception is InvalidOperationException
-            || sql?.Number is -2 or 2 or 20 or 40 or 53 or 64 or 233 or 4060 or 10054 or 18456;
+            || ContainsNetworkFailure(exception)
+            || sql?.Number is -2 or 2 or 20 or 40 or 53 or 64 or 233 or 258 or 4060 or 10054 or 10060 or 18456;
+    }
+
+    private static bool ContainsNetworkFailure(Exception? exception)
+    {
+        while (exception is not null)
+        {
+            if (exception is TimeoutException
+                || exception is Win32Exception { NativeErrorCode: 258 or 10054 or 10060 })
+            {
+                return true;
+            }
+
+            exception = exception.InnerException;
+        }
+
+        return false;
     }
 
     private static SqlException? FindSqlException(Exception? exception)

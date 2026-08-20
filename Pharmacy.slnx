@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Pharmacy.Application/Pharmacy.Application.csproj" />
     <Project Path="src/Pharmacy.Desktop/Pharmacy.Desktop.csproj" />
+    <Project Path="src/Pharmacy.Deployment/Pharmacy.Deployment.csproj" />
     <Project Path="src/Pharmacy.Domain/Pharmacy.Domain.csproj" />
     <Project Path="src/Pharmacy.Infrastructure/Pharmacy.Infrastructure.csproj" />
   </Folder>

@@ -8,6 +8,7 @@ using Pharmacy.Application.Sales.Errors;
 using Pharmacy.Application.Sales.Finalization.Commands;
 using Pharmacy.Application.Sales.Finalization.Models;
 using Pharmacy.Application.Sales.Models;
+using Pharmacy.Application.Security.Contracts;
 using Pharmacy.Domain.Common;
 using Pharmacy.Domain.Sales;
 using Xunit;
@@ -369,6 +370,45 @@ public sealed class SalesApplicationTests
     }
 
     [Fact]
+    public async Task SAL0611_ConfirmedExternalCardSaleEmitsBusinessSuccessAudit()
+    {
+        var draft = SaleDraft.Create(SaleDraftId.New());
+        var product = Product(1);
+        draft.AddItem(
+            SaleProductSnapshot.Create(
+                product.ProductId,
+                product.Reference,
+                product.DisplayName,
+                product.Presentation,
+                product.UnitSalePrice).Value,
+            SaleQuantity.One);
+        var operationId = Guid.NewGuid();
+        var audit = new CapturingBusinessAuditRecorder();
+        var handler = new FinalizeSaleHandler(
+            new PrepareSaleFinalizationHandler(
+                new StubDraftStore(new VersionedSaleDraft(draft, 2)),
+                new StubStock(),
+                new StubPreparationStore()),
+            new SuccessfulFinalizer(),
+            null,
+            audit);
+
+        var result = await handler.HandleAsync(
+            new FinalizeSaleCommand(
+                operationId,
+                draft.Id,
+                2,
+                SalePaymentMethod.ExternalCard,
+                null,
+                true),
+            TestCancellation);
+
+        Assert.True(result.IsSuccess);
+        var recorded = Assert.Single(audit.Successes);
+        Assert.Equal(("sales", "Sale", "sale.finalize", operationId), recorded);
+    }
+
+    [Fact]
     public void ApplicationErrorsExposeStableExpectedCodes()
     {
         Assert.Equal("sales.draft.version.invalid", SalesApplicationErrors.InvalidExpectedVersion.Code);
@@ -376,6 +416,7 @@ public sealed class SalesApplicationTests
         Assert.Equal("sales.product.not_sellable", SalesApplicationErrors.ProductNotSellable.Code);
         Assert.Equal("sales.finalization.empty_draft", SalesApplicationErrors.DraftEmpty.Code);
         Assert.Equal("sales.operation.conflict", SalesApplicationErrors.OperationConflict.Code);
+        Assert.Equal("sales.persistence.failed", SalesApplicationErrors.PersistenceFailed.Code);
     }
 
     private static SellableProductSnapshot Product(int number)
@@ -543,6 +584,60 @@ public sealed class SalesApplicationTests
             LastRequest = request;
             return Task.FromResult(Result<FinalizedSaleView>.Failure(
                 SalesApplicationErrors.OperationConflict));
+        }
+    }
+
+    private sealed class SuccessfulFinalizer : ISaleFinalizer
+    {
+        public Task<Result<FinalizedSaleView>> FinalizeAsync(
+            FinalizeSaleRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            var completedAt = new DateTime(2026, 8, 20, 12, 0, 0, DateTimeKind.Utc);
+            var lines = request.Preparation.Lines.Select((line, index) => new FinalizedSaleLineView(
+                index + 1,
+                line.ProductId,
+                line.Reference,
+                line.DisplayName,
+                line.Presentation,
+                line.UnitPrice,
+                line.Quantity,
+                line.Subtotal,
+                Array.Empty<SaleAllocationView>())).ToArray();
+            var payment = new SalePaymentView(
+                1,
+                request.Payment.Method,
+                Money.Create(request.Payment.Amount).Value,
+                request.Payment.TenderedAmount,
+                request.Payment.ChangeGiven,
+                request.Payment.ExternalCardConfirmed,
+                completedAt);
+            return Task.FromResult(Result<FinalizedSaleView>.Success(new FinalizedSaleView(
+                1,
+                "VTE-SAL-AUDIT-1",
+                request.Preparation.OperationId,
+                completedAt,
+                request.Preparation.Total,
+                request.Preparation.TotalQuantity,
+                lines,
+                payment)));
+        }
+    }
+
+    private sealed class CapturingBusinessAuditRecorder : IBusinessAuditRecorder
+    {
+        public List<(string Module, string EntityType, string Action, Guid? OperationId)> Successes { get; } = [];
+
+        public Task RecordSuccessAsync(
+            string module,
+            string entityType,
+            string? entityId,
+            string action,
+            Guid? operationId,
+            CancellationToken cancellationToken = default)
+        {
+            Successes.Add((module, entityType, action, operationId));
+            return Task.CompletedTask;
         }
     }
 }

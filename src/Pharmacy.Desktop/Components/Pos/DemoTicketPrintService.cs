@@ -75,27 +75,42 @@ public sealed class DemoTicketPrintService
     {
         ArgumentNullException.ThrowIfNull(sale);
         if (!TryBegin(sale.Reference, isReprint)) return false;
-        if (simulateFailure)
+
+        try
         {
-            await Task.Delay(120, cancellationToken);
+            if (simulateFailure)
+            {
+                await Task.Delay(120, cancellationToken);
+                return Complete(sale.Reference, DemoPrintSimulationOutcome.Failure);
+            }
+
+            if (printer is null)
+            {
+                await Task.Delay(120, cancellationToken);
+                return Complete(sale.Reference, DemoPrintSimulationOutcome.Success);
+            }
+
+            var request = new ReceiptPrintRequest(
+                Guid.NewGuid(), sale.SaleId, sale.Reference, sale.CompletedAtUtc,
+                sale.Lines.Select(line => new ReceiptLineData(
+                    line.ProductName, line.Quantity.Value, line.UnitPrice.Amount, line.Subtotal.Amount)).ToArray(),
+                sale.Total.Amount,
+                sale.PaymentMethod == DemoPaymentMethod.Cash ? "Cash" : "ExternalCard",
+                isReprint);
+            var result = await printer.PrintAsync(request, cancellationToken);
+            return Complete(sale.Reference, result.IsSuccess && result.Value.Succeeded
+                ? DemoPrintSimulationOutcome.Success
+                : DemoPrintSimulationOutcome.Failure);
+        }
+        catch (OperationCanceledException)
+        {
+            Complete(sale.Reference, DemoPrintSimulationOutcome.Failure);
+            throw;
+        }
+        catch (Exception)
+        {
             return Complete(sale.Reference, DemoPrintSimulationOutcome.Failure);
         }
-        if (printer is null)
-        {
-            await Task.Delay(120, cancellationToken);
-            return Complete(sale.Reference, DemoPrintSimulationOutcome.Success);
-        }
-        var request = new ReceiptPrintRequest(
-            Guid.NewGuid(), sale.SaleId, sale.Reference, sale.CompletedAtUtc,
-            sale.Lines.Select(line => new ReceiptLineData(
-                line.ProductName, line.Quantity.Value, line.UnitPrice.Amount, line.Subtotal.Amount)).ToArray(),
-            sale.Total.Amount,
-            sale.PaymentMethod == DemoPaymentMethod.Cash ? "Cash" : "ExternalCard",
-            isReprint);
-        var result = await printer.PrintAsync(request, cancellationToken);
-        return Complete(sale.Reference, result.IsSuccess && result.Value.Succeeded
-            ? DemoPrintSimulationOutcome.Success
-            : DemoPrintSimulationOutcome.Failure);
     }
 
     public bool Complete(string reference, DemoPrintSimulationOutcome outcome)

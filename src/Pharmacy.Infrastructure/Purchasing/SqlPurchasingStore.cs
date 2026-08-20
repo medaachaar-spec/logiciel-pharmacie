@@ -76,6 +76,7 @@ internal sealed class SqlPurchasingStore : IPurchasingStore
         {
             await using var db = await factory.CreateDbContextAsync(cancellationToken); var order = await OrderQuery(db).SingleOrDefaultAsync(x => x.Id == command.OrderId, cancellationToken); if (order is null) return Result<PurchaseOrderView>.Failure(PurchasingErrors.OrderNotFound); if (order.Status != PurchaseOrderStatus.Draft) return Result<PurchaseOrderView>.Failure(PurchasingErrors.OrderInvalidStatus);
             SetVersion(db, order, nameof(PurchaseOrderEntity.RowVersion), command.OrderRowVersion); var product = await PurchasableProduct(db, command.ProductId, cancellationToken); if (product is null) return Result<PurchaseOrderView>.Failure(PurchasingErrors.ProductNotFound);
+            if (!ValidProductSnapshot(product)) return Result<PurchaseOrderView>.Failure(PurchasingErrors.ValidationFailed);
             var existing = order.Lines.SingleOrDefault(x => x.ProductId == command.ProductId); var now = clock.UtcNow;
             if (existing is null) { order.Lines.Add(new PurchaseOrderLineEntity { Product = product, ProductCodeSnapshot = product.LocalSettings!.InternalCode ?? string.Empty, ProductNameSnapshot = product.Name, OrderedQuantity = command.Quantity, UnitPurchasePrice = command.UnitPurchasePrice, CreatedAtUtc = now, UpdatedAtUtc = now }); }
             else { existing.OrderedQuantity = checked(existing.OrderedQuantity + command.Quantity); if (command.UnitPurchasePrice is not null) existing.UnitPurchasePrice = command.UnitPurchasePrice; existing.UpdatedAtUtc = now; }
@@ -185,7 +186,7 @@ internal sealed class SqlPurchasingStore : IPurchasingStore
         PurchaseOrderEntity? order = null;
         if (command.PurchaseOrderId is not null) { order = await OrderQuery(db).SingleOrDefaultAsync(x => x.Id == command.PurchaseOrderId, token); if (order is null) return (null, null, null, null, PurchasingErrors.OrderNotFound); if (order.SupplierId != supplier.Id || order.Status is not (PurchaseOrderStatus.Confirmed or PurchaseOrderStatus.PartiallyReceived)) return (null, null, null, null, PurchasingErrors.OrderInvalidStatus); if (string.IsNullOrWhiteSpace(command.ExpectedOrderRowVersion)) return (null, null, null, null, PurchasingErrors.ReceiptConcurrencyConflict); }
         else if (command.Lines.Any(x => x.PurchaseOrderLineId is not null)) return (null, null, null, null, PurchasingErrors.OrderLineNotFound);
-        var ids = command.Lines.Select(x => x.ProductId).Distinct().ToArray(); var products = await db.Products.Include(x => x.LocalSettings).Where(x => ids.Contains(x.Id) && x.IsActive && x.LocalSettings != null && x.LocalSettings.IsActive && x.LocalSettings.IsPurchasable).ToDictionaryAsync(x => x.Id, token); if (products.Count != ids.Length) return (null, null, null, null, PurchasingErrors.ProductNotFound);
+        var ids = command.Lines.Select(x => x.ProductId).Distinct().ToArray(); var products = await db.Products.Include(x => x.LocalSettings).Where(x => ids.Contains(x.Id) && x.IsActive && x.LocalSettings != null && x.LocalSettings.IsActive && x.LocalSettings.IsPurchasable).ToDictionaryAsync(x => x.Id, token); if (products.Count != ids.Length) return (null, null, null, null, PurchasingErrors.ProductNotFound); if (products.Values.Any(product => !ValidProductSnapshot(product))) return (null, null, null, null, PurchasingErrors.ValidationFailed);
         if (order is not null)
         {
             foreach (var group in command.Lines.GroupBy(x => x.PurchaseOrderLineId)) { if (group.Key is null) return (null, null, null, null, PurchasingErrors.OrderLineNotFound); var line = order.Lines.SingleOrDefault(x => x.Id == group.Key.Value); if (line is null || group.Any(x => x.ProductId != line.ProductId)) return (null, null, null, null, PurchasingErrors.OrderLineNotFound); if (group.Sum(x => x.Quantity) > line.OrderedQuantity - line.ReceivedQuantity) return (null, null, null, null, PurchasingErrors.QuantityExceedsOrder); }
@@ -217,6 +218,7 @@ internal sealed class SqlPurchasingStore : IPurchasingStore
     private static void TouchOrder(PharmacyDbContext db, PurchaseOrderEntity order, DateTime now) { order.UpdatedAtUtc = now; db.Entry(order).Property(x => x.UpdatedAtUtc).IsModified = true; }
     private static string NormalizeCode(string value) => value.Trim().ToUpperInvariant();
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static bool ValidProductSnapshot(ProductEntity product) => product.Name.Length <= 200 && (product.LocalSettings!.InternalCode?.Length ?? 0) <= 64;
     private static Result<T> Unavailable<T>() => Result<T>.Failure(PurchasingErrors.ReceiptDatabaseUnavailable);
     private static string Fingerprint(FinalizeGoodsReceiptCommand command)
     {

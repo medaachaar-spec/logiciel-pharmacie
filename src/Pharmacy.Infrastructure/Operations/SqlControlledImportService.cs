@@ -33,7 +33,7 @@ public sealed class SqlControlledImportService : IControlledImportService
     {
         var denied = authorizer.Authorize(SecurityPermissions.ImportView);
         if (denied.IsFailure) return Result<ImportPreviewView>.Failure(denied.Error);
-        return await Task.Run(() => Parse(request), cancellationToken);
+        return await Task.Run(() => Parse(request, includeAllRows: false), cancellationToken);
     }
 
     public async Task<Result<ImportReportView>> ConfirmAsync(ConfirmImportRequest request, CancellationToken cancellationToken = default)
@@ -42,70 +42,84 @@ public sealed class SqlControlledImportService : IControlledImportService
         var denied = authorizer.Authorize(SecurityPermissions.ImportExecute, true);
         if (denied.IsFailure) { await AuditFailureQuietlyAsync(request.OperationId, denied.Error.Code, cancellationToken); return Result<ImportReportView>.Failure(denied.Error); }
         var parsed = await Task.Run(
-            () => Parse(new PreviewImportRequest(request.FileName, request.Content, request.Type, request.Mapping, MaximumRows)),
+            () => Parse(new PreviewImportRequest(request.FileName, request.Content, request.Type, request.Mapping, MaximumRows), includeAllRows: true),
             cancellationToken);
         if (parsed.IsFailure) return Result<ImportReportView>.Failure(parsed.Error);
         if (!parsed.Value.CanConfirm) { await AuditFailureQuietlyAsync(request.OperationId, OperationsErrors.ImportValidationFailed.Code, cancellationToken); return Result<ImportReportView>.Failure(OperationsErrors.ImportValidationFailed); }
         var fingerprint = Fingerprint(request.OperationId, parsed.Value.Sha256, request.Type, request.Mapping);
 
-        await using var strategyContext = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var strategy = strategyContext.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async () =>
+        try
         {
-            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-            await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
-            try
+            await using var strategyContext = await contextFactory.CreateDbContextAsync(cancellationToken);
+            var strategy = strategyContext.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(async () =>
             {
-                var replay = await context.ImportJobs.AsNoTracking().SingleOrDefaultAsync(job => job.OperationId == request.OperationId, cancellationToken);
-                if (replay is not null)
+                await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+                await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
+                try
                 {
-                    await transaction.CommitAsync(cancellationToken);
-                    if (!string.Equals(replay.Fingerprint, fingerprint, StringComparison.Ordinal))
+                    var replay = await context.ImportJobs.AsNoTracking().SingleOrDefaultAsync(job => job.OperationId == request.OperationId, cancellationToken);
+                    if (replay is not null)
                     {
-                        await AuditFailureQuietlyAsync(request.OperationId, "import.idempotence.conflict", cancellationToken);
-                        return Result<ImportReportView>.Failure(new Error("import.idempotence.conflict", "Cet OperationId a déjà été utilisé avec un contenu différent."));
+                        await transaction.CommitAsync(cancellationToken);
+                        if (!string.Equals(replay.Fingerprint, fingerprint, StringComparison.Ordinal))
+                        {
+                            await AuditFailureQuietlyAsync(request.OperationId, "import.idempotence.conflict", cancellationToken);
+                            return Result<ImportReportView>.Failure(new Error("import.idempotence.conflict", "Cet OperationId a déjà été utilisé avec un contenu différent."));
+                        }
+                        return Result<ImportReportView>.Success(MapReport(replay, Array.Empty<ImportIssueView>(), true));
                     }
-                    return Result<ImportReportView>.Success(MapReport(replay, Array.Empty<ImportIssueView>(), true));
-                }
 
-                var issues = new List<ImportIssueView>(); var created = 0; var ignored = 0;
-                if (request.Type == ControlledImportType.Catalogue)
-                    (created, ignored) = await ImportCatalogueAsync(context, parsed.Value.Rows, request.Mapping, issues, cancellationToken);
-                else
-                    (created, ignored) = await ImportStockAsync(context, parsed.Value.Rows, request.Type, request.Mapping, issues, request.OperationId, cancellationToken);
-                if (issues.Any(issue => issue.Severity == ImportIssueSeverity.Error))
+                    var issues = new List<ImportIssueView>(); var created = 0; var ignored = 0;
+                    if (request.Type == ControlledImportType.Catalogue)
+                        (created, ignored) = await ImportCatalogueAsync(context, parsed.Value.Rows, request.Mapping, issues, cancellationToken);
+                    else
+                        (created, ignored) = await ImportStockAsync(context, parsed.Value.Rows, request.Type, request.Mapping, issues, request.OperationId, cancellationToken);
+                    if (issues.Any(issue => issue.Severity == ImportIssueSeverity.Error))
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                        await AuditFailureQuietlyAsync(request.OperationId, OperationsErrors.ImportValidationFailed.Code, cancellationToken);
+                        return Result<ImportReportView>.Failure(OperationsErrors.ImportValidationFailed);
+                    }
+                    var now = clock.UtcNow;
+                    var job = new ImportJobEntity
+                    {
+                        OperationId = request.OperationId, Fingerprint = fingerprint, ImportType = request.Type.ToString(), Status = "Completed",
+                        SourceFileName = parsed.Value.SafeFileName, SourceFileHash = parsed.Value.Sha256, ReadCount = parsed.Value.TotalRows,
+                        CreatedCount = created, UpdatedCount = 0, IgnoredCount = ignored, RejectedCount = 0, StartedAtUtc = now, CompletedAtUtc = now
+                    };
+                    context.ImportJobs.Add(job);
+                    await context.SaveChangesAsync(cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+                    await audit.RecordSuccessAsync("import", "ImportJob", job.Id.ToString(), "import.confirm", request.OperationId, cancellationToken);
+                    return Result<ImportReportView>.Success(MapReport(job, issues, false));
+                }
+                catch (Exception exception) when (CatalogSqlFailure.IsDatabaseUnavailable(exception))
+                {
+                    try { await transaction.RollbackAsync(cancellationToken); } catch { }
+                    await AuditFailureQuietlyAsync(request.OperationId, OperationsErrors.DatabaseUnavailable.Code, cancellationToken);
+                    return Result<ImportReportView>.Failure(OperationsErrors.DatabaseUnavailable);
+                }
+                catch (DbUpdateException)
                 {
                     await transaction.RollbackAsync(cancellationToken);
-                    await AuditFailureQuietlyAsync(request.OperationId, OperationsErrors.ImportValidationFailed.Code, cancellationToken);
-                    return Result<ImportReportView>.Failure(OperationsErrors.ImportValidationFailed);
+                    await AuditFailureQuietlyAsync(request.OperationId, "import.persistence.conflict", cancellationToken);
+                    return Result<ImportReportView>.Failure(new Error("import.persistence.conflict", "Une collision catalogue/stock a annulé l’import complet."));
                 }
-                var now = clock.UtcNow;
-                var job = new ImportJobEntity
-                {
-                    OperationId = request.OperationId, Fingerprint = fingerprint, ImportType = request.Type.ToString(), Status = "Completed",
-                    SourceFileName = parsed.Value.SafeFileName, SourceFileHash = parsed.Value.Sha256, ReadCount = parsed.Value.TotalRows,
-                    CreatedCount = created, UpdatedCount = 0, IgnoredCount = ignored, RejectedCount = 0, StartedAtUtc = now, CompletedAtUtc = now
-                };
-                context.ImportJobs.Add(job);
-                await context.SaveChangesAsync(cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-                await audit.RecordSuccessAsync("import", "ImportJob", job.Id.ToString(), "import.confirm", request.OperationId, cancellationToken);
-                return Result<ImportReportView>.Success(MapReport(job, issues, false));
-            }
-            catch (DbUpdateException)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                await AuditFailureQuietlyAsync(request.OperationId, "import.persistence.conflict", cancellationToken);
-                return Result<ImportReportView>.Failure(new Error("import.persistence.conflict", "Une collision catalogue/stock a annulé l’import complet."));
-            }
-        });
+            });
+        }
+        catch (Exception exception) when (CatalogSqlFailure.IsDatabaseUnavailable(exception))
+        {
+            await AuditFailureQuietlyAsync(request.OperationId, OperationsErrors.DatabaseUnavailable.Code, cancellationToken);
+            return Result<ImportReportView>.Failure(OperationsErrors.DatabaseUnavailable);
+        }
     }
 
-    private static Result<ImportPreviewView> Parse(PreviewImportRequest request)
+    private static Result<ImportPreviewView> Parse(PreviewImportRequest request, bool includeAllRows)
     {
         if (request is null || request.Content is null || request.Content.Length == 0 || request.Content.Length > MaximumBytes
             || !string.Equals(Path.GetExtension(request.FileName), ".csv", StringComparison.OrdinalIgnoreCase)
-            || Path.GetFileName(request.FileName) != request.FileName)
+            || !IsSafeLogicalFileName(request.FileName))
             return Result<ImportPreviewView>.Failure(OperationsErrors.InvalidImportFile);
         string text;
         try { text = new UTF8Encoding(false, true).GetString(request.Content).TrimStart('\uFEFF'); }
@@ -116,8 +130,10 @@ public sealed class SqlControlledImportService : IControlledImportService
         var headers = records[0].Select(value => value.Trim()).ToArray();
         if (headers.Any(string.IsNullOrWhiteSpace) || headers.Distinct(StringComparer.OrdinalIgnoreCase).Count() != headers.Length)
             return Result<ImportPreviewView>.Failure(OperationsErrors.InvalidImportMapping);
+        var mapped = MappedColumns(request.Mapping).Where(value => !string.IsNullOrWhiteSpace(value)).ToArray();
         var required = RequiredColumns(request.Type, request.Mapping).Where(value => !string.IsNullOrWhiteSpace(value)).ToArray();
         if (required.Distinct(StringComparer.OrdinalIgnoreCase).Count() != required.Length
+            || mapped.Distinct(StringComparer.OrdinalIgnoreCase).Count() != mapped.Length
             || required.Any(name => !headers.Contains(name!, StringComparer.OrdinalIgnoreCase)))
             return Result<ImportPreviewView>.Failure(OperationsErrors.InvalidImportMapping);
         var index = headers.Select((name, position) => (name, position)).ToDictionary(x => x.name, x => x.position, StringComparer.OrdinalIgnoreCase);
@@ -151,7 +167,7 @@ public sealed class SqlControlledImportService : IControlledImportService
                 issues.Add(Issue(rowNumber, "import.price.absent", ImportIssueSeverity.Warning, request.Mapping.SalePriceColumn, "PPV absent : le produit sera créé non vendable à prix technique zéro."));
             rows.Add(new(rowNumber, reference, name, salePrice, purchasePrice, barcode, NullIfEmpty(Get(request.Mapping.CategoryColumn)) ?? request.Mapping.DefaultCategoryCode, quantity, lot, expiry, request.Type == ControlledImportType.Catalogue ? "Créer si absent" : "Créer mouvement si stock initial absent"));
         }
-        var previewRows = rows.Take(Math.Clamp(request.PreviewLimit, 1, 1000)).ToArray();
+        var previewRows = includeAllRows ? rows.ToArray() : rows.Take(Math.Clamp(request.PreviewLimit, 1, 1000)).ToArray();
         var hash = Convert.ToHexString(SHA256.HashData(request.Content));
         return Result<ImportPreviewView>.Success(new ImportPreviewView(Path.GetFileName(request.FileName), hash, request.Type, rows.Count, headers, previewRows, issues.AsReadOnly(), !issues.Any(issue => issue.Severity == ImportIssueSeverity.Error)));
     }
@@ -223,11 +239,23 @@ public sealed class SqlControlledImportService : IControlledImportService
         ControlledImportType.Lots => [m.ReferenceColumn, m.DesignationColumn, m.QuantityColumn, m.LotColumn],
         _ => throw new ArgumentOutOfRangeException(nameof(type))
     };
-    private static decimal? ParseDecimal(string value, int row, string? column, List<ImportIssueView> issues) { if (value.Length == 0) return null; if (StartsFormula(value)) { issues.Add(Issue(row,"import.formula.detected",ImportIssueSeverity.Error,column,"Formule interdite.")); return null; } if (decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var result) || decimal.TryParse(value, NumberStyles.Number, CultureInfo.GetCultureInfo("fr-FR"), out result)) { if (result < 0) issues.Add(Issue(row,"import.amount.negative",ImportIssueSeverity.Error,column,"Montant négatif interdit.")); return result; } issues.Add(Issue(row,"import.amount.invalid",ImportIssueSeverity.Error,column,"Montant invalide.")); return null; }
+    private static IReadOnlyList<string?> MappedColumns(CsvImportMapping m) =>
+        [m.ReferenceColumn, m.DesignationColumn, m.SalePriceColumn, m.PurchasePriceColumn, m.BarcodeColumn, m.CategoryColumn, m.QuantityColumn, m.LotColumn, m.ExpiryColumn];
+    private static decimal? ParseDecimal(string value, int row, string? column, List<ImportIssueView> issues) { if (value.Length == 0) return null; if (StartsFormula(value)) { issues.Add(Issue(row,"import.formula.detected",ImportIssueSeverity.Error,column,"Formule interdite.")); return null; } const NumberStyles styles = NumberStyles.AllowDecimalPoint; if (decimal.TryParse(value, styles, CultureInfo.InvariantCulture, out var result) || decimal.TryParse(value, styles, CultureInfo.GetCultureInfo("fr-FR"), out result)) { if (result < 0) issues.Add(Issue(row,"import.amount.negative",ImportIssueSeverity.Error,column,"Montant négatif interdit.")); if (!FitsSqlDecimal19Scale4(result)) issues.Add(Issue(row,"import.amount.precision",ImportIssueSeverity.Error,column,"Montant incompatible avec la précision SQL decimal(19,4).")); return result; } issues.Add(Issue(row,"import.amount.invalid",ImportIssueSeverity.Error,column,"Montant invalide.")); return null; }
     private static int? ParseInt(string value, int row, string? column, List<ImportIssueView> issues) { if (value.Length == 0) return null; if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var result)) return result; issues.Add(Issue(row,"import.quantity.invalid",ImportIssueSeverity.Error,column,"Quantité entière invalide.")); return null; }
     private static DateOnly? ParseDate(string value, int row, string? column, List<ImportIssueView> issues) { if (value.Length == 0) return null; foreach (var format in new[]{"yyyy-MM-dd","dd/MM/yyyy"}) if (DateOnly.TryParseExact(value, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out var result)) return result; issues.Add(Issue(row,"import.date.invalid",ImportIssueSeverity.Error,column,"Date attendue au format yyyy-MM-dd ou dd/MM/yyyy.")); return null; }
     private static ImportIssueView Issue(int row, string code, ImportIssueSeverity severity, string? column, string message) => new(row, code, severity, column, message);
     private static bool StartsFormula(string value) => value.Length > 0 && value[0] is '=' or '+' or '-' or '@';
+    private static bool FitsSqlDecimal19Scale4(decimal value)
+    {
+        var scale = (decimal.GetBits(value)[3] >> 16) & 0x7F;
+        return scale <= 4 && value is >= -999_999_999_999_999.9999m and <= 999_999_999_999_999.9999m;
+    }
+    private static bool IsSafeLogicalFileName(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName) || fileName.Length > 260 || Path.GetFileName(fileName) != fileName) return false;
+        return fileName.IndexOfAny(['<', '>', ':', '"', '/', '\\', '|', '?', '*']) < 0;
+    }
     private static string? NullIfEmpty(string value) => value.Length == 0 ? null : value;
     private static char DetectDelimiter(string text) { var first = text.Split(new[]{"\r\n","\n"}, StringSplitOptions.None)[0]; var semicolon = first.Count(c => c==';'); var comma=first.Count(c=>c==','); var tab=first.Count(c=>c=='\t'); return tab>semicolon && tab>comma?'\t':semicolon>=comma?';':','; }
     private static List<List<string>> ParseCsv(string text, char delimiter) { var rows=new List<List<string>>(); var row=new List<string>(); var cell=new StringBuilder(); var quoted=false; for(var i=0;i<text.Length;i++){var c=text[i]; if(c=='"'){if(quoted&&i+1<text.Length&&text[i+1]=='"'){cell.Append('"');i++;}else quoted=!quoted;} else if(c==delimiter&&!quoted){row.Add(cell.ToString());cell.Clear();} else if((c=='\r'||c=='\n')&&!quoted){if(c=='\r'&&i+1<text.Length&&text[i+1]=='\n')i++;row.Add(cell.ToString());cell.Clear();rows.Add(row);row=new();} else cell.Append(c);} if(quoted) return []; if(cell.Length>0||row.Count>0){row.Add(cell.ToString());rows.Add(row);} return rows; }

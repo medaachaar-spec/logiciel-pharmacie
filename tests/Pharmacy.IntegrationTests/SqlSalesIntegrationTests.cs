@@ -360,6 +360,291 @@ public sealed class SqlSalesIntegrationTests
         }
     }
 
+    [Fact]
+    public async Task RET001_RealSqlSuspensionsPersistRestoreAndCloseAtomicallyWithoutEarlyStockEffects()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var serverConnection = BuildServerConnection();
+        var databaseName = TestDatabasePrefix + Guid.NewGuid().ToString("N")[..12];
+        ValidateTemporaryDatabaseName(databaseName);
+        var databaseConnection = new SqlConnectionStringBuilder(serverConnection.ConnectionString)
+        {
+            InitialCatalog = databaseName,
+            ApplicationName = "Pharmacy.RET001.Tests",
+            Pooling = false
+        };
+        await CreateDatabaseAsync(serverConnection.ConnectionString, databaseName);
+
+        try
+        {
+            var factoryA = new TestDbContextFactory(databaseConnection.ConnectionString);
+            await using (var context = await factoryA.CreateDbContextAsync(cancellationToken))
+            {
+                await context.Database.MigrateAsync(cancellationToken);
+                Assert.Empty(await context.Database.GetPendingMigrationsAsync(cancellationToken));
+            }
+
+            var clock = new FixedClock(
+                new DateOnly(2026, 8, 16),
+                new DateTime(2026, 8, 16, 9, 0, 0, DateTimeKind.Utc));
+            var catalogStore = new SqlCatalogStore(factoryA);
+            var category = await catalogStore.CreateAsync(
+                new CreateCatalogCategoryCommand(
+                    "RET001",
+                    "Suspensions persistantes RET-001",
+                    DefaultTracksLots: false,
+                    DefaultTracksExpiry: false),
+                cancellationToken);
+            Assert.True(category.IsSuccess);
+            var product = await new CreateCatalogProductHandler(catalogStore).HandleAsync(
+                new CreateCatalogProductCommand(
+                    "Produit suspension RET-001",
+                    "Boîte snapshot",
+                    category.Value.CategoryId,
+                    "RET001-PRODUCT",
+                    10m),
+                cancellationToken);
+            Assert.True(product.IsSuccess);
+
+            var inventory = new InventoryCommandHandlers(new SqlInventoryStore(factoryA), clock);
+            var location = await inventory.CreateLocationAsync(
+                new CreateStockLocationCommand(
+                    Guid.NewGuid(),
+                    "RET001-MAIN",
+                    "Emplacement RET-001",
+                    true),
+                cancellationToken);
+            Assert.True(location.IsSuccess);
+            Assert.True((await inventory.RecordOpeningAsync(
+                Opening(product.Value.ProductId, location.Value.LocationId, null, 8),
+                cancellationToken)).IsSuccess);
+
+            var suspendedStoreA = new SqlCustomerCreditCashStore(factoryA, clock);
+            var operationId = Guid.NewGuid();
+            var suspendRequest = new SuspendSaleRequest(
+                operationId,
+                null,
+                new[]
+                {
+                    new SuspendSaleLineRequest(
+                        product.Value.ProductId,
+                        "RET001-PRODUCT",
+                        "Produit suspension RET-001",
+                        "Boîte snapshot",
+                        10m,
+                        2)
+                });
+            var suspended = await suspendedStoreA.SuspendAsync(suspendRequest, cancellationToken);
+            Assert.True(suspended.IsSuccess, suspended.IsFailure ? suspended.Error.Code : null);
+            Assert.Equal(1, await ScalarAsync<int>(databaseConnection.ConnectionString, "SELECT COUNT(*) FROM sales.SuspendedSales;"));
+            Assert.Equal(1, await ScalarAsync<int>(databaseConnection.ConnectionString, "SELECT COUNT(*) FROM sales.SuspendedSaleLines;"));
+            Assert.Equal(8, await BalanceAsync(databaseConnection.ConnectionString, null, product.Value.ProductId));
+            Assert.Equal(0, await ScalarAsync<int>(databaseConnection.ConnectionString, "SELECT COUNT(*) FROM sales.Sales;"));
+            Assert.Equal(0, await ScalarAsync<int>(databaseConnection.ConnectionString, "SELECT COUNT(*) FROM sales.Payments;"));
+            Assert.Equal(0, await ScalarAsync<int>(databaseConnection.ConnectionString, "SELECT COUNT(*) FROM sales.SaleLineAllocations;"));
+            Assert.Equal(0, await ScalarAsync<int>(databaseConnection.ConnectionString, "SELECT COUNT(*) FROM inventory.StockMovements WHERE MovementType=N'Sale';"));
+
+            var replay = await suspendedStoreA.SuspendAsync(suspendRequest, cancellationToken);
+            Assert.True(replay.IsSuccess);
+            Assert.Equal(suspended.Value.SuspendedSaleId, replay.Value.SuspendedSaleId);
+            Assert.Equal(1, await ScalarAsync<int>(databaseConnection.ConnectionString, "SELECT COUNT(*) FROM sales.SuspendedSales;"));
+            var conflictingReplay = await suspendedStoreA.SuspendAsync(
+                suspendRequest with
+                {
+                    Lines = new[] { suspendRequest.Lines[0] with { Quantity = 3 } }
+                },
+                cancellationToken);
+            Assert.Equal("sales.operation.conflict", conflictingReplay.Error.Code);
+
+            var factoryB = new TestDbContextFactory(databaseConnection.ConnectionString);
+            var suspendedStoreB = new SqlCustomerCreditCashStore(factoryB, clock);
+            var reloaded = await suspendedStoreB.GetOpenAsync(cancellationToken);
+            var reloadedSuspension = Assert.Single(reloaded.Value);
+            var reloadedLine = Assert.Single(reloadedSuspension.Lines);
+            Assert.Equal(2, reloadedLine.Quantity.Value);
+            Assert.Equal(10m, reloadedLine.UnitPrice.Amount);
+
+            var draftStore = new InMemorySaleDraftStore();
+            var restored = await new RestoreSuspendedSaleDraftHandler(
+                new InMemorySaleDraftIdGenerator(), draftStore).HandleAsync(
+                    reloadedSuspension,
+                    cancellationToken);
+            Assert.True(restored.IsSuccess);
+            Assert.Equal(2, Assert.Single(restored.Value.Lines).Quantity.Value);
+            Assert.Equal(10m, Assert.Single(restored.Value.Lines).UnitPrice.Amount);
+            Assert.Equal(8, await BalanceAsync(databaseConnection.ConnectionString, null, product.Value.ProductId));
+            Assert.Equal(0, await ScalarAsync<int>(databaseConnection.ConnectionString, "SELECT COUNT(*) FROM inventory.StockMovements WHERE MovementType=N'Sale';"));
+
+            var catalogReader = new SqlProductCatalogReader(factoryB);
+            var availabilityReader = new SqlInventoryStockAvailabilityReader(factoryB, clock);
+            var preparation = await PrepareAsync(
+                Guid.NewGuid(),
+                new DraftScenario(draftStore, restored.Value),
+                availabilityReader,
+                cancellationToken);
+            await ExecuteAsync(
+                databaseConnection.ConnectionString,
+                "UPDATE catalog.ProductLocalSettings SET CurrentSalePrice=12 WHERE ProductId=@productId;",
+                new SqlParameter("@productId", SqlDbType.BigInt) { Value = product.Value.ProductId });
+            Assert.Equal(10m, Assert.Single(restored.Value.Lines).UnitPrice.Amount);
+            var finalizer = new SqlSaleFinalizer(factoryB, clock);
+            var priceChanged = await finalizer.FinalizeAsync(
+                new FinalizeSaleRequest(
+                    preparation,
+                    new SalePaymentRequest(SalePaymentMethod.Cash, 20m, 20m, 0m, false),
+                    SuspendedSale: new SuspendedSaleCompletionRequest(
+                        reloadedSuspension.SuspendedSaleId,
+                        reloadedSuspension.RowVersion)),
+                cancellationToken);
+            Assert.Equal("sales.price.changed", priceChanged.Error.Code);
+            Assert.Equal("Open", await ScalarAsync<string>(
+                databaseConnection.ConnectionString,
+                "SELECT Status FROM sales.SuspendedSales WHERE Id=@id;",
+                new SqlParameter("@id", SqlDbType.BigInt) { Value = reloadedSuspension.SuspendedSaleId }));
+            Assert.Equal(8, await BalanceAsync(databaseConnection.ConnectionString, null, product.Value.ProductId));
+            await ExecuteAsync(
+                databaseConnection.ConnectionString,
+                "UPDATE catalog.ProductLocalSettings SET CurrentSalePrice=10 WHERE ProductId=@productId;",
+                new SqlParameter("@productId", SqlDbType.BigInt) { Value = product.Value.ProductId });
+
+            var finalizeRequest = new FinalizeSaleRequest(
+                preparation,
+                new SalePaymentRequest(SalePaymentMethod.Cash, 20m, 20m, 0m, false),
+                SuspendedSale: new SuspendedSaleCompletionRequest(
+                    reloadedSuspension.SuspendedSaleId,
+                    reloadedSuspension.RowVersion));
+            var finalized = await finalizer.FinalizeAsync(finalizeRequest, cancellationToken);
+            Assert.True(finalized.IsSuccess, finalized.IsFailure ? finalized.Error.Code : null);
+            Assert.Equal("Resumed", await ScalarAsync<string>(
+                databaseConnection.ConnectionString,
+                "SELECT Status FROM sales.SuspendedSales WHERE Id=@id;",
+                new SqlParameter("@id", SqlDbType.BigInt) { Value = reloadedSuspension.SuspendedSaleId }));
+            Assert.Equal(6, await BalanceAsync(databaseConnection.ConnectionString, null, product.Value.ProductId));
+            Assert.Equal(1, await ScalarAsync<int>(databaseConnection.ConnectionString, "SELECT COUNT(*) FROM sales.Sales;"));
+            Assert.Equal(1, await ScalarAsync<int>(databaseConnection.ConnectionString, "SELECT COUNT(*) FROM sales.Payments;"));
+            Assert.Equal(1, await ScalarAsync<int>(databaseConnection.ConnectionString, "SELECT COUNT(*) FROM inventory.StockMovements WHERE MovementType=N'Sale';"));
+            var finalizedReplay = await finalizer.FinalizeAsync(finalizeRequest, cancellationToken);
+            Assert.True(finalizedReplay.IsSuccess);
+            Assert.Equal(finalized.Value.SaleId, finalizedReplay.Value.SaleId);
+            Assert.Equal(6, await BalanceAsync(databaseConnection.ConnectionString, null, product.Value.ProductId));
+            Assert.Equal(1, await ScalarAsync<int>(databaseConnection.ConnectionString, "SELECT COUNT(*) FROM sales.Sales;"));
+
+            var insufficientSuspension = await suspendedStoreB.SuspendAsync(
+                new SuspendSaleRequest(
+                    Guid.NewGuid(),
+                    null,
+                    new[] { suspendRequest.Lines[0] with { Quantity = 3 } }),
+                cancellationToken);
+            var insufficientDraftStore = new InMemorySaleDraftStore();
+            var insufficientDraft = await new RestoreSuspendedSaleDraftHandler(
+                new InMemorySaleDraftIdGenerator(), insufficientDraftStore).HandleAsync(
+                    insufficientSuspension.Value,
+                    cancellationToken);
+            var insufficientPreparation = await PrepareAsync(
+                Guid.NewGuid(),
+                new DraftScenario(insufficientDraftStore, insufficientDraft.Value),
+                availabilityReader,
+                cancellationToken);
+            await ExecuteAsync(
+                databaseConnection.ConnectionString,
+                "UPDATE inventory.StockBalances SET AvailableQuantity=1 WHERE ProductId=@productId AND StockBatchId IS NULL;",
+                new SqlParameter("@productId", SqlDbType.BigInt) { Value = product.Value.ProductId });
+            var insufficient = await finalizer.FinalizeAsync(
+                new FinalizeSaleRequest(
+                    insufficientPreparation,
+                    new SalePaymentRequest(SalePaymentMethod.Cash, 30m, 30m, 0m, false),
+                    SuspendedSale: new SuspendedSaleCompletionRequest(
+                        insufficientSuspension.Value.SuspendedSaleId,
+                        insufficientSuspension.Value.RowVersion)),
+                cancellationToken);
+            Assert.Equal("sales.stock.insufficient", insufficient.Error.Code);
+            Assert.Equal("Open", await ScalarAsync<string>(
+                databaseConnection.ConnectionString,
+                "SELECT Status FROM sales.SuspendedSales WHERE Id=@id;",
+                new SqlParameter("@id", SqlDbType.BigInt) { Value = insufficientSuspension.Value.SuspendedSaleId }));
+            Assert.Equal(1, await ScalarAsync<int>(databaseConnection.ConnectionString, "SELECT COUNT(*) FROM sales.Sales;"));
+            Assert.Equal(1, await ScalarAsync<int>(databaseConnection.ConnectionString, "SELECT COUNT(*) FROM sales.Payments;"));
+            Assert.Equal(1, await ScalarAsync<int>(databaseConnection.ConnectionString, "SELECT COUNT(*) FROM inventory.StockMovements WHERE MovementType=N'Sale';"));
+            await ExecuteAsync(
+                databaseConnection.ConnectionString,
+                "UPDATE inventory.StockBalances SET AvailableQuantity=6 WHERE ProductId=@productId AND StockBatchId IS NULL;",
+                new SqlParameter("@productId", SqlDbType.BigInt) { Value = product.Value.ProductId });
+
+            var abandon = await suspendedStoreB.AbandonAsync(
+                Guid.NewGuid(),
+                insufficientSuspension.Value.SuspendedSaleId,
+                insufficientSuspension.Value.RowVersion,
+                cancellationToken);
+            Assert.True(abandon.IsSuccess);
+            var staleAbandon = await suspendedStoreA.AbandonAsync(
+                Guid.NewGuid(),
+                insufficientSuspension.Value.SuspendedSaleId,
+                insufficientSuspension.Value.RowVersion,
+                cancellationToken);
+            Assert.Equal("sales.operation.conflict", staleAbandon.Error.Code);
+            Assert.Equal(1, await ScalarAsync<int>(databaseConnection.ConnectionString, "SELECT COUNT(*) FROM sales.Sales;"));
+            Assert.Equal(1, await ScalarAsync<int>(databaseConnection.ConnectionString, "SELECT COUNT(*) FROM sales.Payments;"));
+            Assert.Equal(1, await ScalarAsync<int>(databaseConnection.ConnectionString, "SELECT COUNT(*) FROM inventory.StockMovements WHERE MovementType=N'Sale';"));
+
+            var disabledSuspension = await suspendedStoreB.SuspendAsync(
+                new SuspendSaleRequest(
+                    Guid.NewGuid(),
+                    null,
+                    new[] { suspendRequest.Lines[0] with { Quantity = 1 } }),
+                cancellationToken);
+            var disabledDraftStore = new InMemorySaleDraftStore();
+            var disabledDraft = await new RestoreSuspendedSaleDraftHandler(
+                new InMemorySaleDraftIdGenerator(), disabledDraftStore).HandleAsync(
+                    disabledSuspension.Value,
+                    cancellationToken);
+            var disabledPreparation = await PrepareAsync(
+                Guid.NewGuid(),
+                new DraftScenario(disabledDraftStore, disabledDraft.Value),
+                availabilityReader,
+                cancellationToken);
+            await ExecuteAsync(
+                databaseConnection.ConnectionString,
+                "UPDATE catalog.Products SET IsActive=0 WHERE Id=@productId;",
+                new SqlParameter("@productId", SqlDbType.BigInt) { Value = product.Value.ProductId });
+            var disabled = await finalizer.FinalizeAsync(
+                new FinalizeSaleRequest(
+                    disabledPreparation,
+                    new SalePaymentRequest(SalePaymentMethod.Cash, 10m, 10m, 0m, false),
+                    SuspendedSale: new SuspendedSaleCompletionRequest(
+                        disabledSuspension.Value.SuspendedSaleId,
+                        disabledSuspension.Value.RowVersion)),
+                cancellationToken);
+            Assert.Equal("sales.product.not_sellable", disabled.Error.Code);
+            Assert.Equal("Open", await ScalarAsync<string>(
+                databaseConnection.ConnectionString,
+                "SELECT Status FROM sales.SuspendedSales WHERE Id=@id;",
+                new SqlParameter("@id", SqlDbType.BigInt) { Value = disabledSuspension.Value.SuspendedSaleId }));
+            Assert.Equal(6, await BalanceAsync(databaseConnection.ConnectionString, null, product.Value.ProductId));
+            await ExecuteAsync(
+                databaseConnection.ConnectionString,
+                "UPDATE catalog.Products SET IsActive=1 WHERE Id=@productId;",
+                new SqlParameter("@productId", SqlDbType.BigInt) { Value = product.Value.ProductId });
+            Assert.True((await suspendedStoreB.AbandonAsync(
+                Guid.NewGuid(),
+                disabledSuspension.Value.SuspendedSaleId,
+                disabledSuspension.Value.RowVersion,
+                cancellationToken)).IsSuccess);
+            Assert.Empty((await suspendedStoreB.GetOpenAsync(cancellationToken)).Value);
+            _ = catalogReader;
+        }
+        finally
+        {
+            SqlConnection.ClearAllPools();
+            await DropTemporaryDatabaseAsync(serverConnection.ConnectionString, databaseName);
+        }
+    }
+
+    [Fact]
+    public Task SAL0807_SuspendedSalePricePolicyRemainsSnapshotThenRevalidationRefusal()
+    {
+        return RET001_RealSqlSuspensionsPersistRestoreAndCloseAtomicallyWithoutEarlyStockEffects();
+    }
+
     private static async Task<DraftScenario> CreateDraftAsync(
         long productId,
         int quantity,

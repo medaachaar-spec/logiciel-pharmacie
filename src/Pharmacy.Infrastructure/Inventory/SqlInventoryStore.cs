@@ -1,3 +1,4 @@
+using System.Data;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -429,7 +430,7 @@ public sealed class SqlInventoryStore : IInventoryStore
             return await strategy.ExecuteAsync(async () =>
             {
                 await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-                await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+                await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
                 var session = await SessionQuery(context).SingleOrDefaultAsync(
                     candidate => candidate.Id == command.SessionId,
                     cancellationToken);
@@ -559,7 +560,7 @@ public sealed class SqlInventoryStore : IInventoryStore
             return await strategy.ExecuteAsync(async () =>
             {
                 await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-                await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+                await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
                 var session = await SessionQuery(context).SingleOrDefaultAsync(
                     candidate => candidate.Id == command.SessionId,
                     cancellationToken);
@@ -591,6 +592,17 @@ public sealed class SqlInventoryStore : IInventoryStore
                     .Include(balance => balance.StockBatch)
                     .Where(balance => balance.StockLocationId == session.StockLocationId)
                     .ToArrayAsync(cancellationToken);
+                var snapshotKeys = session.Lines
+                    .Select(line => (line.ProductId, line.StockBatchId))
+                    .ToHashSet();
+
+                if (balances.Length != snapshotKeys.Count
+                    || balances.Any(balance => !snapshotKeys.Contains((balance.ProductId, balance.StockBatchId)))
+                    || balances.Any(balance => balance.UpdatedAtUtc > session.StartedAtUtc))
+                {
+                    return Result<InventorySessionView>.Failure(InventoryErrors.ConcurrencyConflict);
+                }
+
                 var now = DateTime.UtcNow;
 
                 foreach (var line in session.Lines)

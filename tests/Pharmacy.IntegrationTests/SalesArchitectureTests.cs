@@ -64,7 +64,8 @@ public sealed class SalesArchitectureTests
             typeof(ISaleDraftIdGenerator),
             typeof(ISaleFinalizationPreparationStore),
             typeof(ISaleFinalizer),
-            typeof(ISalesReader)
+            typeof(ISalesReader),
+            typeof(ISuspendedSaleStore)
         };
         var infrastructureTypes = typeof(Pharmacy.Infrastructure.AssemblyMarker).Assembly.GetTypes();
         var implementations = infrastructureTypes
@@ -80,6 +81,8 @@ public sealed class SalesArchitectureTests
             implementation.FullName == "Pharmacy.Infrastructure.Sales.SqlSaleFinalizer");
         Assert.Contains(implementations, implementation =>
             implementation.FullName == "Pharmacy.Infrastructure.Sales.SqlSalesReader");
+        Assert.Contains(implementations, implementation =>
+            implementation.FullName == "Pharmacy.Infrastructure.Sales.SqlCustomerCreditCashStore");
     }
 
     [Fact]
@@ -97,7 +100,7 @@ public sealed class SalesArchitectureTests
 
         Assert.Contains("SalesPosCoordinator", desktopSource, StringComparison.Ordinal);
         Assert.Contains("AddCatalogBackedSales", desktopSource, StringComparison.Ordinal);
-        Assert.Contains("AddSqlCatalogAdaptersFromEnvironment", desktopSource, StringComparison.Ordinal);
+        Assert.Contains("AddSqlCatalogAdapters(databaseEndpoint)", desktopSource, StringComparison.Ordinal);
         Assert.Contains("@inject SalesPosCoordinator", page, StringComparison.Ordinal);
         Assert.DoesNotContain("InMemorySaleDraftStore", page, StringComparison.Ordinal);
     }
@@ -222,6 +225,24 @@ public sealed class SalesArchitectureTests
 
         Assert.Contains("@page \"/diagnostic\"", diagnostic, StringComparison.Ordinal);
         Assert.Contains("@page \"/ui-lab\"", uiLab, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RET001_DesktopActivePosUsesApplicationSuspensionWorkflowAndPersistentLanguage()
+    {
+        var coordinator = File.ReadAllText(PathAt(
+            "src", "Pharmacy.Desktop", "Components", "Pos", "SalesPosCoordinator.cs"));
+        var page = File.ReadAllText(PathAt(
+            "src", "Pharmacy.Desktop", "Components", "Pages", "DemoPosPage.razor"));
+        var panel = File.ReadAllText(PathAt(
+            "src", "Pharmacy.Desktop", "Components", "Pos", "DemoSuspendedSalesPanel.razor"));
+
+        Assert.Contains("SuspendedSaleWorkflow", coordinator, StringComparison.Ordinal);
+        Assert.Contains("LoadSuspendedSalesCoreAsync", coordinator, StringComparison.Ordinal);
+        Assert.Contains("SuspendedSaleCompletionRequest", coordinator, StringComparison.Ordinal);
+        Assert.DoesNotContain("DEMO-HOLD", coordinator, StringComparison.Ordinal);
+        Assert.DoesNotContain("disparaît", page + panel, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Persistée SQL", panel, StringComparison.Ordinal);
     }
 
     private static XDocument Project(params string[] segments)

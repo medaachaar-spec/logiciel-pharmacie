@@ -29,5 +29,15 @@
              Link="SalesPosErrorMapper.cs" />
     <Compile Include="..\..\src\Pharmacy.Desktop\Components\Pos\SalesPosCoordinator.cs"
              Link="SalesPosCoordinator.cs" />
+    <Compile Include="..\..\src\Pharmacy.Desktop\Components\Pos\SalesReturnCoordinator.cs"
+             Link="SalesReturnCoordinator.cs" />
+    <Compile Include="..\..\src\Pharmacy.Desktop\Components\Customers\CustomersCoordinator.cs"
+             Link="CustomersCoordinator.cs" />
+    <Compile Include="..\..\src\Pharmacy.Desktop\Components\Security\SecurityCoordinator.cs"
+             Link="SecurityCoordinator.cs" />
+    <Compile Include="..\..\src\Pharmacy.Desktop\Components\Reporting\ReportingCoordinator.cs"
+             Link="ReportingCoordinator.cs" />
+    <Compile Include="..\..\src\Pharmacy.Desktop\Components\Operations\OperationsCoordinator.cs"
+             Link="OperationsCoordinator.cs" />
   </ItemGroup>
 </Project>

@@ -76,6 +76,19 @@ public sealed record SetUserRolesRequest(
     IReadOnlyList<long> RoleIds,
     byte[] RowVersion);
 
+public sealed record CreateSecurityRoleRequest(
+    Guid OperationId,
+    string Code,
+    string Name,
+    IReadOnlyList<long> PermissionIds);
+
+public sealed record UpdateSecurityRoleRequest(
+    Guid OperationId,
+    long RoleId,
+    string Name,
+    IReadOnlyList<long> PermissionIds,
+    byte[] RowVersion);
+
 public sealed record AuditEventView(
     long AuditEventId,
     string EventType,

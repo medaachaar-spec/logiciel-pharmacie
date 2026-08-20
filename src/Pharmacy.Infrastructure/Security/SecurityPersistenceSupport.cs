@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 using Pharmacy.Application.Security.Errors;
 using Pharmacy.Application.Security.Models;
 using Pharmacy.Domain.Common;
@@ -145,6 +146,15 @@ internal static class SecurityPersistenceSupport
     public static bool IsUniqueViolation(Exception exception)
     {
         return Sales.SalesSqlFailure.IsUniqueViolation(exception);
+    }
+
+    public static bool IsBootstrapLockUnavailable(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException!)
+        {
+            if (current is SqlException { Number: 51000 }) return true;
+        }
+        return false;
     }
 
     public static async Task<T> ExecuteSerializableAsync<T>(

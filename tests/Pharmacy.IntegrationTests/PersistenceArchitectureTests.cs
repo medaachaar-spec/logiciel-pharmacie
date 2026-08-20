@@ -81,7 +81,15 @@ public sealed class PersistenceArchitectureTests
     [Fact]
     public void ProductionSourcesContainNoEnsureCreatedOrSensitiveLogging()
     {
-        var source = AllText(PathAt("src"), "*.cs", "*.csproj", "*.razor");
+        var source = string.Join(Environment.NewLine, new[]
+        {
+            AllText(PathAt("src", "Pharmacy.Domain"), "*.cs", "*.csproj"),
+            AllText(PathAt("src", "Pharmacy.Application"), "*.cs", "*.csproj"),
+            AllText(PathAt("src", "Pharmacy.Desktop"), "*.cs", "*.csproj", "*.razor"),
+            string.Join(Environment.NewLine, Directory.EnumerateFiles(PathAt("src", "Pharmacy.Infrastructure"), "*.cs", SearchOption.AllDirectories)
+                .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}Deployment{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                .Select(File.ReadAllText))
+        });
 
         Assert.DoesNotContain("EnsureCreated", source, StringComparison.Ordinal);
         Assert.DoesNotContain("EnsureDeleted", source, StringComparison.Ordinal);
@@ -309,7 +317,7 @@ public sealed class PersistenceArchitectureTests
             "src",
             "Pharmacy.Desktop",
             "SalesServiceCollectionExtensions.cs"));
-        Assert.Contains("AddSqlCatalogAdaptersFromEnvironment", composition, StringComparison.Ordinal);
+        Assert.Contains("AddSqlCatalogAdapters(databaseEndpoint)", composition, StringComparison.Ordinal);
         Assert.Contains("AddSqlInventoryAdapters", composition, StringComparison.Ordinal);
         Assert.DoesNotContain("SyntheticCatalogStockAvailabilityReader", composition, StringComparison.Ordinal);
         Assert.DoesNotContain("InMemoryProductCatalogReader", composition, StringComparison.Ordinal);

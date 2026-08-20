@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using Pharmacy.Infrastructure.Deployment;
 
 namespace Pharmacy.Desktop;
 
@@ -8,7 +9,7 @@ public partial class App : System.Windows.Application
 {
     private ServiceProvider? serviceProvider;
 
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
@@ -16,13 +17,30 @@ public partial class App : System.Windows.Application
 
         var services = new ServiceCollection();
         services.AddWpfBlazorWebView();
-        services.AddCatalogBackedSales();
+        var databaseEndpoint = DesktopConnectionResolver.Resolve();
+        services.AddCatalogBackedSales(databaseEndpoint);
 
 #if DEBUG
         services.AddBlazorWebViewDeveloperTools();
 #endif
 
         serviceProvider = services.BuildServiceProvider();
+
+        if (!string.IsNullOrWhiteSpace(databaseEndpoint))
+        {
+            var compatibility = await DatabaseCompatibilityGuard.CheckAsync(serviceProvider);
+            if (!compatibility.IsCompatible)
+            {
+                MessageBox.Show(
+                    compatibility.Message + Environment.NewLine + Environment.NewLine +
+                    "L'application ne lancera aucune migration automatiquement. Exécutez Pharmacy.Deployment.",
+                    "Logiciel Pharmacie — schéma SQL incompatible",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                Shutdown(2);
+                return;
+            }
+        }
 
         var mainWindow = new MainWindow(serviceProvider);
         MainWindow = mainWindow;

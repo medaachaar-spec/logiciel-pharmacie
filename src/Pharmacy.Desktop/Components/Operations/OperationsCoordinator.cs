@@ -9,6 +9,7 @@ public sealed class OperationsCoordinator
     private readonly IControlledImportService imports;
     private readonly IDeviceDiagnostics diagnostics;
     private Guid pendingImportOperationId;
+    private int operationInProgress;
 
     public OperationsCoordinator(
         IBackupRecoveryService backups,
@@ -25,7 +26,7 @@ public sealed class OperationsCoordinator
     public ImportPreviewView? ImportPreview { get; private set; }
     public ImportReportView? ImportReport { get; private set; }
     public DeviceDiagnosticView? DeviceDiagnostic { get; private set; }
-    public bool IsBusy { get; private set; }
+    public bool IsBusy => Volatile.Read(ref operationInProgress) != 0;
     public string? Message { get; private set; }
     public string? Error { get; private set; }
 
@@ -112,11 +113,11 @@ public sealed class OperationsCoordinator
 
     private async Task RunAsync(Func<Task> action)
     {
-        if (IsBusy) return;
-        IsBusy = true; Message = null; Error = null;
+        if (Interlocked.CompareExchange(ref operationInProgress, 1, 0) != 0) return;
+        Message = null; Error = null;
         try { await action(); }
         catch (Exception) { Fail("operations.unexpected", "L’opération n’a pas abouti. Consultez le diagnostic et le journal d’audit."); }
-        finally { IsBusy = false; }
+        finally { Interlocked.Exchange(ref operationInProgress, 0); }
     }
 
     private void Fail(string code, string message) => Error = $"{code} — {message}";

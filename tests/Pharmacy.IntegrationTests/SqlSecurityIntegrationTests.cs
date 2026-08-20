@@ -7,8 +7,11 @@ using Pharmacy.Application.Security;
 using Pharmacy.Application.Security.Contracts;
 using Pharmacy.Application.Security.Models;
 using Pharmacy.Application.Security.Services;
+using Pharmacy.Application.Reporting.Models;
+using Pharmacy.Domain.Common;
 using Pharmacy.Infrastructure.Persistence;
 using Pharmacy.Infrastructure.Persistence.Entities.Security;
+using Pharmacy.Infrastructure.Reporting;
 using Pharmacy.Infrastructure.Security;
 using Xunit;
 
@@ -64,12 +67,34 @@ public sealed class SqlSecurityIntegrationTests
             }));
             var service = new SqlAuthenticationService(factory, hasher, generator, session, clock);
 
-            var bootstrap = await service.BootstrapOwnerAsync(
-                new BootstrapOwnerRequest(Guid.NewGuid(), "owner.local", "Propriétaire local", OwnerPassword), token);
+            var initialState = await service.HasUsersAsync(token);
+            Assert.True(initialState.IsSuccess);
+            Assert.False(initialState.Value);
+            var shortPassword = await service.BootstrapOwnerAsync(
+                new BootstrapOwnerRequest(Guid.NewGuid(), "owner.local", "Propriétaire local", "too-short"), token);
+            Assert.Equal("security.password.policy_failed", shortPassword.Error.Code);
+            Assert.Equal(0, await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM security.UserAccounts;"));
+
+            var concurrent = await Task.WhenAll(
+                service.BootstrapOwnerAsync(
+                    new BootstrapOwnerRequest(Guid.NewGuid(), "owner.local", "Propriétaire local", OwnerPassword), token),
+                service.BootstrapOwnerAsync(
+                    new BootstrapOwnerRequest(Guid.NewGuid(), "owner.local", "Propriétaire local", OwnerPassword), token));
+            var bootstrap = Assert.Single(concurrent, result => result.IsSuccess);
+            var refusedConcurrent = Assert.Single(concurrent, result => result.IsFailure);
+            Assert.Equal("security.bootstrap.already_completed", refusedConcurrent.Error.Code);
             Assert.True(bootstrap.IsSuccess, bootstrap.IsFailure ? bootstrap.Error.Code : null);
             Assert.Equal(8, bootstrap.Value.Codes.Count);
             Assert.Equal("security.bootstrap.already_completed", (await service.BootstrapOwnerAsync(
                 new BootstrapOwnerRequest(Guid.NewGuid(), "second", "Second", OwnerPassword), token)).Error.Code);
+            Assert.Equal(1, await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM security.UserAccounts;"));
+            Assert.Equal(1, await ScalarAsync<int>(database.ConnectionString,
+                "SELECT COUNT(*) FROM security.UserRoles ur JOIN security.Roles r ON r.Id=ur.RoleId WHERE r.Code=N'OWNER';"));
+            Assert.Equal(28, await ScalarAsync<int>(database.ConnectionString,
+                "SELECT COUNT(*) FROM security.UserRoles ur JOIN security.RolePermissions rp ON rp.RoleId=ur.RoleId WHERE ur.UserAccountId=1;"));
+            var restartedState = await service.HasUsersAsync(token);
+            Assert.True(restartedState.IsSuccess);
+            Assert.True(restartedState.Value);
 
             Assert.Equal(0, await ScalarAsync<int>(database.ConnectionString,
                 "SELECT COUNT(*) FROM security.UserAccounts WHERE PasswordHash=@plain OR PasswordHash LIKE N'%' + @plain + N'%';",
@@ -107,6 +132,154 @@ public sealed class SqlSecurityIntegrationTests
             Assert.True(await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM audit.AuditEvents;") >= 4);
             Assert.Equal(0, await ScalarAsync<int>(database.ConnectionString,
                 "SELECT COUNT(*) FROM audit.AuditEvents WHERE ReasonCode LIKE N'%password%' OR ActorDisplayName LIKE N'%Password%';"));
+        }
+        finally
+        {
+            SqlConnection.ClearAllPools();
+            await DropDatabaseAsync(server, databaseName);
+        }
+    }
+
+    [Fact]
+    public async Task RealSqlRoleManagementPersistsPermissionsProtectsOwnerAuditsAndDeniesLimitedUser()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var server = BuildServerConnection();
+        var databaseName = Prefix + Guid.NewGuid().ToString("N")[..12];
+        Assert.Matches(new Regex($"^{Prefix}[0-9a-f]{{12}}$", RegexOptions.CultureInvariant), databaseName);
+        var database = new SqlConnectionStringBuilder(server)
+        {
+            InitialCatalog = databaseName,
+            ApplicationName = "Pharmacy.Sec04.Tests",
+            Pooling = false
+        };
+        await CreateDatabaseAsync(server, databaseName);
+
+        try
+        {
+            var factory = new Factory(database.ConnectionString);
+            await using (var context = await factory.CreateDbContextAsync(token))
+            {
+                await context.Database.MigrateAsync(token);
+                Assert.Empty(await context.Database.GetPendingMigrationsAsync(token));
+            }
+
+            var clock = new MutableClock(new DateTime(2026, 8, 14, 10, 0, 0, DateTimeKind.Utc));
+            var session = new CurrentSecuritySession();
+            var generator = new FixedRecoveryGenerator();
+            var hasher = new PasswordHasher<UserAccountEntity>(Options.Create(new PasswordHasherOptions
+            {
+                CompatibilityMode = PasswordHasherCompatibilityMode.IdentityV3,
+                IterationCount = 210_000
+            }));
+            var authentication = new SqlAuthenticationService(factory, hasher, generator, session, clock);
+            var bootstrap = await authentication.BootstrapOwnerAsync(
+                new BootstrapOwnerRequest(Guid.NewGuid(), "owner.sec04", "Owner SEC-04", OwnerPassword), token);
+            Assert.True(bootstrap.IsSuccess, bootstrap.IsFailure ? bootstrap.Error.Code : null);
+            var ownerLogin = await authentication.LoginAsync(
+                new LoginRequest("owner.sec04", OwnerPassword, Guid.NewGuid()), token);
+            Assert.True(ownerLogin.IsSuccess, ownerLogin.IsFailure ? ownerLogin.Error.Code : null);
+
+            var authorizer = new PermissionAuthorizer(session, clock);
+            var administration = new SqlSecurityAdministrationService(
+                factory, hasher, generator, authorizer, session, clock);
+            var permissionResult = await administration.GetPermissionsAsync(token);
+            Assert.True(permissionResult.IsSuccess, permissionResult.IsFailure ? permissionResult.Error.Code : null);
+            Assert.Equal(28, permissionResult.Value.Count);
+            var recipeCodes = new[]
+            {
+                SecurityPermissions.SalesCreate,
+                SecurityPermissions.CatalogView,
+                SecurityPermissions.InventoryView
+            };
+            var recipePermissionIds = permissionResult.Value
+                .Where(permission => recipeCodes.Contains(permission.Code, StringComparer.Ordinal))
+                .Select(permission => permission.PermissionId)
+                .ToArray();
+            Assert.Equal(3, recipePermissionIds.Length);
+
+            var created = await administration.CreateRoleAsync(new CreateSecurityRoleRequest(
+                Guid.NewGuid(), " role-qa-limite ", " QA limité ", recipePermissionIds), token);
+            Assert.True(created.IsSuccess, created.IsFailure ? created.Error.Code : null);
+            Assert.Equal("ROLE-QA-LIMITE", created.Value.Code);
+            Assert.Equal("QA limité", created.Value.Name);
+            Assert.False(created.Value.IsSystemRole);
+            Assert.Equal(recipeCodes.Order(StringComparer.Ordinal), created.Value.Permissions.Select(permission => permission.Code));
+
+            var duplicate = await administration.CreateRoleAsync(new CreateSecurityRoleRequest(
+                Guid.NewGuid(), "ROLE-QA-LIMITE", "Doublon", Array.Empty<long>()), token);
+            Assert.Equal("security.role.code_exists", duplicate.Error.Code);
+            Assert.Equal(1, await ScalarAsync<int>(database.ConnectionString,
+                "SELECT COUNT(*) FROM security.Roles WHERE Code=N'ROLE-QA-LIMITE';"));
+
+            var cashViewId = permissionResult.Value.Single(permission => permission.Code == SecurityPermissions.CashView).PermissionId;
+            var withoutCatalog = recipePermissionIds
+                .Where(id => id != permissionResult.Value.Single(permission => permission.Code == SecurityPermissions.CatalogView).PermissionId)
+                .Append(cashViewId)
+                .ToArray();
+            var firstUpdate = await administration.UpdateRoleAsync(new UpdateSecurityRoleRequest(
+                Guid.NewGuid(), created.Value.RoleId, "QA limité modifié", withoutCatalog, created.Value.RowVersion), token);
+            Assert.True(firstUpdate.IsSuccess, firstUpdate.IsFailure ? firstUpdate.Error.Code : null);
+            Assert.Contains(SecurityPermissions.CashView, firstUpdate.Value.Permissions.Select(permission => permission.Code));
+            Assert.DoesNotContain(SecurityPermissions.CatalogView, firstUpdate.Value.Permissions.Select(permission => permission.Code));
+
+            var restored = await administration.UpdateRoleAsync(new UpdateSecurityRoleRequest(
+                Guid.NewGuid(), firstUpdate.Value.RoleId, "QA limité", recipePermissionIds, firstUpdate.Value.RowVersion), token);
+            Assert.True(restored.IsSuccess, restored.IsFailure ? restored.Error.Code : null);
+            Assert.Equal(recipeCodes.Order(StringComparer.Ordinal), restored.Value.Permissions.Select(permission => permission.Code));
+
+            var staleUpdate = await administration.UpdateRoleAsync(new UpdateSecurityRoleRequest(
+                Guid.NewGuid(), created.Value.RoleId, "Écriture périmée", recipePermissionIds, created.Value.RowVersion), token);
+            Assert.Equal("security.concurrency.conflict", staleUpdate.Error.Code);
+
+            var roles = await administration.GetRolesAsync(token);
+            Assert.True(roles.IsSuccess, roles.IsFailure ? roles.Error.Code : null);
+            var persistedRole = roles.Value.Single(role => role.Code == "ROLE-QA-LIMITE");
+            Assert.Equal("QA limité", persistedRole.Name);
+            Assert.Equal(recipeCodes.Order(StringComparer.Ordinal), persistedRole.Permissions.Select(permission => permission.Code));
+            var ownerRole = roles.Value.Single(role => role.Code == "OWNER");
+            Assert.True(ownerRole.IsSystemRole);
+            Assert.Equal(28, ownerRole.Permissions.Count);
+            var ownerUpdate = await administration.UpdateRoleAsync(new UpdateSecurityRoleRequest(
+                Guid.NewGuid(), ownerRole.RoleId, "Owner modifié", Array.Empty<long>(), ownerRole.RowVersion), token);
+            Assert.Equal("security.role.system_protected", ownerUpdate.Error.Code);
+            Assert.Equal(28, await ScalarAsync<int>(database.ConnectionString,
+                "SELECT COUNT(*) FROM security.RolePermissions rp JOIN security.Roles r ON r.Id=rp.RoleId WHERE r.Code=N'OWNER';"));
+            Assert.Equal("Propriétaire", await ScalarAsync<string>(database.ConnectionString,
+                "SELECT Name FROM security.Roles WHERE Code=N'OWNER';"));
+
+            var limitedUser = await administration.CreateUserAsync(new CreateSecurityUserRequest(
+                Guid.NewGuid(), "UTIL-QA-LIMITE", "Utilisateur QA limité", NewPassword,
+                new[] { restored.Value.RoleId }), token);
+            Assert.True(limitedUser.IsSuccess, limitedUser.IsFailure ? limitedUser.Error.Code : null);
+            Assert.Equal(1, await ScalarAsync<int>(database.ConnectionString,
+                "SELECT COUNT(*) FROM security.UserRoles ur JOIN security.Roles r ON r.Id=ur.RoleId JOIN security.UserAccounts u ON u.Id=ur.UserAccountId WHERE r.Code=N'ROLE-QA-LIMITE' AND u.NormalizedLogin=N'UTIL-QA-LIMITE';"));
+
+            Assert.Equal(1, await ScalarAsync<int>(database.ConnectionString,
+                "SELECT COUNT(*) FROM audit.AuditEvents WHERE EntityType=N'Role' AND Action=N'role.create' AND Result=N'Success' AND ActorUserId IS NOT NULL;"));
+            Assert.Equal(2, await ScalarAsync<int>(database.ConnectionString,
+                "SELECT COUNT(*) FROM audit.AuditEvents WHERE EntityType=N'Role' AND Action=N'role.permissions.change' AND Result=N'Success';"));
+            Assert.True(await ScalarAsync<int>(database.ConnectionString,
+                "SELECT COUNT(*) FROM audit.AuditEventDetails d JOIN audit.AuditEvents e ON e.Id=d.AuditEventId WHERE e.EntityType=N'Role' AND d.FieldName IN (N'PermissionsAdded',N'PermissionsRemoved');") >= 5);
+
+            await authentication.LogoutAsync(Guid.NewGuid(), token);
+            var limitedLogin = await authentication.LoginAsync(
+                new LoginRequest("UTIL-QA-LIMITE", NewPassword, Guid.NewGuid()), token);
+            Assert.True(limitedLogin.IsSuccess, limitedLogin.IsFailure ? limitedLogin.Error.Code : null);
+            Assert.Equal(recipeCodes.Order(StringComparer.Ordinal), limitedLogin.Value.Session.Permissions.Order(StringComparer.Ordinal));
+            Assert.Equal("security.authorization.denied", authorizer.Authorize(SecurityPermissions.InventoryAdjust).Error.Code);
+            Assert.Equal("security.authorization.denied", authorizer.Authorize(SecurityPermissions.InventoryFinalizeCount, true).Error.Code);
+            Assert.Equal("security.authorization.denied", authorizer.Authorize(SecurityPermissions.ReportsView).Error.Code);
+            Assert.Equal("security.authorization.denied", authorizer.Authorize(SecurityPermissions.SecurityManageUsers).Error.Code);
+            Assert.Equal("security.authorization.denied", authorizer.Authorize(SecurityPermissions.SecurityManageRoles).Error.Code);
+
+            var deniedRoleCreate = await administration.CreateRoleAsync(new CreateSecurityRoleRequest(
+                Guid.NewGuid(), "ROLE-INTERDIT", "Interdit", Array.Empty<long>()), token);
+            Assert.Equal("security.authorization.denied", deniedRoleCreate.Error.Code);
+            var reporting = new SqlReportingService(factory, authorizer, new NoOpAuditRecorder(), clock);
+            var deniedReporting = await reporting.GetSnapshotAsync(new ReportingQuery(
+                new ReportingPeriod(clock.UtcNow.AddDays(-1), clock.UtcNow), 10), token);
+            Assert.Equal("security.authorization.denied", deniedReporting.Error.Code);
         }
         finally
         {
@@ -177,8 +350,13 @@ public sealed class SqlSecurityIntegrationTests
         private int generation;
         public IReadOnlyList<string> Generate(int count)
         {
-            generation++;
-            return Enumerable.Range(1, count).Select(index => $"S15{generation:00}-CODE-{index:0000}").ToArray();
+            var currentGeneration = Interlocked.Increment(ref generation);
+            return Enumerable.Range(1, count).Select(index => $"S15{currentGeneration:00}-CODE-{index:0000}").ToArray();
         }
+    }
+
+    private sealed class NoOpAuditRecorder : IBusinessAuditRecorder
+    {
+        public Task RecordSuccessAsync(string module, string entityType, string? entityId, string action, Guid? operationId, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

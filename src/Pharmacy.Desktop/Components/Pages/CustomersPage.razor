@@ -1,4 +1,5 @@
 @page "/module/customers"
+@using Pharmacy.Application.Sales.Models
 @inject Pharmacy.Desktop.Components.Customers.CustomersCoordinator Coordinator
 @implements IDisposable
 
@@ -121,11 +122,50 @@
                     <p>Solde crédit : <strong>@DemoMoney.Format(selected.CreditBalance.Amount)</strong></p>
                     <UiBadge Text="@(selected.CreditAllowed ? "Crédit autorisé" : "Crédit non autorisé")"
                              Variant="@(selected.CreditAllowed ? UiBadgeVariant.Success : UiBadgeVariant.Warning)" />
-                    <label class="ui-field">
-                        <span class="ui-field__label">Règlement espèces</span>
-                        <input class="ui-field__control" inputmode="decimal" value="@paymentAmount" @oninput="args => paymentAmount = args.Value?.ToString() ?? string.Empty" />
-                    </label>
-                    <UiButton Disabled="@(!CanRegisterPayment)" OnClick="RegisterPaymentAsync">Enregistrer le règlement</UiButton>
+                    @if (selected.CreditBalance.Amount == 0m)
+                    {
+                        <UiAlert Title="Aucune dette à régler" Variant="UiAlertVariant.Information">
+                            Le ledger de ce client présente un solde nul. Aucun règlement ne peut être enregistré.
+                        </UiAlert>
+                    }
+                    else
+                    {
+                        <label class="ui-field">
+                            <span class="ui-field__label">Montant du règlement</span>
+                            <input class="ui-field__control"
+                                   inputmode="decimal"
+                                   value="@paymentAmount"
+                                   disabled="@(Coordinator.IsBusy || Coordinator.IsPaymentInProgress)"
+                                   @oninput="args => paymentAmount = args.Value?.ToString() ?? string.Empty" />
+                            <span class="ui-field__help">Maximum : @DemoMoney.Format(selected.CreditBalance.Amount)</span>
+                        </label>
+                        <label class="ui-field">
+                            <span class="ui-field__label">Mode de règlement</span>
+                            <select class="ui-field__control"
+                                    value="@paymentMethod"
+                                    disabled="@(Coordinator.IsBusy || Coordinator.IsPaymentInProgress)"
+                                    @onchange="PaymentMethodChanged">
+                                <option value="@SalePaymentMethod.Cash">Espèces</option>
+                                <option value="@SalePaymentMethod.ExternalCard">Carte — TPE externe</option>
+                            </select>
+                        </label>
+                        @if (paymentMethod == SalePaymentMethod.ExternalCard)
+                        {
+                            <label class="catalog-toggle">
+                                <input type="checkbox"
+                                       checked="@externalCardConfirmed"
+                                       disabled="@(Coordinator.IsBusy || Coordinator.IsPaymentInProgress)"
+                                       @onchange="args => externalCardConfirmed = args.Value is true" />
+                                <span>Résultat confirmé sur le TPE externe — aucune donnée carte saisie</span>
+                            </label>
+                        }
+                        <UiButton Disabled="@(!CanRegisterPayment)"
+                                  IsLoading="@Coordinator.IsPaymentInProgress"
+                                  LoadingText="Enregistrement SQL"
+                                  OnClick="RegisterPaymentAsync">
+                            Enregistrer le règlement
+                        </UiButton>
+                    }
                     <h3>Historique</h3>
                     @if (selected.Ledger.Count == 0)
                     {
@@ -153,12 +193,21 @@
     private string newPhone = string.Empty;
     private bool newCreditAllowed;
     private string paymentAmount = string.Empty;
+    private SalePaymentMethod paymentMethod = SalePaymentMethod.Cash;
+    private bool externalCardConfirmed;
 
     private bool CanRegisterPayment => decimal.TryParse(
         paymentAmount.Replace(',', '.'),
         System.Globalization.NumberStyles.AllowDecimalPoint,
         System.Globalization.CultureInfo.InvariantCulture,
-        out var amount) && amount > 0m && !Coordinator.IsBusy;
+        out var amount)
+        && amount > 0m
+        && Coordinator.SelectedCustomer is not null
+        && amount <= Coordinator.SelectedCustomer.CreditBalance.Amount
+        && (paymentMethod == SalePaymentMethod.Cash
+            || paymentMethod == SalePaymentMethod.ExternalCard && externalCardConfirmed)
+        && !Coordinator.IsBusy
+        && !Coordinator.IsPaymentInProgress;
 
     protected override async Task OnInitializedAsync()
     {
@@ -188,7 +237,23 @@
     private Task SelectAsync(long customerId)
     {
         paymentAmount = string.Empty;
+        paymentMethod = SalePaymentMethod.Cash;
+        externalCardConfirmed = false;
         return Coordinator.SelectAsync(customerId, lifetime.Token);
+    }
+
+    private void PaymentMethodChanged(ChangeEventArgs args)
+    {
+        if (!Enum.TryParse<SalePaymentMethod>(args.Value?.ToString(), out var selected))
+        {
+            return;
+        }
+
+        paymentMethod = selected;
+        if (paymentMethod != SalePaymentMethod.ExternalCard)
+        {
+            externalCardConfirmed = false;
+        }
     }
 
     private async Task RegisterPaymentAsync(MouseEventArgs _)
@@ -202,8 +267,13 @@
             return;
         }
 
-        await Coordinator.RegisterPaymentAsync(amount, lifetime.Token);
+        await Coordinator.RegisterPaymentAsync(
+            amount,
+            paymentMethod,
+            externalCardConfirmed,
+            lifetime.Token);
         paymentAmount = string.Empty;
+        externalCardConfirmed = false;
     }
 
     public void Dispose()
