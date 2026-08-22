@@ -32,6 +32,7 @@ using Pharmacy.Desktop.Components.Operations;
 using Pharmacy.Infrastructure.Operations;
 using Pharmacy.Infrastructure.Branding;
 using Pharmacy.Desktop.Components.Branding;
+using Pharmacy.Desktop.Components.Dashboard;
 
 namespace Pharmacy.Desktop;
 
@@ -103,6 +104,7 @@ public static class SalesServiceCollectionExtensions
         services.AddScoped<ReportingCoordinator>();
         services.AddScoped<OperationsCoordinator>();
         services.AddScoped<BrandingCoordinator>();
+        services.AddScoped<DashboardCoordinator>();
         return services;
     }
 }

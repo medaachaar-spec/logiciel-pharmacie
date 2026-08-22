@@ -10,6 +10,7 @@
 @import url("./security.css");
 @import url("./reporting.css");
 @import url("./operations.css");
+@import url("./dashboard.css");
 
 .development-shell {
     min-height: 100vh;

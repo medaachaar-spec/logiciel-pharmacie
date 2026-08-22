@@ -37,6 +37,8 @@
              Link="SecurityCoordinator.cs" />
     <Compile Include="..\..\src\Pharmacy.Desktop\Components\Reporting\ReportingCoordinator.cs"
              Link="ReportingCoordinator.cs" />
+    <Compile Include="..\..\src\Pharmacy.Desktop\Components\Dashboard\DashboardCoordinator.cs"
+             Link="DashboardCoordinator.cs" />
     <Compile Include="..\..\src\Pharmacy.Desktop\Components\Operations\OperationsCoordinator.cs"
              Link="OperationsCoordinator.cs" />
     <Compile Include="..\..\src\Pharmacy.Desktop\Components\Branding\BrandingCoordinator.cs"

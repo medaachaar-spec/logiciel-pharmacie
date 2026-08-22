@@ -209,7 +209,10 @@ public sealed class CustomUxCleanupTests
             "src/Pharmacy.Infrastructure/Persistence/Entities/Sales/",
             "src/Pharmacy.Infrastructure/Sales/SqlCustomerCreditCashStore.cs",
             "src/Pharmacy.Infrastructure/Sales/SqlSaleFinalizer.cs",
-            "src/Pharmacy.Infrastructure/Sales/SqlSalesReader.cs"
+            "src/Pharmacy.Infrastructure/Sales/SqlSalesReader.cs",
+            "src/Pharmacy.Application/Dashboard/",
+            "src/Pharmacy.Infrastructure/Reporting/SqlDashboardService.cs",
+            "src/Pharmacy.Infrastructure/Reporting/ReportingServiceCollectionExtensions.cs"
         };
         var unexpected = changedBusinessFiles.Split(
                 ['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)

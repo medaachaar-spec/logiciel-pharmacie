@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Pharmacy.Application.Dashboard.Contracts;
 using Pharmacy.Application.Reporting.Contracts;
 
 namespace Pharmacy.Infrastructure.Reporting;
@@ -10,6 +11,7 @@ public static class ReportingServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         services.AddTransient<SqlReportingService>();
         services.AddTransient<IReportingService>(provider => provider.GetRequiredService<SqlReportingService>());
+        services.AddTransient<IDashboardService, SqlDashboardService>();
         return services;
     }
 }

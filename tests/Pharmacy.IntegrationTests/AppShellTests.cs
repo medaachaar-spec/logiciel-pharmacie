@@ -200,7 +200,7 @@ public sealed class AppShellTests
     {
         var source = DesktopText("Components", "Pages", "Home.razor");
 
-        Assert.Contains(">Accueil</h1>", source, StringComparison.Ordinal);
+        Assert.Contains(">Tableau de bord</h1>", source, StringComparison.Ordinal);
         Assert.Contains(">Accès directs</h2>", source, StringComparison.Ordinal);
         Assert.DoesNotContain("démonstration", source, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Sprint", source, StringComparison.OrdinalIgnoreCase);
@@ -231,7 +231,7 @@ public sealed class AppShellTests
         };
 
         Assert.All(expectedRoutes, route => Assert.Contains($"\"{route}\"", source, StringComparison.Ordinal));
-        Assert.Equal(4, Regex.Matches(source, "new DemoQuickAction\\(").Count);
+        Assert.Equal(4, Regex.Matches(source, "new HomeQuickAction\\(").Count);
     }
 
     [Fact]

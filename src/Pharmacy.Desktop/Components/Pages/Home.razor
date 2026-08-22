@@ -1,38 +1,313 @@
 @page "/"
 @page "/home"
+@implements IDisposable
+@inject DashboardCoordinator Dashboard
+@inject NavigationManager Navigation
 @inject IPermissionAuthorizer Authorizer
 
 <PageTitle>Accueil — Logiciel Pharmacie</PageTitle>
 
-<div class="home-page page-content">
-    <header class="page-header" aria-labelledby="home-title">
+<div class="home-page dashboard-page page-content">
+    <header class="dashboard-hero" aria-labelledby="dashboard-title">
         <div>
-            <h1 id="home-title" tabindex="-1">Accueil</h1>
+            <p class="section-kicker">@Greeting</p>
+            <h1 id="dashboard-title" tabindex="-1">Tableau de bord</h1>
+            <p class="dashboard-hero__subtitle">L’essentiel de votre activité, en un coup d’œil.</p>
+        </div>
+        <div class="dashboard-hero__actions">
+            @if (Dashboard.CanCreateSale)
+            {
+                <button type="button" class="dashboard-primary-action" @onclick="OpenSales">
+                    <UiIcon Name="UiIconName.Sales" />
+                    <span>Nouvelle vente</span>
+                </button>
+            }
+            <UiButton Variant="UiButtonVariant.Secondary"
+                      Size="UiButtonSize.Small"
+                      IsLoading="@Dashboard.IsBusy"
+                      LoadingText="Actualisation"
+                      OnClick="RefreshAsync">Actualiser</UiButton>
         </div>
     </header>
 
-    <section aria-labelledby="quick-actions-title">
-        <div class="content-section-heading">
-            <div>
-                <h2 id="quick-actions-title">Accès directs</h2>
+    @if (Dashboard.IsBusy && !Dashboard.HasAnyContent)
+    {
+        <section class="dashboard-loading" aria-live="polite" aria-label="Chargement du tableau de bord">
+            <span class="dashboard-loading__bar"></span>
+            <div class="dashboard-loading__cards">
+                @for (var index = 0; index < 4; index++)
+                {
+                    <span></span>
+                }
             </div>
-        </div>
-        <div class="quick-actions">
-            @foreach (var action in HomePresentationModel.QuickActions.Where(CanAccess))
+            <span class="sr-only">Chargement des indicateurs en cours.</span>
+        </section>
+    }
+    else
+    {
+        <section class="dashboard-kpis" aria-labelledby="dashboard-kpis-title">
+            <h2 id="dashboard-kpis-title" class="sr-only">Indicateurs principaux</h2>
+
+            @if (Dashboard.GlobalSales is { } global)
             {
-                <a class="quick-action" href="@action.Route">
-                    <span class="quick-action__icon" aria-hidden="true"><UiIcon Name="@action.Icon" /></span>
-                    <span>
-                        <strong>@action.Label</strong>
-                        <small>@action.Description</small>
-                    </span>
-                    <span class="quick-action__chevron" aria-hidden="true"><UiIcon Name="UiIconName.Chevron" /></span>
-                </a>
+                <article class="dashboard-kpi">
+                    <span class="dashboard-kpi__icon" aria-hidden="true"><UiIcon Name="UiIconName.Sales" /></span>
+                    <div><span>Ventes</span><strong>@global.TodaySaleCount</strong><small>Aujourd’hui</small></div>
+                </article>
+                <article class="dashboard-kpi">
+                    <span class="dashboard-kpi__icon" aria-hidden="true"><UiIcon Name="UiIconName.Cash" /></span>
+                    <div><span>CA</span><strong>@Money(global.TodayGrossSales)</strong><small>Aujourd’hui</small></div>
+                </article>
             }
-        </div>
-    </section>
+            else if (Dashboard.CanViewPersonalSales && Dashboard.PersonalActivity is not null)
+            {
+                <article class="dashboard-kpi">
+                    <span class="dashboard-kpi__icon" aria-hidden="true"><UiIcon Name="UiIconName.Sales" /></span>
+                    <div><span>Mes ventes</span><strong>@Dashboard.PersonalTodaySaleCount</strong><small>Aujourd’hui</small></div>
+                </article>
+                <article class="dashboard-kpi">
+                    <span class="dashboard-kpi__icon" aria-hidden="true"><UiIcon Name="UiIconName.Cash" /></span>
+                    <div><span>Montant vendu</span><strong>@Money(Dashboard.PersonalTodaySalesAmount)</strong><small>Aujourd’hui</small></div>
+                </article>
+            }
+
+            @if (Dashboard.Credit is { } credit)
+            {
+                <article class="dashboard-kpi">
+                    <span class="dashboard-kpi__icon" aria-hidden="true"><UiIcon Name="UiIconName.Customers" /></span>
+                    <div><span>Crédit clients</span><strong>@Money(credit.OpenCredit)</strong><small>Solde ouvert</small></div>
+                </article>
+            }
+
+            @if (Dashboard.Inventory is { } inventory)
+            {
+                <article class="dashboard-kpi">
+                    <span class="dashboard-kpi__icon" aria-hidden="true"><UiIcon Name="UiIconName.Inventory" /></span>
+                    <div><span>Stock faible</span><strong>@inventory.LowStockProducts</strong><small>@(inventory.LowStockAlertsEnabled ? "Produit(s) sous seuil" : "Alertes désactivées")</small></div>
+                </article>
+            }
+
+            @if (Dashboard.CanViewPersonalSales && Dashboard.CurrentSessionDuration is { } duration)
+            {
+                <article class="dashboard-kpi dashboard-kpi--session">
+                    <span class="dashboard-kpi__icon" aria-hidden="true"><UiIcon Name="UiIconName.Lock" /></span>
+                    <div><span>Durée de session</span><strong>@Duration(duration)</strong><small>Session en cours</small></div>
+                </article>
+            }
+        </section>
+
+        @if (HasErrors)
+        {
+            <section class="dashboard-section-errors" aria-label="Sections indisponibles" aria-live="polite">
+                @foreach (var error in Errors)
+                {
+                    <p>@error</p>
+                }
+            </section>
+        }
+
+        @if (Dashboard.GlobalSales is not null || Dashboard.Employees is not null)
+        {
+            <section class="dashboard-period" aria-label="Période des graphiques">
+                <span>Période</span>
+                <button type="button" class="@(Dashboard.SelectedDays == 7 ? "is-active" : null)" aria-pressed="@(Dashboard.SelectedDays == 7)" @onclick="() => SelectDaysAsync(7)">7 jours</button>
+                <button type="button" class="@(Dashboard.SelectedDays == 30 ? "is-active" : null)" aria-pressed="@(Dashboard.SelectedDays == 30)" @onclick="() => SelectDaysAsync(30)">30 jours</button>
+            </section>
+        }
+
+        @if (Dashboard.GlobalSales is { } sales)
+        {
+            <section class="dashboard-grid dashboard-grid--charts">
+                <article class="dashboard-panel" aria-labelledby="sales-trend-title">
+                    <header class="dashboard-panel__header">
+                        <div><p class="section-kicker">Ventes</p><h2 id="sales-trend-title">Évolution du chiffre d’affaires</h2></div>
+                        <strong>@Money(sales.Trend.Sum(item => item.GrossSales))</strong>
+                    </header>
+                    @if (sales.Trend.All(item => item.GrossSales == 0m))
+                    {
+                        <UiEmptyState Title="Aucune vente sur la période" Description="La courbe se remplira dès la première vente." />
+                    }
+                    else
+                    {
+                        <div class="dashboard-line-chart">
+                            <svg viewBox="0 0 700 220" role="img" aria-labelledby="sales-trend-title sales-trend-description">
+                                <desc id="sales-trend-description">Chiffre d’affaires quotidien sur @Dashboard.SelectedDays jours. Chaque point possède une infobulle et les valeurs sont disponibles dans le tableau accessible.</desc>
+                                <line class="dashboard-chart-gridline" x1="20" y1="180" x2="680" y2="180" />
+                                <line class="dashboard-chart-gridline" x1="20" y1="105" x2="680" y2="105" />
+                                <line class="dashboard-chart-gridline" x1="20" y1="30" x2="680" y2="30" />
+                                <polyline class="dashboard-trend-line" points="@TrendPoints(sales.Trend)" />
+                                @for (var index = 0; index < sales.Trend.Count; index++)
+                                {
+                                    var point = sales.Trend[index];
+                                    <circle class="dashboard-trend-point" cx="@TrendX(index, sales.Trend.Count)" cy="@TrendY(point.GrossSales, sales.Trend)" r="5">
+                                        <title>@point.Day.ToString("dd/MM") — @Money(point.GrossSales) — @point.SaleCount vente(s)</title>
+                                    </circle>
+                                }
+                            </svg>
+                            <div class="dashboard-chart-axis"><span>@sales.Trend[0].Day.ToString("dd/MM")</span><span>@sales.Trend[^1].Day.ToString("dd/MM")</span></div>
+                        </div>
+                        <table class="sr-only">
+                            <caption>Données quotidiennes du chiffre d’affaires</caption>
+                            <thead><tr><th>Jour</th><th>Ventes</th><th>Montant</th></tr></thead>
+                            <tbody>@foreach (var point in sales.Trend) { <tr><td>@point.Day</td><td>@point.SaleCount</td><td>@Money(point.GrossSales)</td></tr> }</tbody>
+                        </table>
+                    }
+                </article>
+
+                <article class="dashboard-panel" aria-labelledby="top-products-title">
+                    <header class="dashboard-panel__header"><div><p class="section-kicker">Produits</p><h2 id="top-products-title">Produits les plus vendus</h2></div></header>
+                    @if (sales.TopProducts.Count == 0)
+                    {
+                        <UiEmptyState Title="Aucun produit vendu" Description="Aucune vente produit sur la période." />
+                    }
+                    else
+                    {
+                        <ol class="dashboard-bars">
+                            @foreach (var product in sales.TopProducts)
+                            {
+                                <li title="@product.ProductName — @product.SoldQuantity unité(s) — @Money(product.GrossSales)">
+                                    <div><span>@product.ProductName</span><strong>@product.SoldQuantity</strong></div>
+                                    <span class="dashboard-bar-track"><span style="width: @BarWidth(product.SoldQuantity, sales.TopProducts.Max(item => item.SoldQuantity))%"></span></span>
+                                </li>
+                            }
+                        </ol>
+                    }
+                </article>
+            </section>
+        }
+
+        <section class="dashboard-grid">
+            @if (Dashboard.Inventory is { } stock)
+            {
+                <article class="dashboard-panel" aria-labelledby="expiry-title">
+                    <header class="dashboard-panel__header">
+                        <div><p class="section-kicker">Stock</p><h2 id="expiry-title">Péremptions prioritaires</h2></div>
+                        <a href="/module/inventory">Voir le stock</a>
+                    </header>
+                    @if (stock.ExpiryAlerts.Count == 0)
+                    {
+                        <UiEmptyState Title="Aucune alerte de péremption" Description="Aucun lot prioritaire selon l’horizon configuré." />
+                    }
+                    else
+                    {
+                        <ul class="dashboard-expiry-list">
+                            @foreach (var alert in stock.ExpiryAlerts)
+                            {
+                                <li>
+                                    <span class="dashboard-expiry-status dashboard-expiry-status--@ExpiryClass(alert)" aria-label="@alert.Status"></span>
+                                    <div><strong title="@alert.ProductName">@alert.ProductName</strong><small>Lot @(alert.BatchNumber ?? "—") · Qté @alert.Quantity</small></div>
+                                    <span><strong>@ExpiryLabel(alert)</strong><small>@alert.ExpiryDate.ToString("dd/MM/yyyy")</small></span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </article>
+            }
+
+            @if (Dashboard.Employees is { } employees)
+            {
+                <article class="dashboard-panel" aria-labelledby="employee-sales-title">
+                    <header class="dashboard-panel__header"><div><p class="section-kicker">Équipe</p><h2 id="employee-sales-title">Ventes par employé</h2></div><a href="/module/administration">Voir les employés</a></header>
+                    @if (employees.All(item => item.SalesCount == 0))
+                    {
+                        <UiEmptyState Title="Aucune vente employé" Description="Aucune vente attribuée sur la période." />
+                    }
+                    else
+                    {
+                        var employeeMax = employees.Max(item => item.GrossSalesAmount);
+                        <ol class="dashboard-bars dashboard-bars--employees">
+                            @foreach (var employee in employees.OrderByDescending(item => item.GrossSalesAmount).ThenBy(item => item.DisplayName).Take(8))
+                            {
+                                <li title="@employee.DisplayName — @employee.SalesCount vente(s) — @Money(employee.GrossSalesAmount)">
+                                    <div><span>@employee.DisplayName</span><strong>@Money(employee.GrossSalesAmount)</strong></div>
+                                    <span class="dashboard-bar-track"><span style="width: @BarWidth(employee.GrossSalesAmount, employeeMax)%"></span></span>
+                                </li>
+                            }
+                        </ol>
+                    }
+                </article>
+            }
+
+            @if (Dashboard.CanViewPersonalSales && Dashboard.PersonalActivity is not null)
+            {
+                <article class="dashboard-panel" aria-labelledby="recent-sales-title">
+                    <header class="dashboard-panel__header"><div><p class="section-kicker">Activité personnelle</p><h2 id="recent-sales-title">Mes ventes récentes</h2></div><a href="/module/sales">Voir mes ventes</a></header>
+                    @if (Dashboard.RecentPersonalSales.Count == 0)
+                    {
+                        <UiEmptyState Title="Aucune vente récente" Description="Vos dernières ventes apparaîtront ici." />
+                    }
+                    else
+                    {
+                        <ul class="dashboard-recent-sales">
+                            @foreach (var sale in Dashboard.RecentPersonalSales)
+                            {
+                                <li><code>@sale.Reference</code><span>@sale.CompletedAtUtc.ToLocalTime().ToString("dd/MM HH:mm")</span><strong>@Money(sale.Amount)</strong></li>
+                            }
+                        </ul>
+                    }
+                </article>
+            }
+        </section>
+
+        <section aria-labelledby="quick-actions-title">
+            <div class="content-section-heading"><div><h2 id="quick-actions-title">Accès directs</h2></div></div>
+            <div class="quick-actions">
+                @foreach (var action in HomePresentationModel.QuickActions.Where(CanAccess))
+                {
+                    <a class="quick-action" href="@action.Route">
+                        <span class="quick-action__icon" aria-hidden="true"><UiIcon Name="@action.Icon" /></span>
+                        <span><strong>@action.Label</strong><small>@action.Description</small></span>
+                        <span class="quick-action__chevron" aria-hidden="true"><UiIcon Name="UiIconName.Chevron" /></span>
+                    </a>
+                }
+            </div>
+        </section>
+    }
 </div>
 
 @code {
-    private bool CanAccess(DemoQuickAction action) => Authorizer.Authorize(action.RequiredPermission).IsSuccess;
+    private readonly CancellationTokenSource lifetime = new();
+    private string Greeting => string.IsNullOrWhiteSpace(Dashboard.CurrentUser?.DisplayName)
+        ? "Bonjour"
+        : $"Bonjour, {Dashboard.CurrentUser.DisplayName}";
+    private bool HasErrors => Errors.Count > 0;
+    private IReadOnlyList<string> Errors => new[]
+        {
+            Dashboard.GlobalSalesError,
+            Dashboard.CreditError,
+            Dashboard.InventoryError,
+            Dashboard.EmployeesError,
+            Dashboard.PersonalError
+        }
+        .Where(value => !string.IsNullOrWhiteSpace(value))
+        .Cast<string>()
+        .Distinct(StringComparer.Ordinal)
+        .ToArray();
+
+    protected override Task OnInitializedAsync() => Dashboard.LoadAsync(lifetime.Token);
+    private Task RefreshAsync(MouseEventArgs _) => Dashboard.LoadAsync(lifetime.Token);
+    private async Task SelectDaysAsync(int days) { await Dashboard.SelectPeriodAsync(days, lifetime.Token); }
+    private void OpenSales() => Navigation.NavigateTo("/module/sales");
+    private bool CanAccess(HomeQuickAction action) => Authorizer.Authorize(action.RequiredPermission).IsSuccess;
+    private static string Money(decimal value) => $"{value:N2} MAD";
+    private static string Duration(TimeSpan value) => value.TotalHours >= 1
+        ? $"{(int)value.TotalHours} h {value.Minutes:00}"
+        : $"{Math.Max(0, value.Minutes)} min";
+    private static decimal BarWidth(decimal value, decimal maximum) => maximum <= 0m ? 0m : Math.Round(value / maximum * 100m, 2);
+    private static string ExpiryClass(DashboardExpiryAlertView alert) => alert.DaysRemaining < 0 ? "expired" : alert.DaysRemaining <= 7 ? "urgent" : "horizon";
+    private static string ExpiryLabel(DashboardExpiryAlertView alert) => alert.DaysRemaining switch
+    {
+        < 0 => $"Expiré depuis {Math.Abs(alert.DaysRemaining)} j",
+        0 => "Expire aujourd’hui",
+        _ => $"Expire dans {alert.DaysRemaining} j"
+    };
+    private static string TrendPoints(IReadOnlyList<DashboardDailySalesPoint> values) => string.Join(' ', values.Select((point, index) => $"{TrendX(index, values.Count)},{TrendY(point.GrossSales, values)}"));
+    private static string TrendX(int index, int count) => (count <= 1 ? 350d : 20d + (660d * index / (count - 1))).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+    private static string TrendY(decimal value, IReadOnlyList<DashboardDailySalesPoint> values)
+    {
+        var maximum = values.Max(item => item.GrossSales);
+        var y = maximum <= 0m ? 180m : 180m - (value / maximum * 150m);
+        return y.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+    }
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
 }
