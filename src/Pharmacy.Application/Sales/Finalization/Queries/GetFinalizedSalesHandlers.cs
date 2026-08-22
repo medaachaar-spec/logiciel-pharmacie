@@ -14,16 +14,19 @@ public sealed class GetSaleByIdHandler
 {
     private readonly ISalesReader reader;
     private readonly IPermissionAuthorizer? authorizer;
+    private readonly ICurrentSecuritySession? securitySession;
 
     public GetSaleByIdHandler(ISalesReader reader)
         : this(reader, null) { }
 
     public GetSaleByIdHandler(
         ISalesReader reader,
-        IPermissionAuthorizer? authorizer)
+        IPermissionAuthorizer? authorizer,
+        ICurrentSecuritySession? securitySession = null)
     {
         this.reader = reader ?? throw new ArgumentNullException(nameof(reader));
         this.authorizer = authorizer;
+        this.securitySession = securitySession;
     }
 
     public Task<Result<FinalizedSaleView>> HandleAsync(
@@ -42,8 +45,13 @@ public sealed class GetSaleByIdHandler
 
         return query.SaleId <= 0
             ? Task.FromResult(Result<FinalizedSaleView>.Failure(SalesApplicationErrors.InvalidSaleQuery))
-            : reader.GetByIdAsync(query.SaleId, cancellationToken);
+            : CanViewAll()
+                ? reader.GetByIdAsync(query.SaleId, cancellationToken)
+                : reader.GetByIdForUserAsync(query.SaleId, securitySession!.User!.UserId, cancellationToken);
     }
+
+    private bool CanViewAll() => authorizer is null || securitySession?.User is null
+        || authorizer.Authorize(SecurityPermissions.SalesViewAllHistory).IsSuccess;
 }
 
 public sealed record GetRecentSalesQuery(int Limit = 10);
@@ -52,16 +60,19 @@ public sealed class GetRecentSalesHandler
 {
     private readonly ISalesReader reader;
     private readonly IPermissionAuthorizer? authorizer;
+    private readonly ICurrentSecuritySession? securitySession;
 
     public GetRecentSalesHandler(ISalesReader reader)
         : this(reader, null) { }
 
     public GetRecentSalesHandler(
         ISalesReader reader,
-        IPermissionAuthorizer? authorizer)
+        IPermissionAuthorizer? authorizer,
+        ICurrentSecuritySession? securitySession = null)
     {
         this.reader = reader ?? throw new ArgumentNullException(nameof(reader));
         this.authorizer = authorizer;
+        this.securitySession = securitySession;
     }
 
     public Task<Result<IReadOnlyList<FinalizedSaleSummaryView>>> HandleAsync(
@@ -81,6 +92,11 @@ public sealed class GetRecentSalesHandler
         return query.Limit is < 1 or > 50
             ? Task.FromResult(Result<IReadOnlyList<FinalizedSaleSummaryView>>.Failure(
                 SalesApplicationErrors.InvalidSaleQuery))
-            : reader.GetRecentAsync(query.Limit, cancellationToken);
+            : CanViewAll()
+                ? reader.GetRecentAsync(query.Limit, cancellationToken)
+                : reader.GetRecentForUserAsync(query.Limit, securitySession!.User!.UserId, cancellationToken);
     }
+
+    private bool CanViewAll() => authorizer is null || securitySession?.User is null
+        || authorizer.Authorize(SecurityPermissions.SalesViewAllHistory).IsSuccess;
 }

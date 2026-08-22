@@ -498,7 +498,8 @@ public sealed class SqlCustomerCreditCashStore :
                 OriginalSaleId = sale.Id,
                 Status = "Completed",
                 RefundMethod = request.RefundMethod.ToString(),
-                CompletedAtUtc = now
+                CompletedAtUtc = now,
+                PerformedByUserAccountId = request.PerformedByUserAccountId
             };
 
             foreach (var lineRequest in request.Lines)
@@ -950,6 +951,7 @@ public sealed class SqlCustomerCreditCashStore :
     {
         if (saleReturn.OriginalSaleId != request.SaleId
             || !string.Equals(saleReturn.RefundMethod, request.RefundMethod.ToString(), StringComparison.Ordinal)
+            || saleReturn.PerformedByUserAccountId != request.PerformedByUserAccountId
             || saleReturn.Lines.Count != request.Lines.Count)
         {
             return false;

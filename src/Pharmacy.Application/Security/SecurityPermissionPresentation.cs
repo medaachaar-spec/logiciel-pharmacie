@@ -6,6 +6,7 @@ public static class SecurityPermissionPresentation
     {
         [SecurityPermissions.SalesCreate] = "Créer et finaliser des ventes",
         [SecurityPermissions.SalesViewHistory] = "Consulter l’historique des ventes",
+        [SecurityPermissions.SalesViewAllHistory] = "Consulter l’historique de toutes les ventes",
         [SecurityPermissions.SalesReturn] = "Enregistrer des retours",
         [SecurityPermissions.SalesRefund] = "Rembourser des ventes",
         [SecurityPermissions.InventoryView] = "Consulter le stock",
@@ -22,6 +23,7 @@ public static class SecurityPermissionPresentation
         [SecurityPermissions.CashView] = "Consulter la caisse",
         [SecurityPermissions.SecurityManageUsers] = "Gérer les employés et comptes",
         [SecurityPermissions.SecurityManageRoles] = "Gérer les rôles et permissions",
+        [SecurityPermissions.SecurityViewEmployeeActivity] = "Consulter l’activité des employés",
         [SecurityPermissions.AuditView] = "Consulter le journal d’activité",
         [SecurityPermissions.ReportsView] = "Consulter les rapports",
         [SecurityPermissions.ReportsExport] = "Exporter les rapports",

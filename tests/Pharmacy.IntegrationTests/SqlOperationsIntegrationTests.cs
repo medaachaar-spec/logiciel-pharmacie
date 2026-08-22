@@ -55,7 +55,7 @@ public sealed class SqlOperationsIntegrationTests
 
             Assert.Equal(2, await ScalarAsync<int>(database.ConnectionString,
                 "SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE s.name=N'operations';"));
-            Assert.Equal(28, await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM security.Permissions;"));
+            Assert.Equal(30, await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM security.Permissions;"));
             await ExecuteAsync(database.ConnectionString,
                 "INSERT INTO catalog.ProductCategories(Code,Name,IsActive,DefaultTracksLots,DefaultTracksExpiry,DefaultDiscountAllowed,SortOrder) VALUES(N'GEN',N'Générique import',1,0,0,0,0);");
 

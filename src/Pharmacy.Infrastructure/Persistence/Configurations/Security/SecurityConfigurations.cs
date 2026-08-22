@@ -38,6 +38,34 @@ internal sealed class UserAccountConfiguration : IEntityTypeConfiguration<UserAc
     }
 }
 
+internal sealed class UserSessionConfiguration : IEntityTypeConfiguration<UserSessionEntity>
+{
+    public void Configure(EntityTypeBuilder<UserSessionEntity> builder)
+    {
+        builder.ToTable("UserSessions", SecuritySchema.Name, table =>
+        {
+            table.HasCheckConstraint(
+                "CK_security_UserSessions_Status",
+                "[Status] IN (N'Open', N'Closed', N'Interrupted')");
+            table.HasCheckConstraint(
+                "CK_security_UserSessions_End_Coherent",
+                "([Status] = N'Closed' AND [EndedAtUtc] IS NOT NULL) OR ([Status] IN (N'Open', N'Interrupted') AND [EndedAtUtc] IS NULL)");
+        });
+        builder.HasKey(entity => entity.Id).HasName("PK_security_UserSessions");
+        builder.Property(entity => entity.Id).UseIdentityColumn();
+        builder.Property(entity => entity.UserAccountId).IsRequired();
+        builder.Property(entity => entity.StartedAtUtc).HasColumnType("datetime2(7)").IsRequired();
+        builder.Property(entity => entity.EndedAtUtc).HasColumnType("datetime2(7)");
+        builder.Property(entity => entity.Status).HasColumnType("nvarchar(32)").HasMaxLength(32).IsRequired();
+        builder.Property(entity => entity.EndReason).HasColumnType("nvarchar(64)").HasMaxLength(64);
+        builder.HasOne(entity => entity.UserAccount).WithMany()
+            .HasForeignKey(entity => entity.UserAccountId).OnDelete(DeleteBehavior.NoAction)
+            .HasConstraintName("FK_security_UserSessions_UserAccounts_UserAccountId");
+        builder.HasIndex(entity => new { entity.UserAccountId, entity.Status, entity.StartedAtUtc, entity.Id })
+            .HasDatabaseName("IX_security_UserSessions_User_Status_Timeline");
+    }
+}
+
 internal sealed class RoleConfiguration : IEntityTypeConfiguration<RoleEntity>
 {
     public void Configure(EntityTypeBuilder<RoleEntity> builder)

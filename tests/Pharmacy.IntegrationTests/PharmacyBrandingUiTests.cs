@@ -101,7 +101,7 @@ public sealed class PharmacyBrandingUiTests
         var catalog = DesktopText("Components", "Navigation", "AppNavigationCatalog.cs");
         var navigationCount = Regex.Matches(catalog, @"new(?:\s+AppNavigationItem)?\s*\(\s*""[^""]+""").Count;
 
-        Assert.Equal(28, permissionCount);
+        Assert.Equal(30, permissionCount);
         Assert.Equal(13, navigationCount);
         Assert.DoesNotContain("BrandingManage", catalog, StringComparison.Ordinal);
     }

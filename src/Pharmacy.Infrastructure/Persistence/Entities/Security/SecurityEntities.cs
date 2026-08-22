@@ -23,6 +23,17 @@ internal sealed class UserAccountEntity
     public ICollection<RecoveryCodeEntity> RecoveryCodes { get; } = new List<RecoveryCodeEntity>();
 }
 
+internal sealed class UserSessionEntity
+{
+    public long Id { get; set; }
+    public long UserAccountId { get; set; }
+    public DateTime StartedAtUtc { get; set; }
+    public DateTime? EndedAtUtc { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string? EndReason { get; set; }
+    public UserAccountEntity UserAccount { get; set; } = null!;
+}
+
 internal sealed class RoleEntity
 {
     public long Id { get; set; }

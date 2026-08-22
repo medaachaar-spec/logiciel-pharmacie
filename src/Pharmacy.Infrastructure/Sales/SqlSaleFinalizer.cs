@@ -443,7 +443,8 @@ public sealed class SqlSaleFinalizer : ISaleFinalizer
             TotalQuantity = request.Preparation.TotalQuantity,
             LineCount = request.Preparation.Lines.Count,
             PaymentMethod = request.Payment.Method,
-            CustomerId = request.Credit?.CustomerId
+            CustomerId = request.Credit?.CustomerId,
+            FinalizedByUserAccountId = request.PerformedByUserAccountId
         };
 
         var lineEntities = new Dictionary<long, SaleLineEntity>();
@@ -624,6 +625,10 @@ public sealed class SqlSaleFinalizer : ISaleFinalizer
             request.SuspendedSale is null
                 ? string.Empty
                 : Convert.ToHexString(request.SuspendedSale.RowVersion));
+        content = string.Join(
+            "|",
+            content,
+            request.PerformedByUserAccountId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty);
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(content)));
     }
 

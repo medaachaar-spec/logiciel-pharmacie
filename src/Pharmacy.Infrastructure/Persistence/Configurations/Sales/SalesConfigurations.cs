@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Pharmacy.Infrastructure.Persistence.Entities.Sales;
+using Pharmacy.Infrastructure.Persistence.Entities.Security;
 
 namespace Pharmacy.Infrastructure.Persistence.Configurations.Sales;
 
@@ -32,9 +33,16 @@ internal sealed class SaleConfiguration : IEntityTypeConfiguration<SaleEntity>
         builder.Property(entity => entity.LineCount).HasColumnType("int").IsRequired();
         builder.Property(entity => entity.PaymentMethod).HasConversion<string>().HasColumnType("nvarchar(32)").HasMaxLength(32).IsRequired();
         builder.Property(entity => entity.CustomerId);
+        builder.Property(entity => entity.FinalizedByUserAccountId);
         builder.HasIndex(entity => entity.Reference).IsUnique().HasDatabaseName("UX_sales_Sales_Reference");
         builder.HasIndex(entity => entity.OperationId).IsUnique().HasDatabaseName("UX_sales_Sales_OperationId");
         builder.HasIndex(entity => new { entity.CompletedAtUtc, entity.Id }).HasDatabaseName("IX_sales_Sales_CompletedAtUtc_Id");
+        builder.HasIndex(entity => new { entity.FinalizedByUserAccountId, entity.CompletedAtUtc, entity.Id })
+            .HasDatabaseName("IX_sales_Sales_Actor_Timeline");
+        builder.HasOne<UserAccountEntity>().WithMany()
+            .HasForeignKey(entity => entity.FinalizedByUserAccountId)
+            .OnDelete(DeleteBehavior.NoAction)
+            .HasConstraintName("FK_sales_Sales_UserAccounts_FinalizedByUserAccountId");
         builder.HasOne<SaleOperationEntity>().WithOne()
             .HasPrincipalKey<SaleOperationEntity>(operation => operation.OperationId)
             .HasForeignKey<SaleEntity>(sale => sale.OperationId)

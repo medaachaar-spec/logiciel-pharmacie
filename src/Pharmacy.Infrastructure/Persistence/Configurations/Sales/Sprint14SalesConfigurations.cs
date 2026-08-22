@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Pharmacy.Infrastructure.Persistence.Entities.Sales;
+using Pharmacy.Infrastructure.Persistence.Entities.Security;
 
 namespace Pharmacy.Infrastructure.Persistence.Configurations.Sales;
 
@@ -79,9 +80,16 @@ internal sealed class SaleReturnConfiguration : IEntityTypeConfiguration<SaleRet
         builder.Property(entity => entity.RefundAmount).HasColumnType("decimal(19,4)").IsRequired();
         builder.Property(entity => entity.RefundMethod).HasColumnType("nvarchar(32)").HasMaxLength(32).IsRequired();
         builder.Property(entity => entity.CompletedAtUtc).HasColumnType("datetime2(7)").IsRequired();
+        builder.Property(entity => entity.PerformedByUserAccountId);
         builder.HasIndex(entity => entity.OperationId).IsUnique().HasDatabaseName("UX_sales_SaleReturns_OperationId");
         builder.HasIndex(entity => entity.Reference).IsUnique().HasDatabaseName("UX_sales_SaleReturns_Reference");
         builder.HasIndex(entity => entity.OriginalSaleId).HasDatabaseName("IX_sales_SaleReturns_OriginalSaleId");
+        builder.HasIndex(entity => new { entity.PerformedByUserAccountId, entity.CompletedAtUtc, entity.Id })
+            .HasDatabaseName("IX_sales_SaleReturns_Actor_Timeline");
+        builder.HasOne<UserAccountEntity>().WithMany()
+            .HasForeignKey(entity => entity.PerformedByUserAccountId)
+            .OnDelete(DeleteBehavior.NoAction)
+            .HasConstraintName("FK_sales_SaleReturns_UserAccounts_PerformedByUserAccountId");
     }
 }
 

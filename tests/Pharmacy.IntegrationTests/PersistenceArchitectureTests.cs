@@ -199,7 +199,8 @@ public sealed class PersistenceArchitectureTests
                 "security.Roles",
                 "security.UserAccounts",
                 "security.UserPermissionOverrides",
-                "security.UserRoles"
+                "security.UserRoles",
+                "security.UserSessions"
             },
             tables);
         Assert.All(context.Model.GetEntityTypes(), entity => Assert.False(entity.ClrType.IsPublic));

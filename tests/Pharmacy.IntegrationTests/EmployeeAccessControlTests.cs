@@ -351,9 +351,9 @@ public sealed class EmployeeAccessControlTests : IClassFixture<SecurityGateSqlFi
     [Fact]
     public async Task EMP030_ExistingPermissionCatalogRemainsCoherent()
     {
-        Assert.Equal(28, SecurityPermissions.All.Count);
-        Assert.Equal(28, SecurityPermissions.All.Distinct(StringComparer.Ordinal).Count());
-        Assert.Equal(28, await fixture.ScalarAsync<int>("SELECT COUNT(*) FROM security.Permissions;"));
+        Assert.Equal(30, SecurityPermissions.All.Count);
+        Assert.Equal(30, SecurityPermissions.All.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(30, await fixture.ScalarAsync<int>("SELECT COUNT(*) FROM security.Permissions;"));
         Assert.All(SecurityRolePresets.SellerPermissions, code => Assert.Contains(code, SecurityPermissions.All));
         Assert.All(SecurityRolePresets.ManagerPermissions, code => Assert.Contains(code, SecurityPermissions.All));
     }

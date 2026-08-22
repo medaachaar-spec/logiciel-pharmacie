@@ -1834,6 +1834,9 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                     b.Property<long?>("CustomerId")
                         .HasColumnType("bigint");
 
+                    b.Property<long?>("FinalizedByUserAccountId")
+                        .HasColumnType("bigint");
+
                     b.Property<decimal>("GrandTotal")
                         .HasColumnType("decimal(19,4)");
 
@@ -1877,6 +1880,9 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CompletedAtUtc", "Id")
                         .HasDatabaseName("IX_sales_Sales_CompletedAtUtc_Id");
+
+                    b.HasIndex("FinalizedByUserAccountId", "CompletedAtUtc", "Id")
+                        .HasDatabaseName("IX_sales_Sales_Actor_Timeline");
 
                     b.ToTable("Sales", "sales", t =>
                         {
@@ -2073,6 +2079,9 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                     b.Property<long>("OriginalSaleId")
                         .HasColumnType("bigint");
 
+                    b.Property<long?>("PerformedByUserAccountId")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("Reference")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -2104,6 +2113,9 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                     b.HasIndex("Reference")
                         .IsUnique()
                         .HasDatabaseName("UX_sales_SaleReturns_Reference");
+
+                    b.HasIndex("PerformedByUserAccountId", "CompletedAtUtc", "Id")
+                        .HasDatabaseName("IX_sales_SaleReturns_Actor_Timeline");
 
                     b.ToTable("SaleReturns", "sales", t =>
                         {
@@ -2645,6 +2657,24 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                             IsSensitive = true,
                             Module = "devices",
                             Name = "devices.configure"
+                        },
+                        new
+                        {
+                            Id = 29L,
+                            Code = "sales.view_all_history",
+                            Description = "Permission explicite sales.view_all_history.",
+                            IsSensitive = true,
+                            Module = "sales",
+                            Name = "sales.view_all_history"
+                        },
+                        new
+                        {
+                            Id = 30L,
+                            Code = "security.view_employee_activity",
+                            Description = "Permission explicite security.view_employee_activity.",
+                            IsSensitive = true,
+                            Module = "security",
+                            Name = "security.view_employee_activity"
                         });
                 });
 
@@ -2960,6 +2990,18 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                         },
                         new
                         {
+                            Id = 29L,
+                            PermissionId = 29L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
+                            Id = 30L,
+                            PermissionId = 30L,
+                            RoleId = 1L
+                        },
+                        new
+                        {
                             Id = 100L,
                             PermissionId = 1L,
                             RoleId = 2L
@@ -3118,6 +3160,18 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                         {
                             Id = 126L,
                             PermissionId = 28L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 127L,
+                            PermissionId = 29L,
+                            RoleId = 2L
+                        },
+                        new
+                        {
+                            Id = 128L,
+                            PermissionId = 30L,
                             RoleId = 2L
                         },
                         new
@@ -3316,6 +3370,46 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("UX_security_UserRoles_User_Role");
 
                     b.ToTable("UserRoles", "security");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Security.UserSessionEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("EndReason")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime?>("EndedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<long>("UserAccountId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id")
+                        .HasName("PK_security_UserSessions");
+
+                    b.HasIndex("UserAccountId", "Status", "StartedAtUtc", "Id")
+                        .HasDatabaseName("IX_security_UserSessions_User_Status_Timeline");
+
+                    b.ToTable("UserSessions", "security", t =>
+                        {
+                            t.HasCheckConstraint("CK_security_UserSessions_End_Coherent", "([Status] = N'Closed' AND [EndedAtUtc] IS NOT NULL) OR ([Status] IN (N'Open', N'Interrupted') AND [EndedAtUtc] IS NULL)");
+
+                            t.HasCheckConstraint("CK_security_UserSessions_Status", "[Status] IN (N'Open', N'Closed', N'Interrupted')");
+                        });
                 });
 
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Audit.AuditEventDetailEntity", b =>
@@ -3620,6 +3714,12 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Sales.SaleEntity", b =>
                 {
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Security.UserAccountEntity", null)
+                        .WithMany()
+                        .HasForeignKey("FinalizedByUserAccountId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_sales_Sales_UserAccounts_FinalizedByUserAccountId");
+
                     b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Sales.SaleOperationEntity", null)
                         .WithOne()
                         .HasForeignKey("Pharmacy.Infrastructure.Persistence.Entities.Sales.SaleEntity", "OperationId")
@@ -3688,6 +3788,15 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                         .HasConstraintName("FK_sales_SaleOperations_Sales_ResultSaleId");
 
                     b.Navigation("ResultSale");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Sales.SaleReturnEntity", b =>
+                {
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Security.UserAccountEntity", null)
+                        .WithMany()
+                        .HasForeignKey("PerformedByUserAccountId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_sales_SaleReturns_UserAccounts_PerformedByUserAccountId");
                 });
 
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Sales.SaleReturnLineEntity", b =>
@@ -3785,6 +3894,18 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                         .HasConstraintName("FK_security_UserRoles_UserAccounts_UserAccountId");
 
                     b.Navigation("Role");
+
+                    b.Navigation("UserAccount");
+                });
+
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Security.UserSessionEntity", b =>
+                {
+                    b.HasOne("Pharmacy.Infrastructure.Persistence.Entities.Security.UserAccountEntity", "UserAccount")
+                        .WithMany()
+                        .HasForeignKey("UserAccountId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_security_UserSessions_UserAccounts_UserAccountId");
 
                     b.Navigation("UserAccount");
                 });

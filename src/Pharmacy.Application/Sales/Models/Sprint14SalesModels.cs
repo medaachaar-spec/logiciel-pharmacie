@@ -45,7 +45,8 @@ public sealed record ReturnSaleRequest(
     Guid OperationId,
     long SaleId,
     IReadOnlyList<ReturnSaleLineRequest> Lines,
-    ReturnRefundMethod RefundMethod);
+    ReturnRefundMethod RefundMethod,
+    long? PerformedByUserAccountId = null);
 
 public sealed record ReturnSaleLineRequest(
     long SaleLineId,

@@ -87,4 +87,8 @@ public static class SecurityErrors
     public static Error DatabaseUnavailable { get; } = new(
         "security.database.unavailable",
         "Le service de données local est indisponible. Les opérations métier sont temporairement bloquées.");
+
+    public static Error InvalidActivityPeriod { get; } = new(
+        "security.employee_activity.invalid_period",
+        "La période d’activité demandée est invalide.");
 }

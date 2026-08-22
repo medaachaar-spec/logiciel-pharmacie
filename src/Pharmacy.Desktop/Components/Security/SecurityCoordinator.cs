@@ -18,6 +18,7 @@ public sealed class SecurityCoordinator
     private readonly ISecurityBootstrapService bootstrap;
     private readonly ISecurityAdministrationService administration;
     private readonly IAuditReader auditReader;
+    private readonly IEmployeeActivityReader? employeeActivityReader;
     private readonly ICurrentSecuritySession session;
     private int operationInProgress;
 
@@ -26,12 +27,14 @@ public sealed class SecurityCoordinator
         ISecurityBootstrapService bootstrap,
         ISecurityAdministrationService administration,
         IAuditReader auditReader,
-        ICurrentSecuritySession session)
+        ICurrentSecuritySession session,
+        IEmployeeActivityReader? employeeActivityReader = null)
     {
         this.authentication = authentication;
         this.bootstrap = bootstrap;
         this.administration = administration;
         this.auditReader = auditReader;
+        this.employeeActivityReader = employeeActivityReader;
         this.session = session;
     }
 
@@ -50,6 +53,8 @@ public sealed class SecurityCoordinator
         .ToArray();
     public IReadOnlyList<SecurityPermissionView> Permissions { get; private set; } = Array.Empty<SecurityPermissionView>();
     public IReadOnlyList<AuditEventView> AuditEvents { get; private set; } = Array.Empty<AuditEventView>();
+    public IReadOnlyList<EmployeeActivitySummaryView> EmployeeSummaries { get; private set; } = Array.Empty<EmployeeActivitySummaryView>();
+    public EmployeeActivityDetailView? SelectedEmployeeActivity { get; private set; }
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
@@ -181,8 +186,33 @@ public sealed class SecurityCoordinator
             Users = users.Value;
             Roles = roles.Value;
             Permissions = permissions.Value;
+            if (employeeActivityReader is not null)
+            {
+                var today = EmployeeActivityPeriod.Today(DateTime.UtcNow);
+                var summaries = await employeeActivityReader.GetSummariesAsync(today, cancellationToken);
+                if (summaries.IsSuccess) EmployeeSummaries = summaries.Value;
+            }
         });
     }
+
+    public async Task LoadEmployeeActivityAsync(
+        long userId,
+        EmployeeActivityPeriod period,
+        CancellationToken cancellationToken = default)
+    {
+        await RunAsync(async () =>
+        {
+            if (employeeActivityReader is null) return;
+            var result = await employeeActivityReader.GetEmployeeAsync(userId, period, cancellationToken);
+            if (result.IsFailure) { Message = result.Error.Message; return; }
+            SelectedEmployeeActivity = result.Value;
+        });
+    }
+
+    public void CloseEmployeeActivity() => SelectedEmployeeActivity = null;
+
+    public EmployeeActivitySummaryView? EmployeeSummary(long userId) =>
+        EmployeeSummaries.FirstOrDefault(item => item.UserId == userId);
 
     public async Task LoadAuditAsync(CancellationToken cancellationToken = default)
     {
@@ -323,6 +353,12 @@ public sealed class SecurityCoordinator
         if (users.IsSuccess) Users = users.Value;
         if (roles.IsSuccess) Roles = roles.Value;
         if (permissions.IsSuccess) Permissions = permissions.Value;
+        if (employeeActivityReader is not null)
+        {
+            var summaries = await employeeActivityReader.GetSummariesAsync(
+                EmployeeActivityPeriod.Today(DateTime.UtcNow), cancellationToken);
+            if (summaries.IsSuccess) EmployeeSummaries = summaries.Value;
+        }
     }
 
     private async Task RunAsync(Func<Task> operation)

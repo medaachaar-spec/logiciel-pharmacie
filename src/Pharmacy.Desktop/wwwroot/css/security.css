@@ -37,8 +37,8 @@
 .security-panel--accounts, .security-panel--permissions { width: 100%; }
 .security-table-wrap { width: 100%; max-width: 100%; overflow-x: auto; }
 .security-panel table { width: 100%; border-collapse: collapse; }
-.security-accounts-table { min-width: 46rem; table-layout: auto; }
-.security-accounts-table th:last-child { width: 48%; }
+.security-accounts-table { min-width: 78rem; table-layout: auto; }
+.security-accounts-table th:last-child { width: 31%; }
 .security-panel th, .security-panel td { padding: var(--space-3); border-bottom: var(--border-width) solid var(--color-border); text-align: left; vertical-align: top; }
 .security-panel td small { display: block; color: var(--color-text-secondary); }
 .security-panel td button { margin: 0 var(--space-2) var(--space-2) 0; }
@@ -70,6 +70,24 @@
 .security-system-role { flex: 0 0 auto; padding: var(--space-1) var(--space-2); border: var(--border-width) solid var(--color-border); border-radius: var(--radius-pill); color: var(--color-text-secondary); background: var(--color-surface-subtle); font-size: var(--font-size-metadata); font-weight: var(--font-weight-bold); }
 .security-empty-state { margin: var(--space-2) 0; }
 .security-account--selected { background: var(--color-accent-subtle); }
+.security-state-badge { display: inline-flex; padding: var(--space-1) var(--space-2); border-radius: var(--radius-pill); color: var(--color-text-secondary); background: var(--color-surface-subtle); font-size: var(--font-size-metadata); font-weight: var(--font-weight-bold); }
+.security-state-badge--active { color: var(--color-success); background: var(--color-success-surface); }
+.employee-activity { display: grid; gap: var(--space-4); }
+.employee-activity__heading { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); }
+.employee-activity__heading h2 { margin-bottom: var(--space-1); }
+.employee-activity__heading p { max-width: 48rem; margin: 0; color: var(--color-text-secondary); }
+.employee-activity__eyebrow { color: var(--color-accent); font-size: var(--font-size-metadata); font-weight: var(--font-weight-bold); letter-spacing: .06em; text-transform: uppercase; }
+.employee-activity__periods, .employee-activity__tabs { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.employee-activity__periods button[aria-pressed="true"], .employee-activity__tabs button[aria-selected="true"] { color: var(--pharmacy-on-primary); background: var(--color-accent); }
+.employee-activity__metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
+.employee-activity__metrics > div { display: grid; gap: var(--space-1); min-width: 0; padding: var(--space-3); border: var(--border-width) solid var(--color-border); border-radius: var(--radius-medium); background: var(--color-surface-subtle); }
+.employee-activity__metrics span { color: var(--color-text-secondary); font-size: var(--font-size-small); }
+.employee-activity__metrics strong { overflow-wrap: anywhere; font-size: var(--font-size-section-title); }
+.employee-activity__summary { padding: var(--space-4); border: var(--border-width) solid var(--color-border); border-radius: var(--radius-medium); background: var(--color-surface-subtle); }
+.employee-activity__summary dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin: 0; }
+.employee-activity__summary dl > div { min-width: 0; }
+.employee-activity__summary dt { color: var(--color-text-secondary); font-size: var(--font-size-small); font-weight: var(--font-weight-bold); }
+.employee-activity__summary dd { margin: var(--space-1) 0 0; overflow-wrap: anywhere; }
 .security-user-access { display: grid; gap: var(--space-4); }
 .security-user-access__heading { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); }
 .security-user-access__heading p { margin: 0; color: var(--color-text-secondary); }
@@ -105,6 +123,7 @@
 @media (max-width: 72rem) {
     .security-admin__grid { grid-template-columns: 1fr; }
     .branding-admin { grid-template-columns: 1fr; }
+    .employee-activity__metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 52rem) {
@@ -117,4 +136,6 @@
     .branding-admin__color-fields { grid-template-columns: 1fr; }
     .security-user-permission-row { grid-template-columns: 1fr; }
     .security-user-access__actions button { flex: 1 1 100%; }
+    .employee-activity__metrics, .employee-activity__summary dl { grid-template-columns: 1fr; }
+    .employee-activity__periods button, .employee-activity__tabs button { flex: 1 1 auto; }
 }

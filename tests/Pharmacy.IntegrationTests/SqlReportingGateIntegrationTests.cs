@@ -498,7 +498,7 @@ public sealed class SqlReportingGateFixture : IAsyncLifetime
         {
             await context.Database.MigrateAsync();
             Assert.Empty(await context.Database.GetPendingMigrationsAsync());
-            Assert.Equal(11, (await context.Database.GetAppliedMigrationsAsync()).Count());
+            Assert.Equal(12, (await context.Database.GetAppliedMigrationsAsync()).Count());
         }
 
         await SeedAsync();

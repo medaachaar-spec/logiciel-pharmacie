@@ -33,15 +33,49 @@ public sealed class SqlSalesReader : ISalesReader, ISaleReturnReader
         }
     }
 
-    public async Task<Result<IReadOnlyList<FinalizedSaleSummaryView>>> GetRecentAsync(
-        int limit,
+    public async Task<Result<FinalizedSaleView>> GetByIdForUserAsync(
+        long saleId,
+        long userAccountId,
         CancellationToken cancellationToken = default)
     {
         try
         {
             await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-            var rows = await context.Sales
+            return await LoadByIdAsync(context, saleId, cancellationToken, userAccountId);
+        }
+        catch (Exception exception) when (SalesSqlFailure.IsDatabaseUnavailable(exception))
+        {
+            return Result<FinalizedSaleView>.Failure(SalesApplicationErrors.DatabaseUnavailable);
+        }
+    }
+
+    public async Task<Result<IReadOnlyList<FinalizedSaleSummaryView>>> GetRecentAsync(
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        return await GetRecentCoreAsync(limit, null, cancellationToken);
+    }
+
+    public async Task<Result<IReadOnlyList<FinalizedSaleSummaryView>>> GetRecentForUserAsync(
+        int limit,
+        long userAccountId,
+        CancellationToken cancellationToken = default)
+    {
+        return await GetRecentCoreAsync(limit, userAccountId, cancellationToken);
+    }
+
+    private async Task<Result<IReadOnlyList<FinalizedSaleSummaryView>>> GetRecentCoreAsync(
+        int limit,
+        long? userAccountId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+            var query = context.Sales
                 .AsNoTracking()
+                .Where(sale => userAccountId == null || sale.FinalizedByUserAccountId == userAccountId);
+            var rows = await query
                 .OrderByDescending(sale => sale.CompletedAtUtc)
                 .ThenByDescending(sale => sale.Id)
                 .Take(limit)
@@ -82,13 +116,32 @@ public sealed class SqlSalesReader : ISalesReader, ISaleReturnReader
         long saleId,
         CancellationToken cancellationToken = default)
     {
+        return await GetPreparationCoreAsync(saleId, null, cancellationToken);
+    }
+
+    public async Task<Result<SaleReturnPreparationView>> GetPreparationForUserAsync(
+        long saleId,
+        long userAccountId,
+        CancellationToken cancellationToken = default)
+    {
+        return await GetPreparationCoreAsync(saleId, userAccountId, cancellationToken);
+    }
+
+    private async Task<Result<SaleReturnPreparationView>> GetPreparationCoreAsync(
+        long saleId,
+        long? userAccountId,
+        CancellationToken cancellationToken)
+    {
         try
         {
             await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
             var sale = await context.Sales
                 .AsNoTracking()
                 .Include(candidate => candidate.Lines)
-                .SingleOrDefaultAsync(candidate => candidate.Id == saleId, cancellationToken);
+                .SingleOrDefaultAsync(
+                    candidate => candidate.Id == saleId
+                        && (userAccountId == null || candidate.FinalizedByUserAccountId == userAccountId),
+                    cancellationToken);
 
             if (sale is null)
             {
@@ -147,7 +200,8 @@ public sealed class SqlSalesReader : ISalesReader, ISaleReturnReader
     internal static async Task<Result<FinalizedSaleView>> LoadByIdAsync(
         PharmacyDbContext context,
         long saleId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        long? userAccountId = null)
     {
         var sale = await context.Sales
             .AsNoTracking()
@@ -155,7 +209,10 @@ public sealed class SqlSalesReader : ISalesReader, ISaleReturnReader
             .Include(candidate => candidate.Lines)
                 .ThenInclude(line => line.Allocations)
             .Include(candidate => candidate.Payments)
-            .SingleOrDefaultAsync(candidate => candidate.Id == saleId, cancellationToken);
+            .SingleOrDefaultAsync(
+                candidate => candidate.Id == saleId
+                    && (userAccountId == null || candidate.FinalizedByUserAccountId == userAccountId),
+                cancellationToken);
 
         return sale is null
             ? Result<FinalizedSaleView>.Failure(SalesApplicationErrors.SaleNotFound)

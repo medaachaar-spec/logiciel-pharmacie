@@ -40,6 +40,7 @@ internal sealed class SaleReturnEntity
     public decimal RefundAmount { get; set; }
     public string RefundMethod { get; set; } = string.Empty;
     public DateTime CompletedAtUtc { get; set; }
+    public long? PerformedByUserAccountId { get; set; }
     public ICollection<SaleReturnLineEntity> Lines { get; } = new List<SaleReturnLineEntity>();
 }
 

@@ -19,6 +19,7 @@ internal sealed class SaleEntity
     public int LineCount { get; set; }
     public SalePaymentMethod PaymentMethod { get; set; }
     public long? CustomerId { get; set; }
+    public long? FinalizedByUserAccountId { get; set; }
     public ICollection<SaleLineEntity> Lines { get; } = new List<SaleLineEntity>();
     public ICollection<PaymentEntity> Payments { get; } = new List<PaymentEntity>();
 }

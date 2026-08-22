@@ -4,6 +4,7 @@ public static class SecurityPermissions
 {
     public const string SalesCreate = "sales.create";
     public const string SalesViewHistory = "sales.view_history";
+    public const string SalesViewAllHistory = "sales.view_all_history";
     public const string SalesReturn = "sales.return";
     public const string SalesRefund = "sales.refund";
     public const string InventoryView = "inventory.view";
@@ -20,6 +21,7 @@ public static class SecurityPermissions
     public const string CashView = "cash.view";
     public const string SecurityManageUsers = "security.manage_users";
     public const string SecurityManageRoles = "security.manage_roles";
+    public const string SecurityViewEmployeeActivity = "security.view_employee_activity";
     public const string AuditView = "audit.view";
     public const string ReportsView = "reports.view";
     public const string ReportsExport = "reports.export";
@@ -60,11 +62,14 @@ public static class SecurityPermissions
         BackupRestore,
         ImportView,
         ImportExecute,
-        DevicesConfigure
+        DevicesConfigure,
+        SalesViewAllHistory,
+        SecurityViewEmployeeActivity
     ];
 
     public static IReadOnlySet<string> Sensitive { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
+        SalesViewAllHistory,
         SalesReturn,
         SalesRefund,
         InventoryAdjust,
@@ -77,6 +82,7 @@ public static class SecurityPermissions
         ReportsManageSettings,
         BackupRestore,
         ImportExecute,
-        DevicesConfigure
+        DevicesConfigure,
+        SecurityViewEmployeeActivity
     };
 }

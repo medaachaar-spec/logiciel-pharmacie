@@ -14,16 +14,19 @@ public sealed class GetSaleReturnPreparationHandler
 {
     private readonly ISaleReturnReader reader;
     private readonly IPermissionAuthorizer? authorizer;
+    private readonly ICurrentSecuritySession? securitySession;
 
     public GetSaleReturnPreparationHandler(ISaleReturnReader reader)
         : this(reader, null) { }
 
     public GetSaleReturnPreparationHandler(
         ISaleReturnReader reader,
-        IPermissionAuthorizer? authorizer)
+        IPermissionAuthorizer? authorizer,
+        ICurrentSecuritySession? securitySession = null)
     {
         this.reader = reader ?? throw new ArgumentNullException(nameof(reader));
         this.authorizer = authorizer;
+        this.securitySession = securitySession;
     }
 
     public Task<Result<SaleReturnPreparationView>> HandleAsync(
@@ -43,6 +46,11 @@ public sealed class GetSaleReturnPreparationHandler
         return query.SaleId <= 0
             ? Task.FromResult(Result<SaleReturnPreparationView>.Failure(
                 SalesApplicationErrors.InvalidSaleQuery))
-            : reader.GetPreparationAsync(query.SaleId, cancellationToken);
+            : CanViewAll()
+                ? reader.GetPreparationAsync(query.SaleId, cancellationToken)
+                : reader.GetPreparationForUserAsync(query.SaleId, securitySession!.User!.UserId, cancellationToken);
     }
+
+    private bool CanViewAll() => authorizer is null || securitySession?.User is null
+        || authorizer.Authorize(SecurityPermissions.SalesViewAllHistory).IsSuccess;
 }

@@ -62,7 +62,10 @@ internal static class SecurityPersistenceSupport
             .ThenInclude(item => item.Permission);
     }
 
-    public static UserSessionView MapSession(UserAccountEntity user, DateTime nowUtc)
+    public static UserSessionView MapSession(
+        UserAccountEntity user,
+        DateTime nowUtc,
+        long? persistedSessionId = null)
     {
         var roles = user.UserRoles
             .Where(userRole => userRole.Role.IsActive)
@@ -87,7 +90,8 @@ internal static class SecurityPersistenceSupport
             Array.AsReadOnly(roles),
             permissions,
             nowUtc,
-            nowUtc);
+            nowUtc,
+            persistedSessionId);
     }
 
     public static AuthenticationEventEntity AuthenticationEvent(

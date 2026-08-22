@@ -37,7 +37,8 @@ public sealed class AdministrationLayoutTests
         Assert.Contains("class=\"security-account-actions\"", page, StringComparison.Ordinal);
         Assert.Contains(".security-panel--accounts, .security-panel--permissions { width: 100%; }", css, StringComparison.Ordinal);
         Assert.Contains(".security-table-wrap { width: 100%; max-width: 100%; overflow-x: auto; }", css, StringComparison.Ordinal);
-        Assert.Contains(".security-accounts-table { min-width: 46rem; table-layout: auto; }", css, StringComparison.Ordinal);
+        Assert.Contains(".security-accounts-table { min-width: 78rem; table-layout: auto; }", css, StringComparison.Ordinal);
+        Assert.Contains("overflow-x: auto", css, StringComparison.Ordinal);
     }
 
     [Fact]

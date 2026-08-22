@@ -31,6 +31,7 @@ public static class SecurityServiceCollectionExtensions
         services.AddScoped<IAuditReader>(provider => provider.GetRequiredService<SqlAuditStore>());
         services.AddScoped<IAuditWriter>(provider => provider.GetRequiredService<SqlAuditStore>());
         services.AddScoped<IBusinessAuditRecorder, BusinessAuditRecorder>();
+        services.AddScoped<IEmployeeActivityReader, SqlEmployeeActivityReader>();
         return services;
     }
 }

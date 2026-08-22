@@ -50,11 +50,11 @@ public sealed class SqlSecurityIntegrationTests
                     item.EndsWith("_SecurityRbacAuditPersistenceV01", StringComparison.Ordinal));
             }
 
-            Assert.Equal(8, await ScalarAsync<int>(database.ConnectionString,
+            Assert.Equal(9, await ScalarAsync<int>(database.ConnectionString,
                 "SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE s.name=N'security';"));
             Assert.Equal(2, await ScalarAsync<int>(database.ConnectionString,
                 "SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE s.name=N'audit';"));
-            Assert.Equal(28, await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM security.Permissions;"));
+            Assert.Equal(30, await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM security.Permissions;"));
             Assert.Equal(0, await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM security.UserAccounts;"));
 
             var clock = new MutableClock(new DateTime(2026, 8, 10, 16, 0, 0, DateTimeKind.Utc));
@@ -90,7 +90,7 @@ public sealed class SqlSecurityIntegrationTests
             Assert.Equal(1, await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM security.UserAccounts;"));
             Assert.Equal(1, await ScalarAsync<int>(database.ConnectionString,
                 "SELECT COUNT(*) FROM security.UserRoles ur JOIN security.Roles r ON r.Id=ur.RoleId WHERE r.Code=N'OWNER';"));
-            Assert.Equal(28, await ScalarAsync<int>(database.ConnectionString,
+            Assert.Equal(30, await ScalarAsync<int>(database.ConnectionString,
                 "SELECT COUNT(*) FROM security.UserRoles ur JOIN security.RolePermissions rp ON rp.RoleId=ur.RoleId WHERE ur.UserAccountId=1;"));
             var restartedState = await service.HasUsersAsync(token);
             Assert.True(restartedState.IsSuccess);
@@ -185,7 +185,7 @@ public sealed class SqlSecurityIntegrationTests
                 factory, hasher, generator, authorizer, session, clock);
             var permissionResult = await administration.GetPermissionsAsync(token);
             Assert.True(permissionResult.IsSuccess, permissionResult.IsFailure ? permissionResult.Error.Code : null);
-            Assert.Equal(28, permissionResult.Value.Count);
+            Assert.Equal(30, permissionResult.Value.Count);
             var recipeCodes = new[]
             {
                 SecurityPermissions.SalesCreate,
@@ -239,11 +239,11 @@ public sealed class SqlSecurityIntegrationTests
             Assert.Equal(recipeCodes.Order(StringComparer.Ordinal), persistedRole.Permissions.Select(permission => permission.Code));
             var ownerRole = roles.Value.Single(role => role.Code == "OWNER");
             Assert.True(ownerRole.IsSystemRole);
-            Assert.Equal(28, ownerRole.Permissions.Count);
+            Assert.Equal(30, ownerRole.Permissions.Count);
             var ownerUpdate = await administration.UpdateRoleAsync(new UpdateSecurityRoleRequest(
                 Guid.NewGuid(), ownerRole.RoleId, "Owner modifié", Array.Empty<long>(), ownerRole.RowVersion), token);
             Assert.Equal("security.role.system_protected", ownerUpdate.Error.Code);
-            Assert.Equal(28, await ScalarAsync<int>(database.ConnectionString,
+            Assert.Equal(30, await ScalarAsync<int>(database.ConnectionString,
                 "SELECT COUNT(*) FROM security.RolePermissions rp JOIN security.Roles r ON r.Id=rp.RoleId WHERE r.Code=N'OWNER';"));
             Assert.Equal("Propriétaire", await ScalarAsync<string>(database.ConnectionString,
                 "SELECT Name FROM security.Roles WHERE Code=N'OWNER';"));

@@ -31,4 +31,9 @@ public interface ISaleReturnReader
     Task<Result<SaleReturnPreparationView>> GetPreparationAsync(
         long saleId,
         CancellationToken cancellationToken = default);
+
+    Task<Result<SaleReturnPreparationView>> GetPreparationForUserAsync(
+        long saleId,
+        long userAccountId,
+        CancellationToken cancellationToken = default) => GetPreparationAsync(saleId, cancellationToken);
 }

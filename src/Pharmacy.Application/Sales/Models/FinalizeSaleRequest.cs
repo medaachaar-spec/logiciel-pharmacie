@@ -6,7 +6,8 @@ public sealed record FinalizeSaleRequest(
     SaleFinalizationPreparation Preparation,
     SalePaymentRequest Payment,
     SaleCreditRequest? Credit = null,
-    SuspendedSaleCompletionRequest? SuspendedSale = null);
+    SuspendedSaleCompletionRequest? SuspendedSale = null,
+    long? PerformedByUserAccountId = null);
 
 public sealed record SalePaymentRequest(
     SalePaymentMethod Method,

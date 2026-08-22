@@ -78,7 +78,24 @@ internal sealed class SqlAuthenticationService : IAuthenticationService, ISecuri
             return Result.Success();
         }
 
-        var result = await RecordSessionEventAsync("Logout", true, null, correlationId, cancellationToken);
+        var result = await RecordSessionEventAsync(
+            "Logout", true, null, correlationId, cancellationToken, "ExplicitLogout");
+        session.Clear();
+        return result;
+    }
+
+    public async Task<Result> CloseApplicationAsync(
+        Guid correlationId,
+        CancellationToken cancellationToken = default)
+    {
+        if (session.User is null)
+        {
+            session.Clear();
+            return Result.Success();
+        }
+
+        var result = await RecordSessionEventAsync(
+            "Logout", true, null, correlationId, cancellationToken, "ApplicationExit");
         session.Clear();
         return result;
     }
@@ -399,8 +416,31 @@ internal sealed class SqlAuthenticationService : IAuthenticationService, ISecuri
                 user.PasswordHash = passwordHasher.HashPassword(user, request.Password ?? string.Empty);
             user.FailedLoginCount = 0;
             user.LockedUntilUtc = null;
-            user.LastLoginAtUtc = now;
+            if (!unlocking)
+            {
+                user.LastLoginAtUtc = now;
+            }
             user.UpdatedAtUtc = now;
+            UserSessionEntity? persistedSession = null;
+            if (!unlocking)
+            {
+                var previousOpenSessions = await context.UserSessions
+                    .Where(candidate => candidate.UserAccountId == user.Id && candidate.Status == "Open")
+                    .ToArrayAsync(cancellationToken);
+                foreach (var previous in previousOpenSessions)
+                {
+                    previous.Status = "Interrupted";
+                    previous.EndReason = "PreviousSessionDetected";
+                }
+
+                persistedSession = new UserSessionEntity
+                {
+                    UserAccountId = user.Id,
+                    StartedAtUtc = now,
+                    Status = "Open"
+                };
+                context.UserSessions.Add(persistedSession);
+            }
             context.AuthenticationEvents.Add(SecurityPersistenceSupport.AuthenticationEvent(
                 eventType, user.Id, normalized, now, true, null, request.CorrelationId));
             context.AuditEvents.Add(SecurityPersistenceSupport.AuditEvent(
@@ -408,7 +448,10 @@ internal sealed class SqlAuthenticationService : IAuthenticationService, ISecuri
                 user.Id, user.DisplayName, "Success", now, null, request.CorrelationId));
             await context.SaveChangesAsync(cancellationToken);
 
-            var mapped = SecurityPersistenceSupport.MapSession(user, now);
+            var mapped = SecurityPersistenceSupport.MapSession(
+                user,
+                now,
+                persistedSession?.Id ?? session.User?.PersistedSessionId);
             if (unlocking && session.IsAuthenticated)
             {
                 session.Unlock(now);
@@ -431,7 +474,8 @@ internal sealed class SqlAuthenticationService : IAuthenticationService, ISecuri
         bool success,
         string? reason,
         Guid correlationId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? sessionEndReason = null)
     {
         var user = session.User;
         if (user is null) return Result.Failure(SecurityErrors.AuthenticationRequired);
@@ -439,6 +483,20 @@ internal sealed class SqlAuthenticationService : IAuthenticationService, ISecuri
         {
             await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
             var now = clock.UtcNow;
+            if (sessionEndReason is not null && user.PersistedSessionId is not null)
+            {
+                var persistedSession = await context.UserSessions.SingleOrDefaultAsync(
+                    candidate => candidate.Id == user.PersistedSessionId.Value
+                        && candidate.UserAccountId == user.UserId
+                        && candidate.Status == "Open",
+                    cancellationToken);
+                if (persistedSession is not null)
+                {
+                    persistedSession.EndedAtUtc = now;
+                    persistedSession.Status = "Closed";
+                    persistedSession.EndReason = sessionEndReason;
+                }
+            }
             context.AuthenticationEvents.Add(SecurityPersistenceSupport.AuthenticationEvent(
                 eventType, user.UserId, user.Login.ToUpperInvariant(), now, success, reason, correlationId));
             context.AuditEvents.Add(SecurityPersistenceSupport.AuditEvent(

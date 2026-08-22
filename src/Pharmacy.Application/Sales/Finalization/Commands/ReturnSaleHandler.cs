@@ -12,12 +12,18 @@ public sealed class ReturnSaleHandler
     private readonly ISaleReturnStore store;
     private readonly IPermissionAuthorizer authorizer;
     private readonly IBusinessAuditRecorder audit;
+    private readonly ICurrentSecuritySession? securitySession;
 
-    public ReturnSaleHandler(ISaleReturnStore store, IPermissionAuthorizer authorizer, IBusinessAuditRecorder audit)
+    public ReturnSaleHandler(
+        ISaleReturnStore store,
+        IPermissionAuthorizer authorizer,
+        IBusinessAuditRecorder audit,
+        ICurrentSecuritySession? securitySession = null)
     {
         this.store = store;
         this.authorizer = authorizer;
         this.audit = audit;
+        this.securitySession = securitySession;
     }
 
     public async Task<Result<SaleReturnView>> HandleAsync(ReturnSaleRequest request, CancellationToken cancellationToken = default)
@@ -26,7 +32,12 @@ public sealed class ReturnSaleHandler
         if (returnPermission is not null) return returnPermission;
         var refundPermission = SecurityCommandGuard.Denied<SaleReturnView>(authorizer, SecurityPermissions.SalesRefund, true);
         if (refundPermission is not null) return refundPermission;
-        var result = await store.ReturnAsync(request, cancellationToken);
+        var attributedRequest = request with
+        {
+            PerformedByUserAccountId = securitySession?.User?.UserId
+                ?? request.PerformedByUserAccountId
+        };
+        var result = await store.ReturnAsync(attributedRequest, cancellationToken);
         if (result.IsSuccess)
             await audit.RecordSuccessAsync("sales", "SaleReturn", result.Value.ReturnId.ToString(),
                 "sale.return_refund", request.OperationId, cancellationToken);

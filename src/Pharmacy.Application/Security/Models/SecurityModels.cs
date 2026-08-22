@@ -9,7 +9,71 @@ public sealed record UserSessionView(
     IReadOnlyList<string> Roles,
     IReadOnlySet<string> Permissions,
     DateTime AuthenticatedAtUtc,
-    DateTime LastReauthenticatedAtUtc);
+    DateTime LastReauthenticatedAtUtc,
+    long? PersistedSessionId = null);
+
+public sealed record EmployeeActivityPeriod(DateTime FromUtc, DateTime ToUtc)
+{
+    public bool IsValid => FromUtc.Kind == DateTimeKind.Utc
+        && ToUtc.Kind == DateTimeKind.Utc
+        && FromUtc < ToUtc;
+
+    public static EmployeeActivityPeriod Today(DateTime nowUtc)
+    {
+        var from = DateTime.SpecifyKind(nowUtc.Date, DateTimeKind.Utc);
+        return new EmployeeActivityPeriod(from, from.AddDays(1));
+    }
+
+    public static EmployeeActivityPeriod LastDays(DateTime nowUtc, int days)
+    {
+        if (days <= 0) throw new ArgumentOutOfRangeException(nameof(days));
+        return new EmployeeActivityPeriod(nowUtc.AddDays(-days), nowUtc);
+    }
+}
+
+public sealed record EmployeeActivitySummaryView(
+    long UserId,
+    string Login,
+    string DisplayName,
+    string PrimaryRole,
+    bool IsActive,
+    DateTime? LastLoginAtUtc,
+    DateTime? CurrentSessionStartedAtUtc,
+    int SalesCount,
+    decimal GrossSalesAmount,
+    int ReturnsPerformedCount,
+    decimal RefundAmount);
+
+public sealed record EmployeeSessionHistoryView(
+    long SessionId,
+    DateTime StartedAtUtc,
+    DateTime? EndedAtUtc,
+    string Status,
+    string? EndReason)
+{
+    public TimeSpan? Duration => EndedAtUtc is null ? null : EndedAtUtc.Value - StartedAtUtc;
+}
+
+public sealed record EmployeeSaleHistoryView(
+    long SaleId,
+    string Reference,
+    DateTime CompletedAtUtc,
+    decimal Amount);
+
+public sealed record EmployeeActivityItemView(
+    string ActivityId,
+    DateTime OccurredAtUtc,
+    string Category,
+    string Action,
+    string? BusinessReference,
+    decimal? Amount,
+    string Result);
+
+public sealed record EmployeeActivityDetailView(
+    EmployeeActivitySummaryView Summary,
+    IReadOnlyList<EmployeeSessionHistoryView> Sessions,
+    IReadOnlyList<EmployeeSaleHistoryView> Sales,
+    IReadOnlyList<EmployeeActivityItemView> Activity);
 
 public sealed record AuthenticationResultView(
     UserSessionView Session,

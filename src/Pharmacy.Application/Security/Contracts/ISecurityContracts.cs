@@ -43,9 +43,23 @@ public interface IAuthenticationService
     Task<Result<AuthenticationResultView>> UnlockAsync(LoginRequest request, CancellationToken cancellationToken = default);
     Task<Result> LockAsync(Guid correlationId, CancellationToken cancellationToken = default);
     Task<Result> LogoutAsync(Guid correlationId, CancellationToken cancellationToken = default);
+    Task<Result> CloseApplicationAsync(Guid correlationId, CancellationToken cancellationToken = default) =>
+        LogoutAsync(correlationId, cancellationToken);
     Task<Result> ReauthenticateAsync(string password, Guid correlationId, CancellationToken cancellationToken = default);
     Task<Result> ChangePasswordAsync(string currentPassword, string newPassword, Guid correlationId, CancellationToken cancellationToken = default);
     Task<Result> RecoverPasswordAsync(string login, string recoveryCode, string newPassword, Guid correlationId, CancellationToken cancellationToken = default);
+}
+
+public interface IEmployeeActivityReader
+{
+    Task<Result<IReadOnlyList<EmployeeActivitySummaryView>>> GetSummariesAsync(
+        EmployeeActivityPeriod period,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<EmployeeActivityDetailView>> GetEmployeeAsync(
+        long userId,
+        EmployeeActivityPeriod period,
+        CancellationToken cancellationToken = default);
 }
 
 public interface ISecurityBootstrapService

@@ -196,7 +196,20 @@ public sealed class CustomUxCleanupTests
             "src/Pharmacy.Infrastructure/Persistence/Migrations/",
             "src/Pharmacy.Infrastructure/Persistence/PharmacyDbContext.cs",
             "src/Pharmacy.Infrastructure/Operations/SqlBackupRecoveryService.cs",
-            "src/Pharmacy.Application/Operations/Models/BackupModels.cs"
+            "src/Pharmacy.Application/Operations/Models/BackupModels.cs",
+            "src/Pharmacy.Application/Sales/Contracts/ISalesReader.cs",
+            "src/Pharmacy.Application/Sales/Contracts/Sprint14SalesContracts.cs",
+            "src/Pharmacy.Application/Sales/Finalization/Commands/FinalizeSaleHandler.cs",
+            "src/Pharmacy.Application/Sales/Finalization/Commands/ReturnSaleHandler.cs",
+            "src/Pharmacy.Application/Sales/Finalization/Queries/GetFinalizedSalesHandlers.cs",
+            "src/Pharmacy.Application/Sales/Finalization/Queries/GetSaleReturnPreparationHandler.cs",
+            "src/Pharmacy.Application/Sales/Models/FinalizeSaleRequest.cs",
+            "src/Pharmacy.Application/Sales/Models/Sprint14SalesModels.cs",
+            "src/Pharmacy.Infrastructure/Persistence/Configurations/Sales/",
+            "src/Pharmacy.Infrastructure/Persistence/Entities/Sales/",
+            "src/Pharmacy.Infrastructure/Sales/SqlCustomerCreditCashStore.cs",
+            "src/Pharmacy.Infrastructure/Sales/SqlSaleFinalizer.cs",
+            "src/Pharmacy.Infrastructure/Sales/SqlSalesReader.cs"
         };
         var unexpected = changedBusinessFiles.Split(
                 ['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)

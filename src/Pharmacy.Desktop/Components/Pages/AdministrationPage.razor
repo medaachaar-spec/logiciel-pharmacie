@@ -91,11 +91,23 @@
         </section>
 
         <section class="security-panel security-panel--accounts">
-            <h2>Comptes utilisateurs</h2>
-            <div class="security-table-wrap" tabindex="0"><table class="security-accounts-table"><thead><tr><th>Compte</th><th>Rôles</th><th>État</th><th>Actions sensibles</th></tr></thead><tbody>
+            <h2>Employés et comptes utilisateurs</h2>
+            <div class="security-table-wrap" tabindex="0"><table class="security-accounts-table"><thead><tr><th>Compte</th><th>Rôle principal</th><th>État</th><th>Dernière connexion</th><th>Ventes aujourd’hui</th><th>Montant aujourd’hui</th><th>Actions</th></tr></thead><tbody>
             @foreach (var user in Security.Users)
             {
-                <tr class="@(selectedAccessUser?.UserId == user.UserId ? "security-account--selected" : null)"><td><strong>@user.DisplayName</strong><small>@user.Login</small></td><td>@Security.UserRoleLabel(user)</td><td>@(user.IsActive ? "Actif" : "Désactivé")</td><td><div class="security-account-actions">
+                var employeeSummary = Security.EmployeeSummary(user.UserId);
+                <tr class="@(selectedAccessUser?.UserId == user.UserId ? "security-account--selected" : null)">
+                    <td><strong>@user.DisplayName</strong><small>@user.Login</small></td>
+                    <td>@Security.UserRoleLabel(user)</td>
+                    <td><span class="security-state-badge @(user.IsActive ? "security-state-badge--active" : null)">@(user.IsActive ? "Actif" : "Désactivé")</span></td>
+                    <td>@FormatDateTime(employeeSummary?.LastLoginAtUtc)</td>
+                    <td>@(employeeSummary?.SalesCount ?? 0)</td>
+                    <td>@FormatMoney(employeeSummary?.GrossSalesAmount ?? 0m)</td>
+                    <td><div class="security-account-actions">
+                    @if (canViewEmployeeActivity)
+                    {
+                        <button type="button" @onclick="() => OpenEmployeeActivityAsync(user.UserId)">Voir l’activité</button>
+                    }
                     @if (!user.Roles.Contains(SecurityRolePresets.OwnerCode, StringComparer.Ordinal))
                     {
                         <button @onclick="() => Security.SetUserActiveAsync(user, !user.IsActive)">@(user.IsActive ? "Désactiver" : "Réactiver")</button>
@@ -118,6 +130,88 @@
             }
             </tbody></table></div>
         </section>
+
+        @if (canViewEmployeeActivity && Security.SelectedEmployeeActivity is { } employeeActivity)
+        {
+            <section class="security-panel employee-activity" aria-labelledby="employee-activity-title">
+                <header class="employee-activity__heading">
+                    <div>
+                        <span class="employee-activity__eyebrow">Historique employé</span>
+                        <h2 id="employee-activity-title">@employeeActivity.Summary.DisplayName</h2>
+                        <p>Les durées indiquent uniquement l’ouverture de la session applicative, pas un temps de travail réel.</p>
+                    </div>
+                    <button type="button" @onclick="CloseEmployeeActivity">Fermer</button>
+                </header>
+
+                <div class="employee-activity__periods" aria-label="Période de l’activité">
+                    <button type="button" aria-pressed="@(activityPeriod == "today")" @onclick="ShowTodayAsync">Aujourd’hui</button>
+                    <button type="button" aria-pressed="@(activityPeriod == "7days")" @onclick="ShowSevenDaysAsync">7 jours</button>
+                    <button type="button" aria-pressed="@(activityPeriod == "30days")" @onclick="ShowThirtyDaysAsync">30 jours</button>
+                </div>
+
+                <div class="employee-activity__metrics" aria-label="Résumé de la période">
+                    <div><span>Ventes</span><strong>@employeeActivity.Summary.SalesCount</strong></div>
+                    <div><span>Ventes brutes</span><strong>@FormatMoney(employeeActivity.Summary.GrossSalesAmount)</strong></div>
+                    <div><span>Retours effectués</span><strong>@employeeActivity.Summary.ReturnsPerformedCount</strong></div>
+                    <div><span>Montant remboursé</span><strong>@FormatMoney(employeeActivity.Summary.RefundAmount)</strong></div>
+                </div>
+
+                <div class="employee-activity__tabs" role="tablist" aria-label="Détail employé">
+                    @foreach (var tab in EmployeeTabs)
+                    {
+                        <button type="button" role="tab" aria-selected="@(employeeTab == tab.Code)" @onclick="() => employeeTab = tab.Code">@tab.Label</button>
+                    }
+                </div>
+
+                @if (employeeTab == "summary")
+                {
+                    <div class="employee-activity__summary" role="tabpanel">
+                        <dl>
+                            <div><dt>Compte</dt><dd>@employeeActivity.Summary.Login</dd></div>
+                            <div><dt>Statut</dt><dd>@(employeeActivity.Summary.IsActive ? "Actif" : "Désactivé")</dd></div>
+                            <div><dt>Dernière connexion</dt><dd>@FormatDateTime(employeeActivity.Summary.LastLoginAtUtc)</dd></div>
+                            <div><dt>Session courante</dt><dd>@(employeeActivity.Summary.CurrentSessionStartedAtUtc is null ? "Aucune" : $"En cours depuis {FormatDateTime(employeeActivity.Summary.CurrentSessionStartedAtUtc)}")</dd></div>
+                        </dl>
+                    </div>
+                }
+                else if (employeeTab == "sessions")
+                {
+                    <div class="security-table-wrap" role="tabpanel" tabindex="0">
+                        <table><thead><tr><th>Début</th><th>Fin</th><th>Durée de session</th><th>État</th></tr></thead><tbody>
+                        @foreach (var item in employeeActivity.Sessions)
+                        {
+                            <tr><td>@FormatDateTime(item.StartedAtUtc)</td><td>@FormatDateTime(item.EndedAtUtc)</td><td>@FormatDuration(item)</td><td>@SessionStatus(item)</td></tr>
+                        }
+                        </tbody></table>
+                        @if (employeeActivity.Sessions.Count == 0) { <p class="security-empty-state">Aucune session enregistrée.</p> }
+                    </div>
+                }
+                else if (employeeTab == "sales")
+                {
+                    <div class="security-table-wrap" role="tabpanel" tabindex="0">
+                        <table><thead><tr><th>Vente</th><th>Date</th><th>Montant</th></tr></thead><tbody>
+                        @foreach (var item in employeeActivity.Sales)
+                        {
+                            <tr><td><strong>@item.Reference</strong></td><td>@FormatDateTime(item.CompletedAtUtc)</td><td>@FormatMoney(item.Amount)</td></tr>
+                        }
+                        </tbody></table>
+                        @if (employeeActivity.Sales.Count == 0) { <p class="security-empty-state">Aucune vente sur cette période.</p> }
+                    </div>
+                }
+                else
+                {
+                    <div class="security-table-wrap" role="tabpanel" tabindex="0">
+                        <table><thead><tr><th>Date</th><th>Catégorie</th><th>Action</th><th>Référence</th><th>Montant</th></tr></thead><tbody>
+                        @foreach (var item in employeeActivity.Activity)
+                        {
+                            <tr><td>@FormatDateTime(item.OccurredAtUtc)</td><td>@item.Category</td><td>@item.Action</td><td>@(item.BusinessReference ?? "—")</td><td>@(item.Amount is null ? "—" : FormatMoney(item.Amount.Value))</td></tr>
+                        }
+                        </tbody></table>
+                        @if (employeeActivity.Activity.Count == 0) { <p class="security-empty-state">Aucune activité métier sur cette période.</p> }
+                    </div>
+                }
+            </section>
+        }
 
         @if (canManageRoles && selectedAccessUser is not null)
         {
@@ -275,7 +369,14 @@
 </div>
 
 @code {
-    private bool denied, canManageRoles;
+    private static readonly (string Code, string Label)[] EmployeeTabs =
+    [
+        ("summary", "Résumé"),
+        ("sessions", "Sessions"),
+        ("sales", "Ventes"),
+        ("activity", "Activité")
+    ];
+    private bool denied, canManageRoles, canViewEmployeeActivity;
     private string reauthPassword = string.Empty, login = string.Empty, displayName = string.Empty, initialPassword = string.Empty;
     private string currentPassword = string.Empty, newPassword = string.Empty;
     private string roleCode = string.Empty, roleName = string.Empty;
@@ -285,6 +386,8 @@
     private long selectedRoleId, roleAssignmentId;
     private SecurityRoleView? editingRole;
     private SecurityUserSummaryView? selectedAccessUser;
+    private long? selectedEmployeeActivityUserId;
+    private string activityPeriod = "today", employeeTab = "summary";
     private bool confirmOverrideReset;
     private readonly HashSet<long> selectedPermissionIds = new();
     private readonly Dictionary<long, SecurityPermissionOverrideEffect> permissionOverrides = new();
@@ -292,12 +395,67 @@
     {
         denied = Authorizer.Authorize(SecurityPermissions.SecurityManageUsers).IsFailure;
         canManageRoles = Authorizer.Authorize(SecurityPermissions.SecurityManageRoles).IsSuccess;
+        canViewEmployeeActivity = Authorizer.Authorize(SecurityPermissions.SecurityViewEmployeeActivity).IsSuccess;
         if (!denied)
         {
             SyncBrandingForm();
             await Security.LoadAdministrationAsync();
         }
     }
+
+    private async Task OpenEmployeeActivityAsync(long userId)
+    {
+        selectedEmployeeActivityUserId = userId;
+        activityPeriod = "today";
+        employeeTab = "summary";
+        await Security.LoadEmployeeActivityAsync(userId, CurrentActivityPeriod());
+    }
+
+    private async Task ChangeActivityPeriodAsync(string period)
+    {
+        if (selectedEmployeeActivityUserId is null) return;
+        activityPeriod = period;
+        await Security.LoadEmployeeActivityAsync(selectedEmployeeActivityUserId.Value, CurrentActivityPeriod());
+    }
+
+    private Task ShowTodayAsync() => ChangeActivityPeriodAsync("today");
+    private Task ShowSevenDaysAsync() => ChangeActivityPeriodAsync("7days");
+    private Task ShowThirtyDaysAsync() => ChangeActivityPeriodAsync("30days");
+
+    private EmployeeActivityPeriod CurrentActivityPeriod()
+    {
+        var nowUtc = DateTime.UtcNow;
+        return activityPeriod switch
+        {
+            "7days" => EmployeeActivityPeriod.LastDays(nowUtc, 7),
+            "30days" => EmployeeActivityPeriod.LastDays(nowUtc, 30),
+            _ => EmployeeActivityPeriod.Today(nowUtc)
+        };
+    }
+
+    private void CloseEmployeeActivity()
+    {
+        selectedEmployeeActivityUserId = null;
+        Security.CloseEmployeeActivity();
+    }
+
+    private static string FormatDateTime(DateTime? value) => value is null
+        ? "Jamais"
+        : value.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+
+    private static string FormatMoney(decimal value) => $"{value:N2} MAD";
+
+    private static string FormatDuration(EmployeeSessionHistoryView session) => session.Duration is null
+        ? session.Status == "Open" ? "En cours" : "Indéterminée"
+        : $"{(int)session.Duration.Value.TotalHours} h {session.Duration.Value.Minutes:00}";
+
+    private static string SessionStatus(EmployeeSessionHistoryView session) => session.Status switch
+    {
+        "Open" => "En cours",
+        "Closed" => session.EndReason == "ApplicationExit" ? "Fermeture application" : "Déconnexion",
+        "Interrupted" => "Interrompue — fin inconnue",
+        _ => "Inconnue"
+    };
     private async Task ReauthenticateAsync() { await Security.ReauthenticateAsync(reauthPassword); reauthPassword = string.Empty; }
     private async Task CreateUserAsync()
     {

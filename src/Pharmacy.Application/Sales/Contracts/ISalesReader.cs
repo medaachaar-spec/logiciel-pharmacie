@@ -12,4 +12,14 @@ public interface ISalesReader
     Task<Result<IReadOnlyList<FinalizedSaleSummaryView>>> GetRecentAsync(
         int limit,
         CancellationToken cancellationToken = default);
+
+    Task<Result<FinalizedSaleView>> GetByIdForUserAsync(
+        long saleId,
+        long userAccountId,
+        CancellationToken cancellationToken = default) => GetByIdAsync(saleId, cancellationToken);
+
+    Task<Result<IReadOnlyList<FinalizedSaleSummaryView>>> GetRecentForUserAsync(
+        int limit,
+        long userAccountId,
+        CancellationToken cancellationToken = default) => GetRecentAsync(limit, cancellationToken);
 }

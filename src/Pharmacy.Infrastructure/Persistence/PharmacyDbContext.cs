@@ -70,6 +70,7 @@ public sealed class PharmacyDbContext : DbContext
     internal DbSet<UserPermissionOverrideEntity> UserPermissionOverrides => Set<UserPermissionOverrideEntity>();
     internal DbSet<RecoveryCodeEntity> RecoveryCodes => Set<RecoveryCodeEntity>();
     internal DbSet<AuthenticationEventEntity> AuthenticationEvents => Set<AuthenticationEventEntity>();
+    internal DbSet<UserSessionEntity> UserSessions => Set<UserSessionEntity>();
     internal DbSet<AuditEventEntity> AuditEvents => Set<AuditEventEntity>();
     internal DbSet<AuditEventDetailEntity> AuditEventDetails => Set<AuditEventDetailEntity>();
     internal DbSet<ReportSettingsEntity> ReportSettings => Set<ReportSettingsEntity>();

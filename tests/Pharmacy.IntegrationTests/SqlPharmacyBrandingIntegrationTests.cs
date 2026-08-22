@@ -180,7 +180,7 @@ public sealed class SqlPharmacyBrandingIntegrationTests(PharmacyBrandingSqlFixtu
             var restored = await backup.RestoreTestAsync(new RestoreTestRequest(Guid.NewGuid(), backupPath), token);
 
             Assert.True(restored.IsSuccess, restored.IsFailure ? restored.Error.Message : null);
-            Assert.Equal(11, restored.Value.AppliedMigrationCount);
+            Assert.Equal(12, restored.Value.AppliedMigrationCount);
             Assert.Equal(5, restored.Value.CriticalTableCount);
             Assert.Equal("Pharmacie Sauvegardée", restored.Value.PharmacyName);
             Assert.Equal("#246B45", restored.Value.PrimaryColor);
@@ -246,7 +246,7 @@ public sealed class PharmacyBrandingSqlFixture : IAsyncLifetime
         Factory = new FactoryImpl(optionsBuilder.Options);
         await using var context = await Factory.CreateDbContextAsync();
         await context.Database.MigrateAsync();
-        Assert.Equal(11, (await context.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(12, (await context.Database.GetAppliedMigrationsAsync()).Count());
         Assert.Empty(await context.Database.GetPendingMigrationsAsync());
     }
 

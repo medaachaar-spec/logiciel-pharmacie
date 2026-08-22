@@ -26,6 +26,7 @@ public sealed class FinalizeSaleHandler
     private readonly ISaleFinalizer finalizer;
     private readonly IPermissionAuthorizer? authorizer;
     private readonly IBusinessAuditRecorder? audit;
+    private readonly ICurrentSecuritySession? securitySession;
 
     public FinalizeSaleHandler(
         PrepareSaleFinalizationHandler preparationHandler,
@@ -43,12 +44,21 @@ public sealed class FinalizeSaleHandler
         ISaleFinalizer finalizer,
         IPermissionAuthorizer? authorizer,
         IBusinessAuditRecorder? audit)
+        : this(preparationHandler, finalizer, authorizer, audit, null) { }
+
+    public FinalizeSaleHandler(
+        PrepareSaleFinalizationHandler preparationHandler,
+        ISaleFinalizer finalizer,
+        IPermissionAuthorizer? authorizer,
+        IBusinessAuditRecorder? audit,
+        ICurrentSecuritySession? securitySession)
     {
         this.preparationHandler = preparationHandler
             ?? throw new ArgumentNullException(nameof(preparationHandler));
         this.finalizer = finalizer ?? throw new ArgumentNullException(nameof(finalizer));
         this.authorizer = authorizer;
         this.audit = audit;
+        this.securitySession = securitySession;
     }
 
     public async Task<Result<FinalizedSaleView>> HandleAsync(
@@ -60,6 +70,7 @@ public sealed class FinalizeSaleHandler
 
         var denied = SecurityCommandGuard.Denied<FinalizedSaleView>(authorizer, SecurityPermissions.SalesCreate);
         if (denied is not null) return denied;
+        var performerUserId = securitySession?.User?.UserId;
 
         if (command.OperationId == Guid.Empty)
         {
@@ -96,7 +107,7 @@ public sealed class FinalizeSaleHandler
             ? null
             : new SaleCreditRequest(command.CustomerId!.Value, command.CreditAmount);
         var finalized = await finalizer.FinalizeAsync(
-            new FinalizeSaleRequest(preparation.Value, payment.Value, credit, command.SuspendedSale),
+            new FinalizeSaleRequest(preparation.Value, payment.Value, credit, command.SuspendedSale, performerUserId),
             cancellationToken);
         if (finalized.IsSuccess && audit is not null)
         {

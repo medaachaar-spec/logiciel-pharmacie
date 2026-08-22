@@ -48,7 +48,7 @@ public sealed class SqlReportingIntegrationTests
 
             Assert.Equal(11, await ScalarAsync<int>(database.ConnectionString,
                 "SELECT COUNT(*) FROM sys.views v JOIN sys.schemas s ON s.schema_id=v.schema_id WHERE s.name=N'reporting';"));
-            Assert.Equal(28, await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM security.Permissions;"));
+            Assert.Equal(30, await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM security.Permissions;"));
             Assert.Equal(1, await ScalarAsync<int>(database.ConnectionString,
                 "SELECT COUNT(*) FROM reporting.ReportSettings WHERE Id=1 AND LowStockAlertsEnabled=0 AND ExpiryAlertsEnabled=0 AND ExpiryHorizonDays IS NULL;"));
 
@@ -165,13 +165,13 @@ public sealed class SqlReportingIntegrationTests
             VALUES(@operationId, N'SPRINT16-TEST', N'MAIN', N'Principal', 1, 1, @now);
             SET @locationId = SCOPE_IDENTITY();
             INSERT inventory.StockBatches(CreationOperationId, CreationFingerprint, ProductId, BatchNumber, ExpiryDate, IsActive, CreatedAtUtc)
-            VALUES(NEWID(), N'RPT-BATCH-1', @productId, N'LOT-10', DATEADD(day, 10, CONVERT(date, @now)), 1, @now);
+            VALUES(NEWID(), N'RPT-BATCH-1', @productId, N'LOT-10', DATEADD(day, 10, CONVERT(date, SYSUTCDATETIME())), 1, @now);
             SET @batchOneId = SCOPE_IDENTITY();
             INSERT inventory.StockBatches(CreationOperationId, CreationFingerprint, ProductId, BatchNumber, ExpiryDate, IsActive, CreatedAtUtc)
-            VALUES(NEWID(), N'RPT-BATCH-2', @productId, N'LOT-60', DATEADD(day, 60, CONVERT(date, @now)), 1, @now);
+            VALUES(NEWID(), N'RPT-BATCH-2', @productId, N'LOT-60', DATEADD(day, 60, CONVERT(date, SYSUTCDATETIME())), 1, @now);
             SET @batchTwoId = SCOPE_IDENTITY();
             INSERT inventory.StockBatches(CreationOperationId, CreationFingerprint, ProductId, BatchNumber, ExpiryDate, IsActive, CreatedAtUtc)
-            VALUES(NEWID(), N'RPT-BATCH-EXP', @secondProductId, N'LOT-EXP', DATEADD(day, -1, CONVERT(date, @now)), 1, @now);
+            VALUES(NEWID(), N'RPT-BATCH-EXP', @secondProductId, N'LOT-EXP', CONVERT(date, N'20000101'), 1, @now);
             SET @expiredBatchId = SCOPE_IDENTITY();
             INSERT inventory.StockBalances(StockLocationId, ProductId, StockBatchId, AvailableQuantity, UpdatedAtUtc)
             VALUES(@locationId, @productId, @batchOneId, 2, @now);
@@ -198,8 +198,8 @@ public sealed class SqlReportingIntegrationTests
             VALUES(@saleId, @secondProductId, N'RPT-002', N'Produit périmé', 20, 2, 40);
             SET @lineTwoId = SCOPE_IDENTITY();
             INSERT sales.SaleLineAllocations(SaleLineId, StockBalanceId, StockBatchId, Quantity, BatchNumberSnapshot, ExpiryDateSnapshot)
-            VALUES(@lineOneId, @balanceOneId, @batchOneId, 1, N'LOT-10', DATEADD(day, 10, CONVERT(date, @now))),
-                  (@lineOneId, @balanceTwoId, @batchTwoId, 2, N'LOT-60', DATEADD(day, 60, CONVERT(date, @now)));
+            VALUES(@lineOneId, @balanceOneId, @batchOneId, 1, N'LOT-10', DATEADD(day, 10, CONVERT(date, SYSUTCDATETIME()))),
+                  (@lineOneId, @balanceTwoId, @batchTwoId, 2, N'LOT-60', DATEADD(day, 60, CONVERT(date, SYSUTCDATETIME())));
             INSERT sales.Payments(SaleId, OperationId, PaymentMethod, Status, Amount, TenderedAmount, ChangeGiven, ExternalCardConfirmed, ConfirmedAtUtc)
             VALUES(@saleId, NEWID(), N'Cash', N'Completed', 30, 30, 0, 0, @now),
                   (@saleId, NEWID(), N'ExternalCard', N'Completed', 30, NULL, 0, 1, @now);
@@ -241,7 +241,7 @@ public sealed class SqlReportingIntegrationTests
             VALUES(N'GR-RPT-001', NEWID(), N'RPT-RECEIPT', @supplierId, @orderId, @locationId, N'PurchaseOrder', N'Completed', N'BL-RPT-001', CONVERT(date,@now), @now, @now);
             SET @receiptId = SCOPE_IDENTITY();
             INSERT purchasing.GoodsReceiptLines(GoodsReceiptId, ProductId, PurchaseOrderLineId, Quantity, UnitPurchasePrice, ProductCodeSnapshot, ProductNameSnapshot, StockBatchId, LotNumberSnapshot, ExpiryDateSnapshot, StockMovementId, CreatedAtUtc)
-            VALUES(@receiptId, @productId, @orderLineId, 5, 10, N'RPT-001', N'=FORMULA', @batchOneId, N'LOT-10', DATEADD(day,10,CONVERT(date,@now)), @movementId, @now);
+            VALUES(@receiptId, @productId, @orderLineId, 5, 10, N'RPT-001', N'=FORMULA', @batchOneId, N'LOT-10', DATEADD(day,10,CONVERT(date,SYSUTCDATETIME())), @movementId, @now);
             """;
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync();

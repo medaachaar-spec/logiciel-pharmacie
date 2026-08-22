@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using Pharmacy.Application.Security.Contracts;
 using Pharmacy.Infrastructure.Deployment;
 
 namespace Pharmacy.Desktop;
@@ -50,6 +51,17 @@ public partial class App : System.Windows.Application
     protected override void OnExit(ExitEventArgs e)
     {
         DispatcherUnhandledException -= HandleDispatcherUnhandledException;
+        try
+        {
+            serviceProvider?.GetService<IAuthenticationService>()
+                ?.CloseApplicationAsync(Guid.NewGuid())
+                .GetAwaiter()
+                .GetResult();
+        }
+        catch
+        {
+            // A failed best-effort close remains identifiable as an open/interrupted session.
+        }
         serviceProvider?.Dispose();
         base.OnExit(e);
     }
