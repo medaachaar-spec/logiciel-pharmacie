@@ -197,6 +197,36 @@
     height: 0.8rem;
 }
 
+.operational-reference {
+    position: relative;
+    min-width: 0;
+}
+
+.operational-reference summary {
+    width: fit-content;
+    max-width: 100%;
+    cursor: pointer;
+    color: var(--color-text-primary);
+    font-family: var(--font-family-monospace);
+    font-size: var(--font-size-metadata);
+    list-style: none;
+}
+
+.operational-reference summary::-webkit-details-marker { display: none; }
+
+.operational-reference summary:focus-visible {
+    border-radius: var(--radius-small);
+    outline: var(--focus-ring-width) solid var(--pharmacy-focus);
+    outline-offset: var(--focus-ring-offset);
+}
+
+.operational-reference[open] code {
+    display: block;
+    margin-top: var(--space-1);
+    overflow-wrap: anywhere;
+    user-select: all;
+}
+
 .app-sidebar__scope {
     display: flex;
     align-items: center;
@@ -356,9 +386,10 @@
     gap: var(--space-2);
 }
 
-.app-topbar__account > span:last-child {
+.app-topbar__identity {
     display: grid;
     min-width: 0;
+    gap: var(--space-1);
     line-height: var(--line-height-tight);
 }
 
@@ -376,6 +407,11 @@
 .app-topbar__account small {
     color: var(--color-text-secondary);
     font-size: var(--font-size-metadata);
+    font-weight: var(--font-weight-medium);
+}
+
+.input-modality-pointer .page-header h1:focus-visible {
+    outline: none;
 }
 
 .app-topbar__avatar {
@@ -911,6 +947,11 @@
     .app-topbar__context {
         align-items: flex-start;
         flex-direction: column;
+    }
+
+    .app-topbar__account {
+        align-items: flex-start;
+        flex-wrap: wrap;
     }
 
     .system-state-list > div {

@@ -259,7 +259,7 @@ public sealed class SqlInventoryGateIntegrationTests(SqlInventoryGateFixture fix
     public async Task STK0621_DisabledProductRemainsCountableForHistoricalStockIntegrity()
     {
         var prepared = await PreparedProductAsync("DISABLED", [("LOT-A", 5, Future)]);
-        var deactivated = await new SetCatalogProductActivationHandler(new SqlCatalogStore(fixture.Factory)).HandleAsync(new(
+        var deactivated = await new SetCatalogProductActivationHandler(new SqlCatalogStore(fixture.Factory), TestPermissionAuthorizer.AllowAll).HandleAsync(new(
             prepared.ProductId, false, false, prepared.ProductRowVersion, prepared.LocalSettingsRowVersion), Token);
         Assert.True(deactivated.IsSuccess);
         var session = await CreateAndStartAsync("DISABLED");
@@ -363,7 +363,7 @@ public sealed class SqlInventoryGateIntegrationTests(SqlInventoryGateFixture fix
     {
         await EnsureTestLocationAsync();
         var code = Code(tag);
-        var product = await new CreateCatalogProductHandler(new SqlCatalogStore(fixture.Factory)).HandleAsync(new(
+        var product = await new CreateCatalogProductHandler(new SqlCatalogStore(fixture.Factory), TestPermissionAuthorizer.AllowAll).HandleAsync(new(
             $"Produit STK {tag}", "Comptage réel", fixture.CategoryId, code, 20m,
             TracksLots: true, TracksExpiry: true), Token);
         Assert.True(product.IsSuccess, product.IsFailure ? product.Error.Code : null);

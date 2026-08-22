@@ -15,7 +15,7 @@ Cocher avec preuve datée ; une case critique vide signifie NO-GO.
 ## Base et exploitation
 
 - [ ] SQL Express réel PASS ;
-- [ ] fresh DB, 10 migrations, 0 pending/model changes ;
+- [ ] fresh DB, 13 migrations, 0 pending/model changes ;
 - [ ] aucun utilisateur/mot de passe/donnée métier seedé ;
 - [ ] backup pré-upgrade + verify + hash ;
 - [ ] rollback restauré sur cible isolée ;
@@ -28,8 +28,8 @@ Cocher avec preuve datée ; une case critique vide signifie NO-GO.
 - [ ] E2E 1–9 PASS ;
 - [ ] Owner bootstrap/récupération PASS ;
 - [ ] RBAC et audit PASS ;
-- [ ] erreurs SQL/printer sans faux succès ;
-- [ ] scanner, imprimante 80 mm, TPE externe et UPS évalués ;
+- [ ] erreurs SQL sans faux succès ; erreurs d’impression sans rollback lorsque l’impression est activée ;
+- [ ] scanner, TPE externe et UPS évalués ; imprimante 80 mm évaluée uniquement si l’impression est activée ;
 - [ ] UAT pharmacienne critique PASS ;
 - [ ] runbook support et contacts remis.
 

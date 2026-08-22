@@ -185,11 +185,12 @@ public sealed class AppShellTests
     }
 
     [Fact]
-    public void Statusbar_ShowsOnlyAnUnderstandableReadyState()
+    public void Statusbar_IsHiddenWhenThereIsNoActionableState()
     {
         var source = DesktopText("Components", "Layout", "AppStatusBar.razor");
 
-        Assert.Contains("Application prête", source, StringComparison.Ordinal);
+        Assert.Contains("!string.IsNullOrWhiteSpace(Message)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Application prête", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Version", source, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("SQL", source, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("BuildConfiguration", source, StringComparison.Ordinal);
@@ -200,7 +201,8 @@ public sealed class AppShellTests
     {
         var source = DesktopText("Components", "Pages", "Home.razor");
 
-        Assert.Contains(">Tableau de bord</h1>", source, StringComparison.Ordinal);
+        Assert.Contains(">@Greeting</h1>", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Tableau de bord</h1>", source, StringComparison.Ordinal);
         Assert.Contains(">Accès directs</h2>", source, StringComparison.Ordinal);
         Assert.DoesNotContain("démonstration", source, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Sprint", source, StringComparison.OrdinalIgnoreCase);

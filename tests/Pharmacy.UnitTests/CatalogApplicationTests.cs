@@ -16,7 +16,7 @@ public sealed class CatalogApplicationTests
     public async Task NegativePriceIsRejectedBeforeTheStore()
     {
         var store = new StubProductStore();
-        var handler = new ChangeCatalogProductPriceHandler(store);
+        var handler = new ChangeCatalogProductPriceHandler(store, TestPermissionAuthorizer.AllowAll);
 
         var result = await handler.HandleAsync(
             new ChangeCatalogProductPriceCommand(1, -0.0001m, null, RowVersion()),
@@ -31,7 +31,7 @@ public sealed class CatalogApplicationTests
     public async Task InvalidRowVersionIsRejectedBeforeUpdate()
     {
         var store = new StubProductStore();
-        var handler = new UpdateCatalogProductHandler(store);
+        var handler = new UpdateCatalogProductHandler(store, TestPermissionAuthorizer.AllowAll);
 
         var result = await handler.HandleAsync(
             new UpdateCatalogProductCommand(
@@ -49,7 +49,7 @@ public sealed class CatalogApplicationTests
     public async Task SearchTrimsTextAndEnforcesLimit()
     {
         var reader = new StubProductReader();
-        var handler = new SearchCatalogProductsHandler(reader);
+        var handler = new SearchCatalogProductsHandler(reader, TestPermissionAuthorizer.AllowAll);
 
         var invalid = await handler.HandleAsync(
             new SearchCatalogProductsQuery("Demo", Limit: 101),
@@ -69,7 +69,7 @@ public sealed class CatalogApplicationTests
     public async Task ProductCreationValidatesReferenceCategoryAndThresholds()
     {
         var store = new StubProductStore();
-        var handler = new CreateCatalogProductHandler(store);
+        var handler = new CreateCatalogProductHandler(store, TestPermissionAuthorizer.AllowAll);
 
         var result = await handler.HandleAsync(
             new CreateCatalogProductCommand(
@@ -86,8 +86,8 @@ public sealed class CatalogApplicationTests
     public async Task CategoryCommandsValidateInputAndConcurrencyToken()
     {
         var store = new StubCategoryStore();
-        var create = new CreateCatalogCategoryHandler(store);
-        var update = new UpdateCatalogCategoryHandler(store);
+        var create = new CreateCatalogCategoryHandler(store, TestPermissionAuthorizer.AllowAll);
+        var update = new UpdateCatalogCategoryHandler(store, TestPermissionAuthorizer.AllowAll);
 
         var invalidCreate = await create.HandleAsync(
             new CreateCatalogCategoryCommand(" ", "Demo"),
@@ -147,7 +147,7 @@ public sealed class CatalogApplicationTests
     public async Task ActivationRequiresBothEightByteRowVersions()
     {
         var store = new StubProductStore();
-        var handler = new SetCatalogProductActivationHandler(store);
+        var handler = new SetCatalogProductActivationHandler(store, TestPermissionAuthorizer.AllowAll);
 
         var result = await handler.HandleAsync(
             new SetCatalogProductActivationCommand(1, false, false, RowVersion(), ""),

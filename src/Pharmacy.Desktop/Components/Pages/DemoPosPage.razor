@@ -288,7 +288,7 @@
                                     @foreach (var sale in Session.RecentSales)
                                     {
                                         <tr @key="sale.SaleId">
-                                            <td><strong>@sale.Reference</strong></td>
+                                            <td><OperationalReference Value="@sale.Reference" /></td>
                                             <td>@sale.CompletedAtUtc.ToString("dd/MM/yyyy HH:mm")</td>
                                             <td>@sale.LineCount</td>
                                             <td>@DemoMoney.Format(sale.Total.Amount)</td>

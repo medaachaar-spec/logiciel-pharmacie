@@ -9,7 +9,7 @@ Pour chaque scénario renseigner : date, version/hash, rôle, données, étapes,
 | UAT-01 | Fresh install et bootstrap Owner | base créée, aucun compte par défaut, récupération conservée | ☐ PASS ☐ FAIL |
 | UAT-02 | Catalogue/import fournisseur | aperçu, validation, import contrôlé, erreurs lisibles | ☐ PASS ☐ FAIL |
 | UAT-03 | Fournisseur, commande, réception | lots/stock/mouvements cohérents, réception idempotente | ☐ PASS ☐ FAIL |
-| UAT-04 | Vente scan/recherche/cash | FEFO, stock décrémenté, vente/ticket persistés | ☐ PASS ☐ FAIL |
+| UAT-04 | Vente scan/recherche/cash | FEFO, stock décrémenté et vente persistée ; aucun ticket lorsque l’impression est désactivée | ☐ PASS ☐ FAIL |
 | UAT-05 | Crédit client et règlement | plafond, dette et cash journal cohérents | ☐ PASS ☐ FAIL |
 | UAT-06 | Retour/remboursement | restock approuvé ou non restockable respecté, audit présent | ☐ PASS ☐ FAIL |
 | UAT-07 | Inventaire | comptage, écart, finalisation et mouvement cohérents | ☐ PASS ☐ FAIL |
@@ -17,7 +17,7 @@ Pour chaque scénario renseigner : date, version/hash, rôle, données, étapes,
 | UAT-09 | Reporting/export | chiffres réconciliés, export protégé contre formules | ☐ PASS ☐ FAIL |
 | UAT-10 | Suspension/reprise | panier retrouvé après redémarrage sans duplication | ☐ PASS ☐ FAIL |
 | UAT-11 | SQL indisponible | blocage explicite, aucune fausse réussite/perte silencieuse | ☐ PASS ☐ FAIL |
-| UAT-12 | Printer/TPE indisponible | vente persistée identifiable, réimpression, aucun PAN stocké | ☐ PASS ☐ FAIL |
+| UAT-12 | Imprimante/TPE indisponible | imprimante non requise si désactivée ; si activée, vente persistée identifiable et réimpression possible ; aucun PAN stocké | ☐ PASS ☐ FAIL |
 | UAT-13 | Backup/restore-test | backup vérifié/hashé, restauration isolée saine | ☐ PASS ☐ FAIL |
 | UAT-14 | Repair/uninstall/reinstall | données et configuration conservées | ☐ PASS ☐ FAIL |
 

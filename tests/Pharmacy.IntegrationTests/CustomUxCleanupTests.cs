@@ -96,7 +96,7 @@ public sealed class CustomUxCleanupTests
             DesktopText("Components", "Pages", "Home.razor"),
             DesktopText("Components", "Pages", "HomePresentationModel.cs"));
 
-        Assert.Contains("Accueil", source, StringComparison.Ordinal);
+        Assert.Contains("@Greeting", source, StringComparison.Ordinal);
         Assert.Contains("Accès directs", source, StringComparison.Ordinal);
         AssertAbsent(source, @"\b(développement|placeholder|provisoire|Sprint|Prototype|démonstration|synthétique|SQL)\b");
         Assert.DoesNotContain("DemoHomeMetric", source, StringComparison.Ordinal);
@@ -125,7 +125,7 @@ public sealed class CustomUxCleanupTests
         {
             "Réauthentification", "Changer mon mot de passe", "Créer un compte",
             "Désactiver", "Réactiver", "Régénérer les codes", "Créer un rôle",
-            "Permissions du rôle", "Matrice rôles / permissions"
+            "Autorisations du rôle", "Rôles et autorisations"
         };
 
         Assert.All(requiredCopy, value => Assert.Contains(value, source, StringComparison.Ordinal));
@@ -196,6 +196,7 @@ public sealed class CustomUxCleanupTests
             "src/Pharmacy.Infrastructure/Persistence/Migrations/",
             "src/Pharmacy.Infrastructure/Persistence/PharmacyDbContext.cs",
             "src/Pharmacy.Infrastructure/Operations/SqlBackupRecoveryService.cs",
+            "src/Pharmacy.Infrastructure/Operations/DeviceServices.cs",
             "src/Pharmacy.Application/Operations/Models/BackupModels.cs",
             "src/Pharmacy.Application/Sales/Contracts/ISalesReader.cs",
             "src/Pharmacy.Application/Sales/Contracts/Sprint14SalesContracts.cs",
@@ -205,6 +206,10 @@ public sealed class CustomUxCleanupTests
             "src/Pharmacy.Application/Sales/Finalization/Queries/GetSaleReturnPreparationHandler.cs",
             "src/Pharmacy.Application/Sales/Models/FinalizeSaleRequest.cs",
             "src/Pharmacy.Application/Sales/Models/Sprint14SalesModels.cs",
+            "src/Pharmacy.Application/Catalog/Commands/CatalogCommandHandlers.cs",
+            "src/Pharmacy.Application/Catalog/Queries/CatalogQueryHandlers.cs",
+            "src/Pharmacy.Application/Customers/Commands/CustomerCommandHandlers.cs",
+            "src/Pharmacy.Application/Customers/Queries/CustomerQueryHandlers.cs",
             "src/Pharmacy.Infrastructure/Persistence/Configurations/Sales/",
             "src/Pharmacy.Infrastructure/Persistence/Entities/Sales/",
             "src/Pharmacy.Infrastructure/Sales/SqlCustomerCreditCashStore.cs",

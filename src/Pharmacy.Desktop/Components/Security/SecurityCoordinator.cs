@@ -319,7 +319,7 @@ public sealed class SecurityCoordinator
             var result = await administration.CreateRoleAsync(
                 new CreateSecurityRoleRequest(Guid.NewGuid(), code, name, permissionIds), cancellationToken);
             if (result.IsFailure) { Message = result.Error.Message; return; }
-            Message = $"Rôle {result.Value.Code} créé avec {result.Value.Permissions.Count} permission(s).";
+            Message = $"Rôle {result.Value.Name} créé avec {AuthorizationCount(result.Value.Permissions.Count)}.";
             await RefreshAdministrationCoreAsync(cancellationToken);
             succeeded = true;
         });
@@ -338,7 +338,7 @@ public sealed class SecurityCoordinator
             var result = await administration.UpdateRoleAsync(
                 new UpdateSecurityRoleRequest(Guid.NewGuid(), role.RoleId, name, permissionIds, role.RowVersion), cancellationToken);
             if (result.IsFailure) { Message = result.Error.Message; return; }
-            Message = $"Rôle {result.Value.Code} mis à jour avec {result.Value.Permissions.Count} permission(s).";
+            Message = $"Rôle {result.Value.Name} mis à jour avec {AuthorizationCount(result.Value.Permissions.Count)}.";
             await RefreshAdministrationCoreAsync(cancellationToken);
             succeeded = true;
         });
@@ -360,6 +360,9 @@ public sealed class SecurityCoordinator
             if (summaries.IsSuccess) EmployeeSummaries = summaries.Value;
         }
     }
+
+    private static string AuthorizationCount(int count) =>
+        $"{count} {(count == 1 ? "autorisation" : "autorisations")}";
 
     private async Task RunAsync(Func<Task> operation)
     {

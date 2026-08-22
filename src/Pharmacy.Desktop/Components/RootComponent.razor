@@ -1,10 +1,12 @@
 @implements IDisposable
 @inject SecurityCoordinator Security
 @inject BrandingCoordinator Branding
+@inject Pharmacy.Desktop.Components.Configuration.ReceiptPrintingSettingsCoordinator ReceiptPrintingSettings
 @inject ICurrentSecuritySession Session
 @inject ISecurityClock SecurityClock
 
-<div class="branding-root" style="@Branding.ThemeStyle">
+<div class="branding-root @(keyboardInput ? "input-modality-keyboard" : "input-modality-pointer")"
+     style="@Branding.ThemeStyle">
     @if (!Security.IsInitialized)
     {
         <p class="loading-message" role="status">Chargement…</p>
@@ -23,7 +25,9 @@
     }
     else
     {
-        <div @onclick="RecordActivity" @onkeydown="RecordActivity">
+        <div @onclick="RecordActivity"
+             @onkeydown="HandleKeyboardInput"
+             @onpointerdown="HandlePointerInput">
             <Router AppAssembly="@typeof(RootComponent).Assembly">
                 <Found Context="routeData">
                     <AuthorizedRouteView RouteData="@routeData" DefaultLayout="@typeof(AppShellLayout)" />
@@ -41,12 +45,15 @@
 
 @code {
     private System.Threading.Timer? inactivityTimer;
+    private bool keyboardInput;
 
     protected override async Task OnInitializedAsync()
     {
         Session.Changed += HandleSessionChanged;
         Branding.Changed += HandleBrandingChanged;
+        ReceiptPrintingSettings.Changed += HandleSettingsChanged;
         await Branding.InitializeAsync();
+        await ReceiptPrintingSettings.InitializeAsync();
         await Security.InitializeAsync();
         inactivityTimer = new System.Threading.Timer(CheckInactivity, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
@@ -55,11 +62,23 @@
     {
         Session.Changed -= HandleSessionChanged;
         Branding.Changed -= HandleBrandingChanged;
+        ReceiptPrintingSettings.Changed -= HandleSettingsChanged;
         inactivityTimer?.Dispose();
         GC.SuppressFinalize(this);
     }
 
     private void RecordActivity() => Session.Touch(SecurityClock.UtcNow);
+
+    private void HandleKeyboardInput(KeyboardEventArgs _)
+    {
+        keyboardInput = true;
+        RecordActivity();
+    }
+
+    private void HandlePointerInput(PointerEventArgs _)
+    {
+        keyboardInput = false;
+    }
 
     private void CheckInactivity(object? state)
     {
@@ -76,4 +95,6 @@
     private void HandleSessionChanged() => _ = InvokeAsync(StateHasChanged);
 
     private void HandleBrandingChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private void HandleSettingsChanged() => _ = InvokeAsync(StateHasChanged);
 }

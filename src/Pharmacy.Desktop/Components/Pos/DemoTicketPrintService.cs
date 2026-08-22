@@ -1,5 +1,6 @@
 using Pharmacy.Application.Operations.Contracts;
 using Pharmacy.Application.Operations.Models;
+using Pharmacy.Application.Configuration;
 
 namespace Pharmacy.Desktop.Components.Pos;
 
@@ -21,10 +22,21 @@ public sealed class DemoTicketPrintService
 {
     private readonly object syncRoot = new();
     private readonly IReceiptPrinter? printer;
+    private readonly IReceiptPrintingPolicy? receiptPrintingPolicy;
     private string? saleReference;
 
     public DemoTicketPrintService() { }
     public DemoTicketPrintService(IReceiptPrinter printer) => this.printer = printer;
+    public DemoTicketPrintService(
+        IReceiptPrinter printer,
+        IReceiptPrintingPolicy receiptPrintingPolicy)
+    {
+        this.printer = printer;
+        this.receiptPrintingPolicy = receiptPrintingPolicy;
+    }
+
+    public bool ReceiptPrintingEnabled =>
+        receiptPrintingPolicy?.ReceiptPrintingEnabled ?? true;
 
     public DemoPrintStatus Status { get; private set; } = DemoPrintStatus.NotRequested;
 
@@ -37,6 +49,12 @@ public sealed class DemoTicketPrintService
     public void PrepareForSale(string reference)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(reference);
+
+        if (!ReceiptPrintingEnabled)
+        {
+            Reset();
+            return;
+        }
 
         lock (syncRoot)
         {
@@ -52,7 +70,8 @@ public sealed class DemoTicketPrintService
     {
         lock (syncRoot)
         {
-            if (!Matches(reference)
+            if (!ReceiptPrintingEnabled
+                || !Matches(reference)
                 || Status == DemoPrintStatus.InProgress
                 || (Status == DemoPrintStatus.Printed && !isReprint)
                 || ContinuedWithoutTicket)
@@ -74,6 +93,7 @@ public sealed class DemoTicketPrintService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(sale);
+        if (!ReceiptPrintingEnabled) return false;
         if (!TryBegin(sale.Reference, isReprint)) return false;
 
         try
@@ -117,7 +137,9 @@ public sealed class DemoTicketPrintService
     {
         lock (syncRoot)
         {
-            if (!Matches(reference) || Status != DemoPrintStatus.InProgress)
+            if (!ReceiptPrintingEnabled
+                || !Matches(reference)
+                || Status != DemoPrintStatus.InProgress)
             {
                 return false;
             }
@@ -134,7 +156,9 @@ public sealed class DemoTicketPrintService
     {
         lock (syncRoot)
         {
-            if (!Matches(reference) || Status != DemoPrintStatus.Failed)
+            if (!ReceiptPrintingEnabled
+                || !Matches(reference)
+                || Status != DemoPrintStatus.Failed)
             {
                 return false;
             }

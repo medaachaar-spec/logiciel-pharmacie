@@ -12,20 +12,17 @@ public sealed class CustomerCommandHandlers
 {
     private readonly ICustomerStore customers;
     private readonly ICreditPaymentStore creditPayments;
-    private readonly IPermissionAuthorizer? authorizer;
+    private readonly IPermissionAuthorizer authorizer;
     private readonly IBusinessAuditRecorder? audit;
 
-    public CustomerCommandHandlers(ICustomerStore customers, ICreditPaymentStore creditPayments)
-        : this(customers, creditPayments, null) { }
-
-    public CustomerCommandHandlers(ICustomerStore customers, ICreditPaymentStore creditPayments, IPermissionAuthorizer? authorizer)
+    public CustomerCommandHandlers(ICustomerStore customers, ICreditPaymentStore creditPayments, IPermissionAuthorizer authorizer)
         : this(customers, creditPayments, authorizer, null) { }
 
-    public CustomerCommandHandlers(ICustomerStore customers, ICreditPaymentStore creditPayments, IPermissionAuthorizer? authorizer, IBusinessAuditRecorder? audit)
+    public CustomerCommandHandlers(ICustomerStore customers, ICreditPaymentStore creditPayments, IPermissionAuthorizer authorizer, IBusinessAuditRecorder? audit)
     {
         this.customers = customers ?? throw new ArgumentNullException(nameof(customers));
         this.creditPayments = creditPayments ?? throw new ArgumentNullException(nameof(creditPayments));
-        this.authorizer = authorizer;
+        this.authorizer = authorizer ?? throw new ArgumentNullException(nameof(authorizer));
         this.audit = audit;
     }
 
@@ -34,9 +31,18 @@ public sealed class CustomerCommandHandlers
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var denied = request.CreditAllowed
-            ? SecurityCommandGuard.Denied<CustomerDetailView>(authorizer, SecurityPermissions.CustomersManageCredit, true)
-            : SecurityCommandGuard.Denied<CustomerDetailView>(authorizer, SecurityPermissions.CustomersManage);
+        var denied = SecurityCommandGuard.Denied<CustomerDetailView>(
+            authorizer,
+            SecurityPermissions.CustomersManage);
+        if (denied is not null) return denied;
+
+        if (request.CreditAllowed)
+        {
+            denied = SecurityCommandGuard.Denied<CustomerDetailView>(
+                authorizer,
+                SecurityPermissions.CustomersManageCredit,
+                true);
+        }
         if (denied is not null) return denied;
         if (request.OperationId == Guid.Empty)
             return Result<CustomerDetailView>.Failure(CustomerApplicationErrors.InvalidOperationId);
@@ -59,15 +65,34 @@ public sealed class CustomerCommandHandlers
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var denied = SecurityCommandGuard.Denied<CustomerDetailView>(authorizer, SecurityPermissions.CustomersManageCredit, true);
+        var denied = SecurityCommandGuard.Denied<CustomerDetailView>(
+            authorizer,
+            SecurityPermissions.CustomersManage);
         if (denied is not null) return denied;
+
+        var current = await customers.GetByIdAsync(request.CustomerId, cancellationToken);
+        if (current.IsFailure) return current;
+
+        var creditChanged = current.Value.CreditAllowed != request.CreditAllowed;
+        if (creditChanged)
+        {
+            denied = SecurityCommandGuard.Denied<CustomerDetailView>(
+                authorizer,
+                SecurityPermissions.CustomersManageCredit,
+                true);
+            if (denied is not null) return denied;
+        }
+
         var updated = await customers.UpdateAsync(request, cancellationToken);
         if (updated.IsSuccess && audit is not null)
         {
             await audit.RecordSuccessAsync("customers", "Customer", updated.Value.CustomerId.ToString(),
                 "customer.update", null, cancellationToken);
-            await audit.RecordSuccessAsync("customers", "Customer", updated.Value.CustomerId.ToString(),
-                request.CreditAllowed ? "credit.allow" : "credit.disallow", null, cancellationToken);
+            if (creditChanged)
+            {
+                await audit.RecordSuccessAsync("customers", "Customer", updated.Value.CustomerId.ToString(),
+                    request.CreditAllowed ? "credit.allow" : "credit.disallow", null, cancellationToken);
+            }
         }
         return updated;
     }

@@ -71,7 +71,7 @@ public static class AppNavigationCatalog
                 AppNavigationKind.Business),
             new(
                 "sales",
-                "Ventes",
+                "Vente",
                 "/module/sales",
                 "Créer, suspendre et finaliser une vente.",
                 AppNavigationGroup.Activity,

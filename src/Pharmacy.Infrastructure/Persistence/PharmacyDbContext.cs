@@ -32,6 +32,8 @@ public sealed class PharmacyDbContext : DbContext
 
     internal DbSet<PharmacyBrandingEntity> PharmacyBranding => Set<PharmacyBrandingEntity>();
 
+    internal DbSet<ApplicationSettingsEntity> ApplicationSettings => Set<ApplicationSettingsEntity>();
+
     internal DbSet<StockLocationEntity> StockLocations => Set<StockLocationEntity>();
 
     internal DbSet<StockBatchEntity> StockBatches => Set<StockBatchEntity>();

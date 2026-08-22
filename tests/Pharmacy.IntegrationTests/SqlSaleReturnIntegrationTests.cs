@@ -63,12 +63,12 @@ public sealed class SqlSaleReturnIntegrationTests
                     DefaultTracksExpiry: true),
                 cancellationToken);
             Assert.True(category.IsSuccess);
-            var productOne = await new CreateCatalogProductHandler(catalogStore).HandleAsync(
+            var productOne = await new CreateCatalogProductHandler(catalogStore, TestPermissionAuthorizer.AllowAll).HandleAsync(
                 new CreateCatalogProductCommand(
                     "Médicament retour M1", "Boîte", category.Value.CategoryId,
                     "RET002-M1", 50m, TracksLots: true, TracksExpiry: true),
                 cancellationToken);
-            var productTwo = await new CreateCatalogProductHandler(catalogStore).HandleAsync(
+            var productTwo = await new CreateCatalogProductHandler(catalogStore, TestPermissionAuthorizer.AllowAll).HandleAsync(
                 new CreateCatalogProductCommand(
                     "Médicament retour M2", "Unité", category.Value.CategoryId,
                     "RET002-M2", 20m),

@@ -5,14 +5,12 @@
 @inject NavigationManager Navigation
 @inject IPermissionAuthorizer Authorizer
 
-<PageTitle>Accueil — Logiciel Pharmacie</PageTitle>
+<PageTitle>@Greeting</PageTitle>
 
 <div class="home-page dashboard-page page-content">
     <header class="dashboard-hero" aria-labelledby="dashboard-title">
         <div>
-            <p class="section-kicker">@Greeting</p>
-            <h1 id="dashboard-title" tabindex="-1">Tableau de bord</h1>
-            <p class="dashboard-hero__subtitle">L’essentiel de votre activité, en un coup d’œil.</p>
+            <h1 id="dashboard-title" tabindex="-1">@Greeting</h1>
         </div>
         <div class="dashboard-hero__actions">
             @if (Dashboard.CanCreateSale)
@@ -87,7 +85,9 @@
                 </article>
             }
 
-            @if (Dashboard.CanViewPersonalSales && Dashboard.CurrentSessionDuration is { } duration)
+            @if (Dashboard.GlobalSales is null
+                && Dashboard.CanViewPersonalSales
+                && Dashboard.CurrentSessionDuration is { } duration)
             {
                 <article class="dashboard-kpi dashboard-kpi--session">
                     <span class="dashboard-kpi__icon" aria-hidden="true"><UiIcon Name="UiIconName.Lock" /></span>
@@ -241,7 +241,7 @@
                         <ul class="dashboard-recent-sales">
                             @foreach (var sale in Dashboard.RecentPersonalSales)
                             {
-                                <li><code>@sale.Reference</code><span>@sale.CompletedAtUtc.ToLocalTime().ToString("dd/MM HH:mm")</span><strong>@Money(sale.Amount)</strong></li>
+                                <li><OperationalReference Value="@sale.Reference" /><span>@sale.CompletedAtUtc.ToLocalTime().ToString("dd/MM HH:mm")</span><strong>@Money(sale.Amount)</strong></li>
                             }
                         </ul>
                     }
@@ -256,7 +256,7 @@
                 {
                     <a class="quick-action" href="@action.Route">
                         <span class="quick-action__icon" aria-hidden="true"><UiIcon Name="@action.Icon" /></span>
-                        <span><strong>@action.Label</strong><small>@action.Description</small></span>
+                        <strong>@action.Label</strong>
                         <span class="quick-action__chevron" aria-hidden="true"><UiIcon Name="UiIconName.Chevron" /></span>
                     </a>
                 }
@@ -297,9 +297,9 @@
     private static string ExpiryClass(DashboardExpiryAlertView alert) => alert.DaysRemaining < 0 ? "expired" : alert.DaysRemaining <= 7 ? "urgent" : "horizon";
     private static string ExpiryLabel(DashboardExpiryAlertView alert) => alert.DaysRemaining switch
     {
-        < 0 => $"Expiré depuis {Math.Abs(alert.DaysRemaining)} j",
-        0 => "Expire aujourd’hui",
-        _ => $"Expire dans {alert.DaysRemaining} j"
+        < 0 => "Expiré",
+        0 => "Aujourd’hui",
+        _ => $"{alert.DaysRemaining} jours"
     };
     private static string TrendPoints(IReadOnlyList<DashboardDailySalesPoint> values) => string.Join(' ', values.Select((point, index) => $"{TrendX(index, values.Count)},{TrendY(point.GrossSales, values)}"));
     private static string TrendX(int index, int count) => (count <= 1 ? 350d : 20d + (660d * index / (count - 1))).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);

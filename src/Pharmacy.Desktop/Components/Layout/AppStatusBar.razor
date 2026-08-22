@@ -1,3 +1,11 @@
-<footer class="app-statusbar" aria-label="État de l’application">
-    <span><span class="app-statusbar__dot app-statusbar__dot--ok" aria-hidden="true"></span>Application prête</span>
-</footer>
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <footer class="app-statusbar" aria-label="État de l’application" role="status">
+        <span><span class="app-statusbar__dot" aria-hidden="true"></span>@Message</span>
+    </footer>
+}
+
+@code {
+    [Parameter]
+    public string? Message { get; set; }
+}

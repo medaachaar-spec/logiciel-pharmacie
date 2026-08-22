@@ -43,4 +43,5 @@ public sealed record RestoreTestView(
     DateTime CompletedAtUtc,
     string? PharmacyName = null,
     string? PrimaryColor = null,
-    string? LogoSha256 = null);
+    string? LogoSha256 = null,
+    bool? ReceiptPrintingEnabled = null);

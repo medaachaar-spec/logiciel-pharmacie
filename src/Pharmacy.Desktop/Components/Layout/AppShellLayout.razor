@@ -16,7 +16,9 @@
                 OnToggleCollapsed="ToggleSidebar"
                 Allowed="CanAccess" />
 
-    <AppTopBar PageTitle="@CurrentPageTitle" PageDescription="@CurrentPageDescription" />
+    <AppTopBar PageTitle="@CurrentPageTitle"
+               PageDescription="@CurrentPageDescription"
+               ShowPageContext="@(!IsHome)" />
 
     <main id="main-content" class="app-main" tabindex="-1">
         @Body
@@ -33,8 +35,12 @@
 
     private string CurrentPageTitle => currentItem?.Label ?? "Page introuvable";
 
-    private string CurrentPageDescription => currentItem?.Description
-        ?? "Cette adresse ne correspond à aucun écran disponible.";
+    private string CurrentPageDescription => PermissionAwarePageDescription.Resolve(
+        currentItem?.Id,
+        currentItem?.Description ?? "Cette adresse ne correspond à aucun écran disponible.",
+        permission => PermissionAuthorizer.Authorize(permission).IsSuccess);
+
+    private bool IsHome => currentPath is "/" or "/home";
 
     protected override void OnInitialized()
     {

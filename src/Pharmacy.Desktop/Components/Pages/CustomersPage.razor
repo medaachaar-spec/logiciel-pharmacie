@@ -1,6 +1,7 @@
 @page "/module/customers"
 @using Pharmacy.Application.Sales.Models
 @inject Pharmacy.Desktop.Components.Customers.CustomersCoordinator Coordinator
+@inject IPermissionAuthorizer Authorizer
 @implements IDisposable
 
 <PageTitle>Clients — Logiciel Pharmacie</PageTitle>
@@ -32,29 +33,35 @@
         </div>
     </section>
 
-    <section class="catalog-editor-card" aria-labelledby="customers-create-title">
-        <div>
-            <p class="catalog-kicker">Création rapide</p>
-            <h2 id="customers-create-title">Nouveau client</h2>
-        </div>
-        <div class="catalog-form-grid">
-            <label class="ui-field">
-                <span class="ui-field__label">Nom</span>
-                <input class="ui-field__control" value="@newName" @oninput="args => newName = args.Value?.ToString() ?? string.Empty" />
-            </label>
-            <label class="ui-field">
-                <span class="ui-field__label">Téléphone facultatif</span>
-                <input class="ui-field__control" value="@newPhone" @oninput="args => newPhone = args.Value?.ToString() ?? string.Empty" />
-            </label>
-            <label class="catalog-toggle">
-                <input type="checkbox" checked="@newCreditAllowed" @onchange="args => newCreditAllowed = args.Value is true" />
-                <span>Autoriser le crédit</span>
-            </label>
-        </div>
-        <UiButton Disabled="@(Coordinator.IsBusy || string.IsNullOrWhiteSpace(newName))" OnClick="CreateAsync">
-            Créer le client
-        </UiButton>
-    </section>
+    @if (CanManageCustomers)
+    {
+        <section class="catalog-editor-card" aria-labelledby="customers-create-title">
+            <div>
+                <p class="catalog-kicker">Création rapide</p>
+                <h2 id="customers-create-title">Nouveau client</h2>
+            </div>
+            <div class="catalog-form-grid">
+                <label class="ui-field">
+                    <span class="ui-field__label">Nom</span>
+                    <input class="ui-field__control" value="@newName" @oninput="args => newName = args.Value?.ToString() ?? string.Empty" />
+                </label>
+                <label class="ui-field">
+                    <span class="ui-field__label">Téléphone facultatif</span>
+                    <input class="ui-field__control" value="@newPhone" @oninput="args => newPhone = args.Value?.ToString() ?? string.Empty" />
+                </label>
+                @if (CanManageCustomerCredit)
+                {
+                    <label class="catalog-toggle">
+                        <input type="checkbox" checked="@newCreditAllowed" @onchange="args => newCreditAllowed = args.Value is true" />
+                        <span>Autoriser le crédit</span>
+                    </label>
+                }
+            </div>
+            <UiButton Disabled="@(Coordinator.IsBusy || string.IsNullOrWhiteSpace(newName))" OnClick="CreateAsync">
+                Créer le client
+            </UiButton>
+        </section>
+    }
 
     @if (!string.IsNullOrWhiteSpace(Coordinator.UserMessage))
     {
@@ -72,7 +79,7 @@
             }
             else if (Coordinator.Customers.Count == 0)
             {
-                <UiEmptyState Title="Aucun client" Description="Créez un client minimal ou ajustez la recherche." />
+                <UiEmptyState Title="Aucun client" Description="Aucun client ne correspond à la recherche." />
             }
             else
             {
@@ -120,13 +127,13 @@
                     <p>Solde crédit : <strong>@DemoMoney.Format(selected.CreditBalance.Amount)</strong></p>
                     <UiBadge Text="@(selected.CreditAllowed ? "Crédit autorisé" : "Crédit non autorisé")"
                              Variant="@(selected.CreditAllowed ? UiBadgeVariant.Success : UiBadgeVariant.Warning)" />
-                    @if (selected.CreditBalance.Amount == 0m)
+                    @if (CanManageCustomerCredit && selected.CreditBalance.Amount == 0m)
                     {
                         <UiAlert Title="Aucune dette à régler" Variant="UiAlertVariant.Information">
                             Le ledger de ce client présente un solde nul. Aucun règlement ne peut être enregistré.
                         </UiAlert>
                     }
-                    else
+                    else if (CanManageCustomerCredit)
                     {
                         <label class="ui-field">
                             <span class="ui-field__label">Montant du règlement</span>
@@ -193,8 +200,10 @@
     private string paymentAmount = string.Empty;
     private SalePaymentMethod paymentMethod = SalePaymentMethod.Cash;
     private bool externalCardConfirmed;
+    private bool CanManageCustomers => Authorizer.Authorize(SecurityPermissions.CustomersManage).IsSuccess;
+    private bool CanManageCustomerCredit => Authorizer.Authorize(SecurityPermissions.CustomersManageCredit).IsSuccess;
 
-    private bool CanRegisterPayment => decimal.TryParse(
+    private bool CanRegisterPayment => CanManageCustomerCredit && decimal.TryParse(
         paymentAmount.Replace(',', '.'),
         System.Globalization.NumberStyles.AllowDecimalPoint,
         System.Globalization.CultureInfo.InvariantCulture,
@@ -226,6 +235,8 @@
 
     private async Task CreateAsync(MouseEventArgs _)
     {
+        if (!CanManageCustomers) return;
+        if (!CanManageCustomerCredit) newCreditAllowed = false;
         await Coordinator.CreateAsync(newName, newPhone, newCreditAllowed, lifetime.Token);
         newName = string.Empty;
         newPhone = string.Empty;
@@ -256,6 +267,7 @@
 
     private async Task RegisterPaymentAsync(MouseEventArgs _)
     {
+        if (!CanManageCustomerCredit) return;
         if (!decimal.TryParse(
                 paymentAmount.Replace(',', '.'),
                 System.Globalization.NumberStyles.AllowDecimalPoint,

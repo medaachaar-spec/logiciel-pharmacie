@@ -2,6 +2,7 @@
 @inject SecurityCoordinator Security
 @inject IPermissionAuthorizer Authorizer
 @inject BrandingCoordinator Branding
+@inject Pharmacy.Desktop.Components.Configuration.ReceiptPrintingSettingsCoordinator ReceiptPrintingSettings
 
 <PageTitle>Administration</PageTitle>
 <div class="page-content catalog-page security-admin">
@@ -17,6 +18,7 @@
     {
         @if (!string.IsNullOrWhiteSpace(Security.Message)) { <div class="security-feedback" role="status">@Security.Message</div> }
         @if (!string.IsNullOrWhiteSpace(Branding.Message)) { <div class="security-feedback" role="status">@Branding.Message</div> }
+        @if (!string.IsNullOrWhiteSpace(ReceiptPrintingSettings.Message)) { <div class="security-feedback" role="status">@ReceiptPrintingSettings.Message</div> }
         @if (!string.IsNullOrWhiteSpace(brandingFileMessage)) { <div class="security-feedback" role="alert">@brandingFileMessage</div> }
 
         <section class="security-panel branding-admin" aria-labelledby="branding-admin-title">
@@ -54,6 +56,39 @@
                 <button type="button" tabindex="-1">Action principale</button>
             </div>
         </section>
+
+        <section class="security-panel administration-settings" aria-labelledby="hardware-settings-title">
+            <div>
+                <h2 id="hardware-settings-title">Matériel et paramètres</h2>
+                <p>Impression des tickets</p>
+            </div>
+            <label class="administration-setting-toggle">
+                <input type="checkbox"
+                       checked="@ReceiptPrintingSettings.ReceiptPrintingEnabled"
+                       disabled="@(ReceiptPrintingSettings.IsBusy || !canConfigureDevices)"
+                       @onchange="ChangeReceiptPrintingAsync" />
+                <span>@(ReceiptPrintingSettings.ReceiptPrintingEnabled ? "Activée" : "Désactivée")</span>
+            </label>
+            @if (!ReceiptPrintingSettings.ReceiptPrintingEnabled)
+            {
+                <small>Aucun ticket n’est imprimé après la vente.</small>
+            }
+        </section>
+
+        <nav class="security-panel administration-tools" aria-label="Outils administratifs">
+            <div><h2>Outils administratifs</h2><p>Accès secondaires hors navigation principale.</p></div>
+            <div class="administration-tools__links">
+                @if (canViewBackups)
+                {
+                    <a href="/module/operations">Sauvegardes et outils</a>
+                }
+                @if (canViewAudit)
+                {
+                    <a href="/module/audit">Journal d’audit</a>
+                }
+                <a href="/diagnostic">Diagnostic et version</a>
+            </div>
+        </nav>
 
         <section class="security-admin__grid" aria-label="Gestion des comptes et mots de passe">
             <div class="security-admin__column">
@@ -273,8 +308,8 @@
             <section class="security-panel security-role-editor" id="security-role-editor" aria-labelledby="security-role-editor-title">
                 <header class="security-role-editor__heading">
                     <div>
-                        <h2 id="security-role-editor-title">@(editingRole is null ? "Créer un rôle" : $"Modifier {editingRole.Code}")</h2>
-                        <p>La sélection est chargée depuis <code>security.Permissions</code>. Une réauthentification récente est exigée à l’enregistrement.</p>
+                        <h2 id="security-role-editor-title">@(editingRole is null ? "Créer un rôle" : $"Modifier {editingRole.Name}")</h2>
+                        <p>Une réauthentification est requise pour enregistrer.</p>
                     </div>
                     @if (editingRole is not null)
                     {
@@ -284,17 +319,17 @@
 
                 <form class="security-role-form" @onsubmit="SaveRoleAsync" @onsubmit:preventDefault>
                     <div class="security-role-form__identity">
-                        <label>Code / nom technique
+                        <label>Identifiant unique
                             <input required maxlength="128" pattern="[A-Za-z][A-Za-z0-9._-]*" readonly="@(editingRole is not null)" autocomplete="off" @bind="roleCode" />
                         </label>
-                        <label>Nom affiché
+                        <label>Nom du rôle
                             <input required maxlength="256" autocomplete="off" @bind="roleName" />
                         </label>
                     </div>
-                    <small>Le code est normalisé en majuscules et devient immuable après création.</small>
+                    <small>L’identifiant est enregistré en majuscules et ne peut plus être modifié après la création.</small>
 
                     <fieldset class="security-permission-selector" disabled="@Security.IsBusy">
-                        <legend>Permissions du rôle</legend>
+                        <legend>Autorisations du rôle</legend>
                         @if (Security.Permissions.Count == 0)
                         {
                             <p class="security-empty-state">Aucune permission disponible. Rechargez Administration après vérification de SQL Server.</p>
@@ -305,14 +340,14 @@
                                 @foreach (var module in Security.Permissions.GroupBy(permission => permission.Module).OrderBy(group => group.Key, StringComparer.Ordinal))
                                 {
                                     <section class="security-permission-group">
-                                        <h3>@module.Key</h3>
+                                        <h3>@SecurityPermissionPresentation.ModuleLabel(module.Key)</h3>
                                         @foreach (var permission in module.OrderBy(item => item.Code, StringComparer.Ordinal))
                                         {
                                             <label class="security-permission-option">
                                                 <input type="checkbox"
                                                        checked="@selectedPermissionIds.Contains(permission.PermissionId)"
                                                        @onchange="args => TogglePermission(permission.PermissionId, args)" />
-                                                <span><strong>@SecurityPermissionPresentation.PermissionLabel(permission.Code)</strong><small>@permission.Code</small></span>
+                                                <span><strong>@SecurityPermissionPresentation.PermissionLabel(permission.Code)</strong></span>
                                             </label>
                                         }
                                     </section>
@@ -335,7 +370,7 @@
         }
 
         <section class="security-panel security-panel--permissions">
-            <h2>Matrice rôles / permissions</h2>
+            <h2>Rôles et autorisations</h2>
             @if (Security.Roles.Count == 0)
             {
                 <p class="security-empty-state">Aucun rôle disponible.</p>
@@ -344,14 +379,17 @@
             {
                 <div class="security-role-summary">
                     <details>
-                        <summary><strong>@role.Name</strong> <code>@role.Code</code> — @role.Permissions.Count permission(s)</summary>
+                        <summary>
+                            <strong>@role.Name</strong>
+                            <small class="security-role-count">@AuthorizationCount(role.Permissions.Count)</small>
+                        </summary>
                         @if (role.Permissions.Count == 0)
                         {
                             <p class="security-empty-state">Ce rôle n’accorde actuellement aucune permission.</p>
                         }
                         else
                         {
-                            <ul>@foreach (var permission in role.Permissions) { <li>@SecurityPermissionPresentation.PermissionLabel(permission.Code) <small>(@permission.Code)</small></li> }</ul>
+                            <ul>@foreach (var permission in role.Permissions) { <li>@SecurityPermissionPresentation.PermissionLabel(permission.Code)</li> }</ul>
                         }
                     </details>
                     @if (role.IsSystemRole)
@@ -376,7 +414,8 @@
         ("sales", "Ventes"),
         ("activity", "Activité")
     ];
-    private bool denied, canManageRoles, canViewEmployeeActivity;
+    private static string AuthorizationCount(int count) => $"{count} {(count == 1 ? "autorisation" : "autorisations")}";
+    private bool denied, canManageRoles, canViewEmployeeActivity, canConfigureDevices, canViewBackups, canViewAudit;
     private string reauthPassword = string.Empty, login = string.Empty, displayName = string.Empty, initialPassword = string.Empty;
     private string currentPassword = string.Empty, newPassword = string.Empty;
     private string roleCode = string.Empty, roleName = string.Empty;
@@ -396,11 +435,21 @@
         denied = Authorizer.Authorize(SecurityPermissions.SecurityManageUsers).IsFailure;
         canManageRoles = Authorizer.Authorize(SecurityPermissions.SecurityManageRoles).IsSuccess;
         canViewEmployeeActivity = Authorizer.Authorize(SecurityPermissions.SecurityViewEmployeeActivity).IsSuccess;
+        canConfigureDevices = Authorizer.Authorize(SecurityPermissions.DevicesConfigure).IsSuccess;
+        canViewBackups = Authorizer.Authorize(SecurityPermissions.BackupView).IsSuccess;
+        canViewAudit = Authorizer.Authorize(SecurityPermissions.AuditView).IsSuccess;
         if (!denied)
         {
             SyncBrandingForm();
             await Security.LoadAdministrationAsync();
         }
+    }
+
+    private Task ChangeReceiptPrintingAsync(ChangeEventArgs args)
+    {
+        var enabled = args.Value is true
+            || bool.TryParse(args.Value?.ToString(), out var parsed) && parsed;
+        return ReceiptPrintingSettings.UpdateAsync(enabled);
     }
 
     private async Task OpenEmployeeActivityAsync(long userId)

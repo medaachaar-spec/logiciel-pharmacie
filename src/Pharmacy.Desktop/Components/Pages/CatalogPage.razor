@@ -1,6 +1,7 @@
 @page "/module/catalog"
 @implements IAsyncDisposable
 @inject CatalogCoordinator Catalog
+@inject IPermissionAuthorizer Authorizer
 
 <PageTitle>Produits — Logiciel Pharmacie</PageTitle>
 
@@ -55,14 +56,17 @@
             </label>
             <div class="catalog-toolbar__actions">
                 <UiButton IsLoading="@Catalog.IsBusy" OnClick="SearchAsync">Rechercher</UiButton>
-                <UiButton Variant="UiButtonVariant.Secondary" Disabled="@Catalog.IsBusy" OnClick="ToggleCreateProductAsync">
-                    @(showCreateProduct ? "Fermer la création" : "Nouveau produit")
-                </UiButton>
+                @if (CanManageCatalog)
+                {
+                    <UiButton Variant="UiButtonVariant.Secondary" Disabled="@Catalog.IsBusy" OnClick="ToggleCreateProductAsync">
+                        @(showCreateProduct ? "Fermer la création" : "Nouveau produit")
+                    </UiButton>
+                }
             </div>
         </div>
     </section>
 
-    @if (showCreateProduct)
+    @if (CanManageCatalog && showCreateProduct)
     {
         <section class="catalog-panel" aria-labelledby="create-product-title">
             <div class="catalog-section-heading">
@@ -152,12 +156,12 @@
                 </div>
 
                 <div class="catalog-form-grid">
-                    <label><span>Désignation *</span><input class="ui-field__control" @bind="editName" disabled="@Catalog.IsBusy" /></label>
-                    <label><span>Présentation</span><input class="ui-field__control" @bind="editPresentation" disabled="@Catalog.IsBusy" /></label>
-                    <label><span>Référence interne *</span><input class="ui-field__control" @bind="editInternalCode" disabled="@Catalog.IsBusy" /></label>
+                    <label><span>Désignation *</span><input class="ui-field__control" @bind="editName" disabled="@(Catalog.IsBusy || !CanManageCatalog)" /></label>
+                    <label><span>Présentation</span><input class="ui-field__control" @bind="editPresentation" disabled="@(Catalog.IsBusy || !CanManageCatalog)" /></label>
+                    <label><span>Référence interne *</span><input class="ui-field__control" @bind="editInternalCode" disabled="@(Catalog.IsBusy || !CanManageCatalog)" /></label>
                     <label>
                         <span>Catégorie *</span>
-                        <select class="ui-field__control" @bind="editCategoryId" disabled="@Catalog.IsBusy">
+                        <select class="ui-field__control" @bind="editCategoryId" disabled="@(Catalog.IsBusy || !CanManageCatalog)">
                             @foreach (var category in Catalog.Categories)
                             {
                                 <option value="@category.CategoryId">@category.Name</option>
@@ -166,22 +170,28 @@
                     </label>
                 </div>
                 <div class="catalog-action-row">
-                    <UiButton IsLoading="@Catalog.IsBusy" OnClick="UpdateProductAsync">Enregistrer</UiButton>
-                    <UiButton Variant="@(product.IsActive && product.IsLocallyActive ? UiButtonVariant.Danger : UiButtonVariant.Secondary)"
-                              Disabled="@Catalog.IsBusy"
-                              OnClick="ToggleProductActivationAsync">
-                        @(product.IsActive && product.IsLocallyActive ? "Désactiver" : "Réactiver")
-                    </UiButton>
+                    @if (CanManageCatalog)
+                    {
+                        <UiButton IsLoading="@Catalog.IsBusy" OnClick="UpdateProductAsync">Enregistrer</UiButton>
+                        <UiButton Variant="@(product.IsActive && product.IsLocallyActive ? UiButtonVariant.Danger : UiButtonVariant.Secondary)"
+                                  Disabled="@Catalog.IsBusy"
+                                  OnClick="ToggleProductActivationAsync">
+                            @(product.IsActive && product.IsLocallyActive ? "Désactiver" : "Réactiver")
+                        </UiButton>
+                    }
                     <UiButton Variant="UiButtonVariant.Tertiary" Disabled="@Catalog.IsBusy" OnClick="ReloadSelectedAsync">Recharger</UiButton>
                 </div>
 
                 <section class="catalog-subsection" aria-labelledby="barcode-title">
                     <h3 id="barcode-title">Codes-barres</h3>
-                    <div class="catalog-inline-form">
-                        <label><span>Nouveau code</span><input class="ui-field__control" @bind="newBarcode" placeholder="Code-barres" disabled="@Catalog.IsBusy" /></label>
-                        <label class="catalog-check"><input type="checkbox" @bind="newBarcodePrimary" disabled="@Catalog.IsBusy" /> Principal</label>
-                        <UiButton Size="UiButtonSize.Small" Disabled="@Catalog.IsBusy" OnClick="AddBarcodeAsync">Ajouter</UiButton>
-                    </div>
+                    @if (CanManageCatalog)
+                    {
+                        <div class="catalog-inline-form">
+                            <label><span>Nouveau code</span><input class="ui-field__control" @bind="newBarcode" placeholder="Code-barres" disabled="@Catalog.IsBusy" /></label>
+                            <label class="catalog-check"><input type="checkbox" @bind="newBarcodePrimary" disabled="@Catalog.IsBusy" /> Principal</label>
+                            <UiButton Size="UiButtonSize.Small" Disabled="@Catalog.IsBusy" OnClick="AddBarcodeAsync">Ajouter</UiButton>
+                        </div>
+                    }
                     @if (product.Barcodes.Count == 0)
                     {
                         <p class="u-muted">Aucun code-barres.</p>
@@ -193,9 +203,12 @@
                             {
                                 <li>
                                     <span><strong>@barcode.Value</strong> — @(barcode.IsActive ? "Actif" : "Inactif") @(barcode.IsPrimary ? "— Principal" : null)</span>
-                                    <UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Tertiary" Disabled="@Catalog.IsBusy" OnClick="args => ToggleBarcodeAsync(barcode)">
-                                        @(barcode.IsActive ? "Désactiver" : "Activer")
-                                    </UiButton>
+                                    @if (CanManageCatalog)
+                                    {
+                                        <UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Tertiary" Disabled="@Catalog.IsBusy" OnClick="args => ToggleBarcodeAsync(barcode)">
+                                            @(barcode.IsActive ? "Désactiver" : "Activer")
+                                        </UiButton>
+                                    }
                                 </li>
                             }
                         </ul>
@@ -205,11 +218,14 @@
                 <section class="catalog-subsection" aria-labelledby="price-title">
                     <h3 id="price-title">Prix et historique</h3>
                     <p class="catalog-price">Prix courant : <strong>@product.CurrentSalePrice.ToString("0.0000") @product.CurrencyCode</strong></p>
-                    <div class="catalog-inline-form">
-                        <label><span>Nouveau prix</span><input class="ui-field__control" type="number" min="0" step="0.0001" @bind="newPrice" disabled="@Catalog.IsBusy" /></label>
-                        <label><span>Motif</span><input class="ui-field__control" @bind="priceReason" disabled="@Catalog.IsBusy" /></label>
-                        <UiButton Size="UiButtonSize.Small" Disabled="@Catalog.IsBusy" OnClick="ChangePriceAsync">Changer le prix</UiButton>
-                    </div>
+                    @if (CanChangePrice)
+                    {
+                        <div class="catalog-inline-form">
+                            <label><span>Nouveau prix</span><input class="ui-field__control" type="number" min="0" step="0.0001" @bind="newPrice" disabled="@Catalog.IsBusy" /></label>
+                            <label><span>Motif</span><input class="ui-field__control" @bind="priceReason" disabled="@Catalog.IsBusy" /></label>
+                            <UiButton Size="UiButtonSize.Small" Disabled="@Catalog.IsBusy" OnClick="ChangePriceAsync">Changer le prix</UiButton>
+                        </div>
+                    }
                     <div class="catalog-table-scroll" tabindex="0" aria-label="Historique des prix">
                         <table class="catalog-table catalog-table--compact">
                             <thead><tr><th>Date UTC</th><th>Ancien</th><th>Nouveau</th><th>Origine</th><th>Motif</th></tr></thead>
@@ -246,27 +262,35 @@
                         {
                             <tr>
                                 <td>@category.Code</td><td>@category.Name</td><td>@(category.IsActive ? "Active" : "Inactive")</td>
-                                <td><UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Tertiary" Disabled="@Catalog.IsBusy" OnClick="args => EditCategory(category)">Modifier</UiButton></td>
+                                <td>
+                                    @if (CanManageCatalog)
+                                    {
+                                        <UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Tertiary" Disabled="@Catalog.IsBusy" OnClick="args => EditCategory(category)">Modifier</UiButton>
+                                    }
+                                </td>
                             </tr>
                         }
                     </tbody>
                 </table>
             </div>
-            <div class="catalog-category-form">
-                <label><span>Code *</span><input class="ui-field__control" @bind="categoryCode" disabled="@Catalog.IsBusy" /></label>
-                <label><span>Nom *</span><input class="ui-field__control" @bind="categoryName" disabled="@Catalog.IsBusy" /></label>
-                <label><span>Ordre</span><input class="ui-field__control" type="number" min="0" @bind="categorySortOrder" disabled="@Catalog.IsBusy" /></label>
-                <div class="catalog-action-row">
-                    <UiButton Size="UiButtonSize.Small" Disabled="@Catalog.IsBusy" OnClick="SaveCategoryAsync">@(editedCategory is null ? "Créer" : "Enregistrer")</UiButton>
-                    @if (editedCategory is not null)
-                    {
-                        <UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" Disabled="@Catalog.IsBusy" OnClick="ToggleCategoryActivationAsync">
-                            @(editedCategory.IsActive ? "Désactiver" : "Réactiver")
-                        </UiButton>
-                        <UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Tertiary" OnClick="CancelCategoryEditAsync">Annuler</UiButton>
-                    }
+            @if (CanManageCatalog)
+            {
+                <div class="catalog-category-form">
+                    <label><span>Code *</span><input class="ui-field__control" @bind="categoryCode" disabled="@Catalog.IsBusy" /></label>
+                    <label><span>Nom *</span><input class="ui-field__control" @bind="categoryName" disabled="@Catalog.IsBusy" /></label>
+                    <label><span>Ordre</span><input class="ui-field__control" type="number" min="0" @bind="categorySortOrder" disabled="@Catalog.IsBusy" /></label>
+                    <div class="catalog-action-row">
+                        <UiButton Size="UiButtonSize.Small" Disabled="@Catalog.IsBusy" OnClick="SaveCategoryAsync">@(editedCategory is null ? "Créer" : "Enregistrer")</UiButton>
+                        @if (editedCategory is not null)
+                        {
+                            <UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Secondary" Disabled="@Catalog.IsBusy" OnClick="ToggleCategoryActivationAsync">
+                                @(editedCategory.IsActive ? "Désactiver" : "Réactiver")
+                            </UiButton>
+                            <UiButton Size="UiButtonSize.Small" Variant="UiButtonVariant.Tertiary" OnClick="CancelCategoryEditAsync">Annuler</UiButton>
+                        }
+                    </div>
                 </div>
-            </div>
+            }
         </div>
     </section>
 </div>
@@ -295,6 +319,8 @@
     private string categoryCode = string.Empty;
     private string categoryName = string.Empty;
     private int categorySortOrder;
+    private bool CanManageCatalog => Authorizer.Authorize(SecurityPermissions.CatalogManage).IsSuccess;
+    private bool CanChangePrice => Authorizer.Authorize(SecurityPermissions.CatalogChangePrice).IsSuccess;
 
     protected override async Task OnInitializedAsync()
     {
@@ -328,12 +354,14 @@
 
     private Task ToggleCreateProductAsync(MouseEventArgs _)
     {
+        if (!CanManageCatalog) return Task.CompletedTask;
         showCreateProduct = !showCreateProduct;
         return Task.CompletedTask;
     }
 
     private async Task CreateProductAsync(MouseEventArgs _)
     {
+        if (!CanManageCatalog) return;
         var barcodes = string.IsNullOrWhiteSpace(createBarcode)
             ? Array.Empty<CatalogBarcodeInput>()
             : new[] { new CatalogBarcodeInput(createBarcode, true) };
@@ -369,6 +397,7 @@
 
     private async Task UpdateProductAsync(MouseEventArgs _)
     {
+        if (!CanManageCatalog) return;
         var product = Catalog.SelectedProduct;
         if (product is null) return;
         await Catalog.UpdateProductAsync(
@@ -395,6 +424,7 @@
 
     private async Task ToggleProductActivationAsync(MouseEventArgs _)
     {
+        if (!CanManageCatalog) return;
         var product = Catalog.SelectedProduct;
         if (product is null) return;
         var activate = !(product.IsActive && product.IsLocallyActive);
@@ -411,6 +441,7 @@
 
     private async Task AddBarcodeAsync(MouseEventArgs _)
     {
+        if (!CanManageCatalog) return;
         var product = Catalog.SelectedProduct;
         if (product is null) return;
         await Catalog.AddBarcodeAsync(
@@ -425,6 +456,7 @@
 
     private Task ToggleBarcodeAsync(CatalogBarcodeView barcode)
     {
+        if (!CanManageCatalog) return Task.CompletedTask;
         var product = Catalog.SelectedProduct;
         return product is null
             ? Task.CompletedTask
@@ -442,6 +474,7 @@
 
     private async Task ChangePriceAsync(MouseEventArgs _)
     {
+        if (!CanChangePrice) return;
         var product = Catalog.SelectedProduct;
         if (product is null) return;
         await Catalog.ChangePriceAsync(
@@ -481,6 +514,7 @@
 
     private Task EditCategory(CatalogCategoryView category)
     {
+        if (!CanManageCatalog) return Task.CompletedTask;
         editedCategory = category;
         categoryCode = category.Code;
         categoryName = category.Name;
@@ -490,6 +524,7 @@
 
     private async Task SaveCategoryAsync(MouseEventArgs _)
     {
+        if (!CanManageCatalog) return;
         if (editedCategory is null)
         {
             await Catalog.CreateCategoryAsync(
@@ -516,6 +551,7 @@
 
     private async Task ToggleCategoryActivationAsync(MouseEventArgs _)
     {
+        if (!CanManageCatalog) return;
         if (editedCategory is null) return;
         await Catalog.SetCategoryActivationAsync(
             new SetCatalogCategoryActivationCommand(

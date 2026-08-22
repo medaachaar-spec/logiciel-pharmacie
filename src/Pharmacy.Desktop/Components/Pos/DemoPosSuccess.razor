@@ -1,7 +1,7 @@
 <section class="pos-success" aria-labelledby="demo-success-title">
     <div class="pos-success__mark" aria-hidden="true">✓</div>
     <h2 id="demo-success-title">Vente enregistrée</h2>
-    <p class="pos-success__reference">Référence : <strong>@Result.Reference</strong></p>
+    <div class="pos-success__reference">Référence : <OperationalReference Value="@Result.Reference" /></div>
 
     <dl class="pos-success__summary">
         <div>
@@ -25,6 +25,8 @@
         </div>
     </dl>
 
+    @if (Session.ReceiptPrintingEnabled)
+    {
     <section class="pos-ticket" aria-labelledby="demo-ticket-title">
         <div class="pos-ticket__heading">
             <div>
@@ -103,6 +105,7 @@
             <div><dt>Dernière tentative</dt><dd>@LastAttemptLabel</dd></div>
         </dl>
     </section>
+    }
 
     <div class="pos-success__actions">
         <UiButton Size="UiButtonSize.Large" OnClick="NewSaleAsync">Nouvelle vente</UiButton>

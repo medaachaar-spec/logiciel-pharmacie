@@ -10,17 +10,12 @@ namespace Pharmacy.Application.Customers.Queries;
 public sealed class CustomerQueryHandlers
 {
     private readonly ICustomerStore customers;
-    private readonly IPermissionAuthorizer? authorizer;
+    private readonly IPermissionAuthorizer authorizer;
 
-    public CustomerQueryHandlers(ICustomerStore customers)
-        : this(customers, null)
-    {
-    }
-
-    public CustomerQueryHandlers(ICustomerStore customers, IPermissionAuthorizer? authorizer)
+    public CustomerQueryHandlers(ICustomerStore customers, IPermissionAuthorizer authorizer)
     {
         this.customers = customers ?? throw new ArgumentNullException(nameof(customers));
-        this.authorizer = authorizer;
+        this.authorizer = authorizer ?? throw new ArgumentNullException(nameof(authorizer));
     }
 
     public Task<Result<IReadOnlyList<CustomerSummaryView>>> SearchAsync(

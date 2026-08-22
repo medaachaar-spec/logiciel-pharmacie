@@ -5,12 +5,14 @@ using Microsoft.Extensions.DependencyInjection;
 using Pharmacy.Application.Branding;
 using Pharmacy.Application.Branding.Contracts;
 using Pharmacy.Application.Branding.Models;
+using Pharmacy.Application.Configuration;
 using Pharmacy.Application.Operations.Contracts;
 using Pharmacy.Application.Operations.Models;
 using Pharmacy.Application.Security;
 using Pharmacy.Application.Security.Contracts;
 using Pharmacy.Application.Security.Models;
 using Pharmacy.Infrastructure.Branding;
+using Pharmacy.Infrastructure.Configuration;
 using Pharmacy.Infrastructure.Operations;
 using Pharmacy.Infrastructure.Persistence;
 using Pharmacy.Infrastructure.Security;
@@ -180,8 +182,8 @@ public sealed class SqlPharmacyBrandingIntegrationTests(PharmacyBrandingSqlFixtu
             var restored = await backup.RestoreTestAsync(new RestoreTestRequest(Guid.NewGuid(), backupPath), token);
 
             Assert.True(restored.IsSuccess, restored.IsFailure ? restored.Error.Message : null);
-            Assert.Equal(12, restored.Value.AppliedMigrationCount);
-            Assert.Equal(5, restored.Value.CriticalTableCount);
+            Assert.Equal(13, restored.Value.AppliedMigrationCount);
+            Assert.Equal(6, restored.Value.CriticalTableCount);
             Assert.Equal("Pharmacie Sauvegardée", restored.Value.PharmacyName);
             Assert.Equal("#246B45", restored.Value.PrimaryColor);
             Assert.Equal(Convert.ToHexString(SHA256.HashData(logo)), restored.Value.LogoSha256);
@@ -192,6 +194,109 @@ public sealed class SqlPharmacyBrandingIntegrationTests(PharmacyBrandingSqlFixtu
         {
             if (!string.IsNullOrWhiteSpace(backupPath) && File.Exists(backupPath)) File.Delete(backupPath);
         }
+    }
+
+    [Fact]
+    public async Task PRINT001_SQLDefaultIsDisabled()
+    {
+        await fixture.ResetAsync();
+        await using var provider = fixture.CreateProvider(authorized: true);
+        var settings = await provider.GetRequiredService<IReceiptPrintingSettingsService>()
+            .GetAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(settings.IsSuccess);
+        Assert.False(settings.Value.ReceiptPrintingEnabled);
+    }
+
+    [Fact]
+    public async Task PRINT011_PRINT012_ManagerUpdatePersistsAcrossRestart()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await fixture.ResetAsync();
+        await using (var provider = fixture.CreateProviderWithPermissions(
+            SecurityRolePresets.ManagerCode,
+            SecurityPermissions.DevicesConfigure))
+        {
+            var service = provider.GetRequiredService<IReceiptPrintingSettingsService>();
+            var current = (await service.GetAsync(token)).Value;
+            var updated = await service.UpdateAsync(new UpdateReceiptPrintingSettingsRequest(
+                Guid.NewGuid(), true, current.RowVersion), token);
+            Assert.True(updated.IsSuccess, updated.IsFailure ? updated.Error.Message : null);
+        }
+
+        await using var restarted = fixture.CreateProvider(authorized: false);
+        var reloaded = await restarted.GetRequiredService<IReceiptPrintingSettingsService>().GetAsync(token);
+        Assert.True(reloaded.IsSuccess);
+        Assert.True(reloaded.Value.ReceiptPrintingEnabled);
+    }
+
+    [Fact]
+    public async Task PRINT013_SellerCannotUpdateSQLSetting()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await fixture.ResetAsync();
+        await using var provider = fixture.CreateProviderWithPermissions(
+            SecurityRolePresets.SellerCode,
+            SecurityPermissions.SalesCreate);
+        var service = provider.GetRequiredService<IReceiptPrintingSettingsService>();
+        var current = (await service.GetAsync(token)).Value;
+
+        var result = await service.UpdateAsync(new UpdateReceiptPrintingSettingsRequest(
+            Guid.NewGuid(), true, current.RowVersion), token);
+
+        Assert.Equal("security.authorization.denied", result.Error.Code);
+        Assert.False((await service.GetAsync(token)).Value.ReceiptPrintingEnabled);
+    }
+
+    [Fact]
+    public async Task PRINT019_OfficialBackupRestorePreservesPrintingSetting()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await fixture.ResetAsync();
+        await using var provider = fixture.CreateProvider(authorized: true);
+        var settings = provider.GetRequiredService<IReceiptPrintingSettingsService>();
+        var current = (await settings.GetAsync(token)).Value;
+        Assert.True((await settings.UpdateAsync(new UpdateReceiptPrintingSettingsRequest(
+            Guid.NewGuid(), true, current.RowVersion), token)).IsSuccess);
+
+        var backup = provider.GetRequiredService<IBackupRecoveryService>();
+        string? backupPath = null;
+        try
+        {
+            var created = await backup.CreateAsync(new CreateBackupRequest(
+                Guid.NewGuid(), SqlBackupType.Full, CopyToExternal: false), token);
+            Assert.True(created.IsSuccess, created.IsFailure ? created.Error.Message : null);
+            backupPath = created.Value.Backup.FullPath;
+            var restored = await backup.RestoreTestAsync(
+                new RestoreTestRequest(Guid.NewGuid(), backupPath), token);
+            Assert.True(restored.IsSuccess, restored.IsFailure ? restored.Error.Message : null);
+            Assert.True(restored.Value.ReceiptPrintingEnabled);
+            Assert.True(restored.Value.CleanupPassed);
+        }
+        finally
+        {
+            if (!string.IsNullOrWhiteSpace(backupPath) && File.Exists(backupPath)) File.Delete(backupPath);
+        }
+    }
+
+    [Fact]
+    public async Task PRINT020_SettingsChangeIsAuditedAsBooleanOnly()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await fixture.ResetAsync();
+        await using var provider = fixture.CreateProvider(authorized: true);
+        var service = provider.GetRequiredService<IReceiptPrintingSettingsService>();
+        var current = (await service.GetAsync(token)).Value;
+        var operationId = Guid.NewGuid();
+
+        var result = await service.UpdateAsync(new UpdateReceiptPrintingSettingsRequest(
+            operationId, true, current.RowVersion), token);
+
+        Assert.True(result.IsSuccess);
+        var audit = await fixture.ReadBrandingAuditAsync(operationId);
+        Assert.Equal("receipt-printing.update", audit.Action);
+        Assert.Equal(["ReceiptPrintingEnabled"], audit.Fields);
+        Assert.All(audit.Values, value => Assert.Contains(value, new[] { "False", "True" }));
     }
 
     private static async Task<Pharmacy.Domain.Common.Result<PharmacyBrandingView>> UpdateAsync(
@@ -246,7 +351,7 @@ public sealed class PharmacyBrandingSqlFixture : IAsyncLifetime
         Factory = new FactoryImpl(optionsBuilder.Options);
         await using var context = await Factory.CreateDbContextAsync();
         await context.Database.MigrateAsync();
-        Assert.Equal(12, (await context.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(13, (await context.Database.GetAppliedMigrationsAsync()).Count());
         Assert.Empty(await context.Database.GetPendingMigrationsAsync());
     }
 
@@ -267,6 +372,7 @@ public sealed class PharmacyBrandingSqlFixture : IAsyncLifetime
         services.AddPharmacySqlServerPersistence(databaseConnection);
         services.AddLocalSqlSecurity();
         services.AddSqlPharmacyBranding();
+        services.AddSqlApplicationSettings();
         services.AddOperationalServices();
         var provider = services.BuildServiceProvider();
         if (authorized)
@@ -279,12 +385,34 @@ public sealed class PharmacyBrandingSqlFixture : IAsyncLifetime
                 ["OWNER"],
                 new HashSet<string>([
                     SecurityPermissions.SecurityManageUsers,
+                    SecurityPermissions.DevicesConfigure,
                     SecurityPermissions.BackupCreate,
                     SecurityPermissions.BackupRestore
                 ], StringComparer.Ordinal),
                 now,
                 now), now);
         }
+        return provider;
+    }
+
+    public ServiceProvider CreateProviderWithPermissions(string role, params string[] permissions)
+    {
+        var services = new ServiceCollection();
+        services.AddPharmacySqlServerPersistence(databaseConnection);
+        services.AddLocalSqlSecurity();
+        services.AddSqlPharmacyBranding();
+        services.AddSqlApplicationSettings();
+        services.AddOperationalServices();
+        var provider = services.BuildServiceProvider();
+        var now = DateTime.UtcNow;
+        provider.GetRequiredService<ICurrentSecuritySession>().Establish(new UserSessionView(
+            1702,
+            $"qa.{role.ToLowerInvariant()}",
+            $"QA {role}",
+            [role],
+            new HashSet<string>(permissions, StringComparer.Ordinal),
+            now,
+            now), now);
         return provider;
     }
 
@@ -295,8 +423,13 @@ public sealed class PharmacyBrandingSqlFixture : IAsyncLifetime
             SET PharmacyName=N'Pharmacie Diar Douha', PrimaryColor='#0D9A48',
                 LogoContent=NULL, LogoMimeType=NULL, LogoFileName=NULL, UpdatedAtUtc=SYSUTCDATETIME()
             WHERE Id=1;
+            UPDATE configuration.ApplicationSettings
+            SET ReceiptPrintingEnabled=0, UpdatedAtUtc=SYSUTCDATETIME()
+            WHERE Id=1;
             DELETE FROM audit.AuditEventDetails WHERE AuditEventId IN (SELECT Id FROM audit.AuditEvents WHERE Module=N'branding');
             DELETE FROM audit.AuditEvents WHERE Module=N'branding';
+            DELETE FROM audit.AuditEventDetails WHERE AuditEventId IN (SELECT Id FROM audit.AuditEvents WHERE Module=N'Configuration');
+            DELETE FROM audit.AuditEvents WHERE Module=N'Configuration';
             """);
     }
 

@@ -19,7 +19,7 @@ Cette RC n’est pas une validation production finale.
 - [ ] backup de référence ;
 - [ ] `health` PASS, 0 migration pending ;
 - [ ] connexion Owner puis utilisateur limité ;
-- [ ] vente synthétique cash, retour et ticket ;
+- [ ] vente synthétique cash et retour ; ticket uniquement si l’impression est activée ;
 - [ ] réconciliation stock/caisse ;
 - [ ] aucune alerte sécurité/SQL ;
 - [ ] décision GO datée par propriétaire métier et responsable technique.

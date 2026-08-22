@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Pharmacy.Application.Catalog.Commands;
 using Pharmacy.Application.Catalog.Models;
 using Pharmacy.Application.Catalog.Queries;
+using Pharmacy.Application.Security;
 using Pharmacy.Application.Sales.Contracts;
 using Pharmacy.Application.Sales.Models;
 using Pharmacy.Domain.Sales;
@@ -57,7 +58,7 @@ public sealed class SqlCatalogIntegrationTests
                 cancellationToken);
             Assert.True(categoryResult.IsSuccess);
 
-            var createHandler = new CreateCatalogProductHandler(store);
+            var createHandler = new CreateCatalogProductHandler(store, TestPermissionAuthorizer.AllowAll);
             var created = await createHandler.HandleAsync(
                 new CreateCatalogProductCommand(
                     "Produit SQL Sprint 10",
@@ -136,7 +137,7 @@ public sealed class SqlCatalogIntegrationTests
                 databaseConnection.ConnectionString,
                 "SELECT COUNT(*) FROM catalog.ProductLocalSettings WHERE InternalCode = N'S10-INTERNAL-MISSING';"));
 
-            var negativePrice = await new ChangeCatalogProductPriceHandler(store).HandleAsync(
+            var negativePrice = await new ChangeCatalogProductPriceHandler(store, TestPermissionAuthorizer.AllowAll).HandleAsync(
                 new ChangeCatalogProductPriceCommand(
                     created.Value.ProductId, -1m, null, created.Value.LocalSettingsRowVersion),
                 cancellationToken);
@@ -144,7 +145,7 @@ public sealed class SqlCatalogIntegrationTests
             Assert.Equal("catalog.price.invalid", negativePrice.Error.Code);
 
             var staleDetails = created.Value;
-            var changedPrice = await new ChangeCatalogProductPriceHandler(store).HandleAsync(
+            var changedPrice = await new ChangeCatalogProductPriceHandler(store, TestPermissionAuthorizer.AllowAll).HandleAsync(
                 new ChangeCatalogProductPriceCommand(
                     staleDetails.ProductId, 19.9900m, "Test synthétique", staleDetails.LocalSettingsRowVersion),
                 cancellationToken);
@@ -152,7 +153,7 @@ public sealed class SqlCatalogIntegrationTests
             Assert.Equal(19.9900m, changedPrice.Value.CurrentSalePrice);
             Assert.Equal(2, changedPrice.Value.PriceHistory.Count);
 
-            var conflict = await new ChangeCatalogProductPriceHandler(store).HandleAsync(
+            var conflict = await new ChangeCatalogProductPriceHandler(store, TestPermissionAuthorizer.AllowAll).HandleAsync(
                 new ChangeCatalogProductPriceCommand(
                     staleDetails.ProductId, 29.9900m, "Conflit synthétique", staleDetails.LocalSettingsRowVersion),
                 cancellationToken);
@@ -162,7 +163,7 @@ public sealed class SqlCatalogIntegrationTests
             Assert.Equal(19.9900m, afterConflict.CurrentSalePrice);
             Assert.Equal(2, afterConflict.PriceHistory.Count);
 
-            var deactivated = await new SetCatalogProductActivationHandler(store).HandleAsync(
+            var deactivated = await new SetCatalogProductActivationHandler(store, TestPermissionAuthorizer.AllowAll).HandleAsync(
                 new SetCatalogProductActivationCommand(
                     afterConflict.ProductId, false, false,
                     afterConflict.ProductRowVersion, afterConflict.LocalSettingsRowVersion),
@@ -177,7 +178,7 @@ public sealed class SqlCatalogIntegrationTests
                     Limit: 10),
                 cancellationToken)).Value);
 
-            var reactivated = await new SetCatalogProductActivationHandler(store).HandleAsync(
+            var reactivated = await new SetCatalogProductActivationHandler(store, TestPermissionAuthorizer.AllowAll).HandleAsync(
                 new SetCatalogProductActivationCommand(
                     deactivated.Value.ProductId, true, true,
                     deactivated.Value.ProductRowVersion, deactivated.Value.LocalSettingsRowVersion),
@@ -185,7 +186,7 @@ public sealed class SqlCatalogIntegrationTests
             Assert.True(reactivated.IsSuccess);
 
             var barcode = Assert.Single(reactivated.Value.Barcodes);
-            var barcodeDisabled = await new UpdateCatalogBarcodeHandler(store).HandleAsync(
+            var barcodeDisabled = await new UpdateCatalogBarcodeHandler(store, TestPermissionAuthorizer.AllowAll).HandleAsync(
                 new UpdateCatalogBarcodeCommand(
                     reactivated.Value.ProductId, barcode.BarcodeId, barcode.Value,
                     barcode.IsPrimary, false, barcode.RowVersion, barcode.BarcodeType),
@@ -234,6 +235,112 @@ public sealed class SqlCatalogIntegrationTests
         {
             SqlConnection.ClearAllPools();
             await DropTemporaryDatabaseAsync(serverConnection.ConnectionString, databaseName);
+        }
+    }
+
+    [Fact]
+    public async Task RBSELL009_UnauthorizedCatalogMutationsLeaveSqlUnchanged()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var server = BuildServerConnection();
+        var databaseName = TestDatabasePrefix + Guid.NewGuid().ToString("N")[..12];
+        ValidateTemporaryDatabaseName(databaseName);
+        var database = new SqlConnectionStringBuilder(server.ConnectionString)
+        {
+            InitialCatalog = databaseName,
+            ApplicationName = "Pharmacy.RBSELL009.Tests",
+            Pooling = false
+        };
+        await CreateDatabaseAsync(server.ConnectionString, databaseName);
+
+        try
+        {
+            var factory = new TestDbContextFactory(database.ConnectionString, new CountingCommandInterceptor());
+            await using (var context = await factory.CreateDbContextAsync(token))
+            {
+                await context.Database.MigrateAsync(token);
+            }
+
+            var store = new SqlCatalogStore(factory);
+            var category = await store.CreateAsync(
+                new CreateCatalogCategoryCommand("RBSELL", "RBAC Seller"), token);
+            Assert.True(category.IsSuccess);
+            var product = await store.CreateAsync(
+                new CreateCatalogProductCommand(
+                    "Produit RBAC Seller", "Boîte", category.Value.CategoryId,
+                    "RBSELL-SQL-PRODUCT", 10m,
+                    [new CatalogBarcodeInput("RBSELL-SQL-BARCODE", true)]),
+                token);
+            Assert.True(product.IsSuccess);
+
+            var beforeProducts = await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM catalog.Products;");
+            var beforeBarcodes = await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM catalog.ProductBarcodes;");
+            var beforePrices = await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM catalog.ProductPriceHistories;");
+            var beforeCategories = await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM catalog.ProductCategories;");
+            var seller = new TestPermissionAuthorizer(
+                SecurityPermissions.CatalogView,
+                SecurityPermissions.InventoryView,
+                SecurityPermissions.CustomersView,
+                SecurityPermissions.SalesCreate,
+                SecurityPermissions.SalesViewHistory);
+
+            var denied = new List<string>
+            {
+                (await new CreateCatalogProductHandler(store, seller).HandleAsync(
+                    new CreateCatalogProductCommand("Interdit", null, category.Value.CategoryId, "RBSELL-DENIED", 1m), token)).Error.Code,
+                (await new UpdateCatalogProductHandler(store, seller).HandleAsync(
+                    new UpdateCatalogProductCommand(
+                        product.Value.ProductId, "Interdit", product.Value.Presentation,
+                        product.Value.CategoryId, product.Value.InternalCode,
+                        product.Value.IsSellable, product.Value.IsPurchasable,
+                        product.Value.TracksLots, product.Value.TracksExpiry,
+                        product.Value.DiscountAllowed, product.Value.QuantityScale,
+                        product.Value.StorageLocation, product.Value.MinimumStock,
+                        product.Value.MaximumStock, product.Value.ProductRowVersion,
+                        product.Value.LocalSettingsRowVersion), token)).Error.Code,
+                (await new SetCatalogProductActivationHandler(store, seller).HandleAsync(
+                    new SetCatalogProductActivationCommand(
+                        product.Value.ProductId, false, false,
+                        product.Value.ProductRowVersion, product.Value.LocalSettingsRowVersion), token)).Error.Code,
+                (await new AddCatalogBarcodeHandler(store, seller).HandleAsync(
+                    new AddCatalogBarcodeCommand(product.Value.ProductId, "RBSELL-DENIED-BARCODE", false), token)).Error.Code,
+                (await new UpdateCatalogBarcodeHandler(store, seller).HandleAsync(
+                    new UpdateCatalogBarcodeCommand(
+                        product.Value.ProductId, product.Value.Barcodes[0].BarcodeId,
+                        product.Value.Barcodes[0].Value, true, false,
+                        product.Value.Barcodes[0].RowVersion), token)).Error.Code,
+                (await new ChangeCatalogProductPriceHandler(store, seller).HandleAsync(
+                    new ChangeCatalogProductPriceCommand(
+                        product.Value.ProductId, 99m, null, product.Value.LocalSettingsRowVersion), token)).Error.Code,
+                (await new CreateCatalogCategoryHandler(store, seller).HandleAsync(
+                    new CreateCatalogCategoryCommand("DENIED", "Interdit"), token)).Error.Code,
+                (await new UpdateCatalogCategoryHandler(store, seller).HandleAsync(
+                    new UpdateCatalogCategoryCommand(
+                        category.Value.CategoryId, category.Value.Code, "Interdit", 0,
+                        false, false, false, category.Value.RowVersion), token)).Error.Code,
+                (await new SetCatalogCategoryActivationHandler(store, seller).HandleAsync(
+                    new SetCatalogCategoryActivationCommand(
+                        category.Value.CategoryId, false, category.Value.RowVersion), token)).Error.Code
+            };
+
+            Assert.All(denied, code => Assert.Equal("security.authorization.denied", code));
+            Assert.Equal(beforeProducts, await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM catalog.Products;"));
+            Assert.Equal(beforeBarcodes, await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM catalog.ProductBarcodes;"));
+            Assert.Equal(beforePrices, await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM catalog.ProductPriceHistories;"));
+            Assert.Equal(beforeCategories, await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM catalog.ProductCategories;"));
+            Assert.Equal("Produit RBAC Seller", await ScalarAsync<string>(
+                database.ConnectionString,
+                "SELECT Name FROM catalog.Products WHERE Id=@id;",
+                new SqlParameter("@id", SqlDbType.BigInt) { Value = product.Value.ProductId }));
+            Assert.Equal(10m, await ScalarAsync<decimal>(
+                database.ConnectionString,
+                "SELECT CurrentSalePrice FROM catalog.ProductLocalSettings WHERE ProductId=@id;",
+                new SqlParameter("@id", SqlDbType.BigInt) { Value = product.Value.ProductId }));
+        }
+        finally
+        {
+            SqlConnection.ClearAllPools();
+            await DropTemporaryDatabaseAsync(server.ConnectionString, databaseName);
         }
     }
 

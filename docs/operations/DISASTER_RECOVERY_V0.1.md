@@ -40,7 +40,7 @@ Déclarer un incident si SQL Server est indisponible, si la base est suspecte/co
 - Support externe absent : conserver la sauvegarde locale, signaler RPO non protégé hors machine et restaurer le support ; ne pas déclarer la continuité conforme.
 - Sauvegarde invalide : ne pas restaurer ; revenir à la génération précédente vérifiée et recalculer la perte potentielle.
 - SQL indisponible : le POS ne doit pas promettre une vente persistée ; diagnostiquer service, stockage et droits avant reprise.
-- Imprimante indisponible : la vente déjà commitée reste valide ; réessayer ou continuer sans ticket, sans recréer vente/paiement.
+- Imprimante indisponible : aucun impact lorsque l’impression est désactivée ; lorsqu’elle est activée, la vente déjà commitée reste valide et peut être réimprimée sans recréer vente/paiement.
 - Panne électrique : appliquer l’arrêt contrôlé de l’onduleur et vérifier SQL au redémarrage.
 
 ## Exercice et clôture

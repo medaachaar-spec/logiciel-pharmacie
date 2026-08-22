@@ -313,7 +313,7 @@ public sealed class DemoPosTests
         Assert.Contains("@page \"/module/sales\"", page, StringComparison.Ordinal);
         Assert.Contains("Nouvelle vente", page, StringComparison.Ordinal);
         Assert.DoesNotContain("module/sales", placeholder, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("\"sales\",\n                \"Ventes\"", navigation, StringComparison.Ordinal);
+        Assert.Contains("\"sales\",\n                \"Vente\"", navigation, StringComparison.Ordinal);
         Assert.Contains("AppNavigationAccessState.Available", navigation, StringComparison.Ordinal);
     }
 

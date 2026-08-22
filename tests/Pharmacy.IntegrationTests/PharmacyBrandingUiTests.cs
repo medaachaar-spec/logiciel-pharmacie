@@ -72,8 +72,8 @@ public sealed class PharmacyBrandingUiTests
     {
         var css = DesktopText("wwwroot", "css", "security.css");
 
-        Assert.Contains("text-overflow: ellipsis", css, StringComparison.Ordinal);
-        Assert.Contains("overflow-wrap: anywhere", css, StringComparison.Ordinal);
+        Assert.Contains("overflow-wrap: normal", css, StringComparison.Ordinal);
+        Assert.Contains("word-break: normal", css, StringComparison.Ordinal);
         Assert.Contains("min-width: 0", css, StringComparison.Ordinal);
     }
 

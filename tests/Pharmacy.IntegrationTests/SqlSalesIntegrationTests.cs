@@ -72,7 +72,7 @@ public sealed class SqlSalesIntegrationTests
                 cancellationToken);
             Assert.True(category.IsSuccess);
 
-            var lotProduct = await new CreateCatalogProductHandler(catalogStore).HandleAsync(
+            var lotProduct = await new CreateCatalogProductHandler(catalogStore, TestPermissionAuthorizer.AllowAll).HandleAsync(
                 new CreateCatalogProductCommand(
                     "Produit FEFO Sprint 13",
                     "Boîte de test",
@@ -84,7 +84,7 @@ public sealed class SqlSalesIntegrationTests
                 cancellationToken);
             Assert.True(lotProduct.IsSuccess);
 
-            var plainProduct = await new CreateCatalogProductHandler(catalogStore).HandleAsync(
+            var plainProduct = await new CreateCatalogProductHandler(catalogStore, TestPermissionAuthorizer.AllowAll).HandleAsync(
                 new CreateCatalogProductCommand(
                     "Produit carte Sprint 13",
                     "Unité de test",
@@ -396,7 +396,7 @@ public sealed class SqlSalesIntegrationTests
                     DefaultTracksExpiry: false),
                 cancellationToken);
             Assert.True(category.IsSuccess);
-            var product = await new CreateCatalogProductHandler(catalogStore).HandleAsync(
+            var product = await new CreateCatalogProductHandler(catalogStore, TestPermissionAuthorizer.AllowAll).HandleAsync(
                 new CreateCatalogProductCommand(
                     "Produit suspension RET-001",
                     "Boîte snapshot",

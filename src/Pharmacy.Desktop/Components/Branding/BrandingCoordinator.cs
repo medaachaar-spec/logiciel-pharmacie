@@ -9,11 +9,15 @@ public sealed class BrandingCoordinator
 {
     public const string BundledLogoPath = "branding/pharmacie-diar-douha-logo.png";
     private readonly IPharmacyBrandingService service;
+    private readonly RuntimeWindowTitle? windowTitle;
     private int operationInProgress;
 
-    public BrandingCoordinator(IPharmacyBrandingService service)
+    public BrandingCoordinator(
+        IPharmacyBrandingService service,
+        RuntimeWindowTitle? windowTitle = null)
     {
         this.service = service;
+        this.windowTitle = windowTitle;
         Current = PharmacyBrandingDefaults.CreateView();
         RefreshDerivedValues();
     }
@@ -110,6 +114,7 @@ public sealed class BrandingCoordinator
             ? $"data:{Current.LogoMimeType};base64,{Convert.ToBase64String(Current.LogoContent)}"
             : BundledLogoPath;
         ThemeStyle = BuildThemeStyle(Current.PrimaryColor);
+        windowTitle?.SetPharmacyName(Current.PharmacyName);
     }
 
     private void NotifyChanged() => Changed?.Invoke();

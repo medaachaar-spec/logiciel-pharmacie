@@ -33,6 +33,9 @@ using Pharmacy.Infrastructure.Operations;
 using Pharmacy.Infrastructure.Branding;
 using Pharmacy.Desktop.Components.Branding;
 using Pharmacy.Desktop.Components.Dashboard;
+using Pharmacy.Application.Configuration;
+using Pharmacy.Infrastructure.Configuration;
+using Pharmacy.Desktop.Components.Configuration;
 
 namespace Pharmacy.Desktop;
 
@@ -50,6 +53,7 @@ public static class SalesServiceCollectionExtensions
         services.AddSqlReporting();
         services.AddOperationalServices();
         services.AddSqlPharmacyBranding();
+        services.AddSqlApplicationSettings();
         services.AddSingleton<ISaleDraftStore, InMemorySaleDraftStore>();
         services.AddSingleton<ISaleDraftIdGenerator, InMemorySaleDraftIdGenerator>();
         services.AddSingleton<ISaleFinalizationPreparationStore, InMemorySaleFinalizationPreparationStore>();
@@ -103,7 +107,11 @@ public static class SalesServiceCollectionExtensions
         services.AddScoped<SecurityCoordinator>();
         services.AddScoped<ReportingCoordinator>();
         services.AddScoped<OperationsCoordinator>();
+        services.AddSingleton<RuntimeWindowTitle>();
         services.AddScoped<BrandingCoordinator>();
+        services.AddScoped<ReceiptPrintingSettingsCoordinator>();
+        services.AddScoped<IReceiptPrintingPolicy>(provider =>
+            provider.GetRequiredService<ReceiptPrintingSettingsCoordinator>());
         services.AddScoped<DashboardCoordinator>();
         return services;
     }

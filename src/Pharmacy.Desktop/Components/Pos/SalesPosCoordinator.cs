@@ -9,6 +9,7 @@ using Pharmacy.Application.Sales.Finalization.Commands;
 using Pharmacy.Application.Sales.Finalization.Queries;
 using Pharmacy.Application.Sales.Models;
 using Pharmacy.Application.Sales.Suspensions;
+using Pharmacy.Application.Configuration;
 using Pharmacy.Domain.Common;
 using Pharmacy.Domain.Sales;
 
@@ -123,6 +124,7 @@ public sealed class SalesPosCoordinator
     private readonly GetRecentSalesHandler getRecentSalesHandler;
     private readonly DemoTicketPrintService ticketPrintService;
     private readonly SuspendedSaleWorkflow suspendedSaleWorkflow;
+    private readonly IReceiptPrintingPolicy? receiptPrintingPolicy;
     private readonly List<SalesPosSuspendedDraft> suspendedDrafts = new();
     private readonly ReadOnlyCollection<SalesPosSuspendedDraft> readOnlySuspendedDrafts;
     private readonly SemaphoreSlim continuityGate = new(1, 1);
@@ -150,7 +152,8 @@ public sealed class SalesPosCoordinator
         FinalizeSaleHandler finalizeSaleHandler,
         GetRecentSalesHandler getRecentSalesHandler,
         DemoTicketPrintService ticketPrintService,
-        SuspendedSaleWorkflow suspendedSaleWorkflow)
+        SuspendedSaleWorkflow suspendedSaleWorkflow,
+        IReceiptPrintingPolicy? receiptPrintingPolicy = null)
     {
         this.createDraftHandler = createDraftHandler ?? throw new ArgumentNullException(nameof(createDraftHandler));
         this.searchProductsHandler = searchProductsHandler ?? throw new ArgumentNullException(nameof(searchProductsHandler));
@@ -167,6 +170,7 @@ public sealed class SalesPosCoordinator
         this.ticketPrintService = ticketPrintService ?? throw new ArgumentNullException(nameof(ticketPrintService));
         this.suspendedSaleWorkflow = suspendedSaleWorkflow
             ?? throw new ArgumentNullException(nameof(suspendedSaleWorkflow));
+        this.receiptPrintingPolicy = receiptPrintingPolicy;
         readOnlySuspendedDrafts = suspendedDrafts.AsReadOnly();
     }
 
@@ -217,6 +221,9 @@ public sealed class SalesPosCoordinator
     public DateTimeOffset? LastPrintAttemptAtLocal => ticketPrintService.LastAttemptAtLocal;
 
     public bool ContinuedWithoutTicket => ticketPrintService.ContinuedWithoutTicket;
+
+    public bool ReceiptPrintingEnabled =>
+        receiptPrintingPolicy?.ReceiptPrintingEnabled ?? true;
 
     public decimal Total => CurrentDraft?.Total.Amount ?? 0m;
 
@@ -986,7 +993,14 @@ public sealed class SalesPosCoordinator
             activeSuspension = null;
             Step = DemoPosStep.Success;
             completionInProgress = false;
-            ticketPrintService.PrepareForSale(Result.Reference);
+            if (ReceiptPrintingEnabled)
+            {
+                ticketPrintService.PrepareForSale(Result.Reference);
+            }
+            else
+            {
+                ticketPrintService.Reset();
+            }
             await PrepareNextDraftAsync(cancellationToken);
             await LoadRecentSalesCoreAsync(cancellationToken, preserveFeedback: true);
             await LoadSuspendedSalesCoreAsync(cancellationToken, preserveFeedback: true);
@@ -1012,24 +1026,30 @@ public sealed class SalesPosCoordinator
 
     public bool TryBeginTicketPrint()
     {
-        return Result is not null && ticketPrintService.TryBegin(Result.Reference);
+        return ReceiptPrintingEnabled
+            && Result is not null
+            && ticketPrintService.TryBegin(Result.Reference);
     }
 
     public bool CompleteTicketPrint(DemoPrintSimulationOutcome outcome)
     {
-        return Result is not null && ticketPrintService.Complete(Result.Reference, outcome);
+        return ReceiptPrintingEnabled
+            && Result is not null
+            && ticketPrintService.Complete(Result.Reference, outcome);
     }
 
     public Task<bool> PrintTicketAsync(bool isReprint, bool simulateFailure, CancellationToken cancellationToken = default)
     {
-        return Result is null
+        return !ReceiptPrintingEnabled || Result is null
             ? Task.FromResult(false)
             : ticketPrintService.PrintPersistedAsync(Result, isReprint, simulateFailure, cancellationToken);
     }
 
     public bool ContinueWithoutTicket()
     {
-        return Result is not null && ticketPrintService.ContinueWithoutTicket(Result.Reference);
+        return ReceiptPrintingEnabled
+            && Result is not null
+            && ticketPrintService.ContinueWithoutTicket(Result.Reference);
     }
 
     public int? KnownAvailability(ProductId productId)

@@ -11,15 +11,24 @@ namespace Pharmacy.Application.Catalog.Commands;
 public sealed class CreateCatalogProductHandler
 {
     private readonly ICatalogProductStore store;
+    private readonly IPermissionAuthorizer authorizer;
 
-    public CreateCatalogProductHandler(ICatalogProductStore store) =>
+    public CreateCatalogProductHandler(ICatalogProductStore store, IPermissionAuthorizer authorizer)
+    {
         this.store = store ?? throw new ArgumentNullException(nameof(store));
+        this.authorizer = authorizer ?? throw new ArgumentNullException(nameof(authorizer));
+    }
 
     public Task<Result<CatalogProductDetails>> HandleAsync(
         CreateCatalogProductCommand command,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        var denied = SecurityCommandGuard.Denied<CatalogProductDetails>(
+            authorizer,
+            SecurityPermissions.CatalogManage);
+        if (denied is not null) return Task.FromResult(denied);
+
         var validation = CatalogCommandValidation.ValidateProductInput(
             command.Name,
             command.InternalCode,
@@ -37,15 +46,24 @@ public sealed class CreateCatalogProductHandler
 public sealed class UpdateCatalogProductHandler
 {
     private readonly ICatalogProductStore store;
+    private readonly IPermissionAuthorizer authorizer;
 
-    public UpdateCatalogProductHandler(ICatalogProductStore store) =>
+    public UpdateCatalogProductHandler(ICatalogProductStore store, IPermissionAuthorizer authorizer)
+    {
         this.store = store ?? throw new ArgumentNullException(nameof(store));
+        this.authorizer = authorizer ?? throw new ArgumentNullException(nameof(authorizer));
+    }
 
     public Task<Result<CatalogProductDetails>> HandleAsync(
         UpdateCatalogProductCommand command,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        var denied = SecurityCommandGuard.Denied<CatalogProductDetails>(
+            authorizer,
+            SecurityPermissions.CatalogManage);
+        if (denied is not null) return Task.FromResult(denied);
+
         var validation = CatalogCommandValidation.ValidateProductInput(
             command.Name,
             command.InternalCode,
@@ -65,15 +83,24 @@ public sealed class UpdateCatalogProductHandler
 public sealed class SetCatalogProductActivationHandler
 {
     private readonly ICatalogProductStore store;
+    private readonly IPermissionAuthorizer authorizer;
 
-    public SetCatalogProductActivationHandler(ICatalogProductStore store) =>
+    public SetCatalogProductActivationHandler(ICatalogProductStore store, IPermissionAuthorizer authorizer)
+    {
         this.store = store ?? throw new ArgumentNullException(nameof(store));
+        this.authorizer = authorizer ?? throw new ArgumentNullException(nameof(authorizer));
+    }
 
     public Task<Result<CatalogProductDetails>> HandleAsync(
         SetCatalogProductActivationCommand command,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        var denied = SecurityCommandGuard.Denied<CatalogProductDetails>(
+            authorizer,
+            SecurityPermissions.CatalogManage);
+        if (denied is not null) return Task.FromResult(denied);
+
         return command.ProductId <= 0 || !CatalogCommandValidation.ValidToken(command.ProductRowVersion)
             || !CatalogCommandValidation.ValidToken(command.LocalSettingsRowVersion)
             ? Task.FromResult(Result<CatalogProductDetails>.Failure(CatalogCommandValidation.InvalidInput))
@@ -84,15 +111,24 @@ public sealed class SetCatalogProductActivationHandler
 public sealed class AddCatalogBarcodeHandler
 {
     private readonly ICatalogProductStore store;
+    private readonly IPermissionAuthorizer authorizer;
 
-    public AddCatalogBarcodeHandler(ICatalogProductStore store) =>
+    public AddCatalogBarcodeHandler(ICatalogProductStore store, IPermissionAuthorizer authorizer)
+    {
         this.store = store ?? throw new ArgumentNullException(nameof(store));
+        this.authorizer = authorizer ?? throw new ArgumentNullException(nameof(authorizer));
+    }
 
     public Task<Result<CatalogProductDetails>> HandleAsync(
         AddCatalogBarcodeCommand command,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        var denied = SecurityCommandGuard.Denied<CatalogProductDetails>(
+            authorizer,
+            SecurityPermissions.CatalogManage);
+        if (denied is not null) return Task.FromResult(denied);
+
         return command.ProductId <= 0 || string.IsNullOrWhiteSpace(command.Value) || command.Value.Trim().Length > 128
             ? Task.FromResult(Result<CatalogProductDetails>.Failure(CatalogCommandValidation.InvalidInput))
             : store.AddBarcodeAsync(command, cancellationToken);
@@ -102,15 +138,24 @@ public sealed class AddCatalogBarcodeHandler
 public sealed class UpdateCatalogBarcodeHandler
 {
     private readonly ICatalogProductStore store;
+    private readonly IPermissionAuthorizer authorizer;
 
-    public UpdateCatalogBarcodeHandler(ICatalogProductStore store) =>
+    public UpdateCatalogBarcodeHandler(ICatalogProductStore store, IPermissionAuthorizer authorizer)
+    {
         this.store = store ?? throw new ArgumentNullException(nameof(store));
+        this.authorizer = authorizer ?? throw new ArgumentNullException(nameof(authorizer));
+    }
 
     public Task<Result<CatalogProductDetails>> HandleAsync(
         UpdateCatalogBarcodeCommand command,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        var denied = SecurityCommandGuard.Denied<CatalogProductDetails>(
+            authorizer,
+            SecurityPermissions.CatalogManage);
+        if (denied is not null) return Task.FromResult(denied);
+
         return command.ProductId <= 0 || command.BarcodeId <= 0 || string.IsNullOrWhiteSpace(command.Value)
             || command.Value.Trim().Length > 128 || !CatalogCommandValidation.ValidToken(command.RowVersion)
             ? Task.FromResult(Result<CatalogProductDetails>.Failure(CatalogCommandValidation.InvalidInput))
@@ -121,17 +166,18 @@ public sealed class UpdateCatalogBarcodeHandler
 public sealed class ChangeCatalogProductPriceHandler
 {
     private readonly ICatalogProductStore store;
-    private readonly IPermissionAuthorizer? authorizer;
+    private readonly IPermissionAuthorizer authorizer;
     private readonly IBusinessAuditRecorder? audit;
-
-    public ChangeCatalogProductPriceHandler(ICatalogProductStore store) =>
-        this.store = store ?? throw new ArgumentNullException(nameof(store));
 
     public ChangeCatalogProductPriceHandler(ICatalogProductStore store, IPermissionAuthorizer authorizer)
         : this(store, authorizer, null) { }
 
     public ChangeCatalogProductPriceHandler(ICatalogProductStore store, IPermissionAuthorizer authorizer, IBusinessAuditRecorder? audit)
-    { this.store = store ?? throw new ArgumentNullException(nameof(store)); this.authorizer = authorizer; this.audit = audit; }
+    {
+        this.store = store ?? throw new ArgumentNullException(nameof(store));
+        this.authorizer = authorizer ?? throw new ArgumentNullException(nameof(authorizer));
+        this.audit = audit;
+    }
 
     public async Task<Result<CatalogProductDetails>> HandleAsync(
         ChangeCatalogProductPriceCommand command,
@@ -159,15 +205,24 @@ public sealed class ChangeCatalogProductPriceHandler
 public sealed class CreateCatalogCategoryHandler
 {
     private readonly ICatalogCategoryStore store;
+    private readonly IPermissionAuthorizer authorizer;
 
-    public CreateCatalogCategoryHandler(ICatalogCategoryStore store) =>
+    public CreateCatalogCategoryHandler(ICatalogCategoryStore store, IPermissionAuthorizer authorizer)
+    {
         this.store = store ?? throw new ArgumentNullException(nameof(store));
+        this.authorizer = authorizer ?? throw new ArgumentNullException(nameof(authorizer));
+    }
 
     public Task<Result<CatalogCategoryView>> HandleAsync(
         CreateCatalogCategoryCommand command,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        var denied = SecurityCommandGuard.Denied<CatalogCategoryView>(
+            authorizer,
+            SecurityPermissions.CatalogManage);
+        if (denied is not null) return Task.FromResult(denied);
+
         return !CatalogCommandValidation.ValidCategory(command.Code, command.Name, command.SortOrder)
             ? Task.FromResult(Result<CatalogCategoryView>.Failure(CatalogCommandValidation.InvalidInput))
             : store.CreateAsync(command, cancellationToken);
@@ -177,15 +232,24 @@ public sealed class CreateCatalogCategoryHandler
 public sealed class UpdateCatalogCategoryHandler
 {
     private readonly ICatalogCategoryStore store;
+    private readonly IPermissionAuthorizer authorizer;
 
-    public UpdateCatalogCategoryHandler(ICatalogCategoryStore store) =>
+    public UpdateCatalogCategoryHandler(ICatalogCategoryStore store, IPermissionAuthorizer authorizer)
+    {
         this.store = store ?? throw new ArgumentNullException(nameof(store));
+        this.authorizer = authorizer ?? throw new ArgumentNullException(nameof(authorizer));
+    }
 
     public Task<Result<CatalogCategoryView>> HandleAsync(
         UpdateCatalogCategoryCommand command,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        var denied = SecurityCommandGuard.Denied<CatalogCategoryView>(
+            authorizer,
+            SecurityPermissions.CatalogManage);
+        if (denied is not null) return Task.FromResult(denied);
+
         return command.CategoryId <= 0 || !CatalogCommandValidation.ValidCategory(command.Code, command.Name, command.SortOrder)
             || !CatalogCommandValidation.ValidToken(command.RowVersion)
             ? Task.FromResult(Result<CatalogCategoryView>.Failure(CatalogCommandValidation.InvalidInput))
@@ -196,15 +260,24 @@ public sealed class UpdateCatalogCategoryHandler
 public sealed class SetCatalogCategoryActivationHandler
 {
     private readonly ICatalogCategoryStore store;
+    private readonly IPermissionAuthorizer authorizer;
 
-    public SetCatalogCategoryActivationHandler(ICatalogCategoryStore store) =>
+    public SetCatalogCategoryActivationHandler(ICatalogCategoryStore store, IPermissionAuthorizer authorizer)
+    {
         this.store = store ?? throw new ArgumentNullException(nameof(store));
+        this.authorizer = authorizer ?? throw new ArgumentNullException(nameof(authorizer));
+    }
 
     public Task<Result<CatalogCategoryView>> HandleAsync(
         SetCatalogCategoryActivationCommand command,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        var denied = SecurityCommandGuard.Denied<CatalogCategoryView>(
+            authorizer,
+            SecurityPermissions.CatalogManage);
+        if (denied is not null) return Task.FromResult(denied);
+
         return command.CategoryId <= 0 || !CatalogCommandValidation.ValidToken(command.RowVersion)
             ? Task.FromResult(Result<CatalogCategoryView>.Failure(CatalogCommandValidation.InvalidInput))
             : store.SetActivationAsync(command, cancellationToken);

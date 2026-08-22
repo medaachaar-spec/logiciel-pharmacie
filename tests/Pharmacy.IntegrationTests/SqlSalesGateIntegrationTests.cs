@@ -463,7 +463,7 @@ public sealed class SqlSalesGateFixture : IAsyncLifetime
         {
             await context.Database.MigrateAsync();
             Assert.Empty(await context.Database.GetPendingMigrationsAsync());
-            Assert.Equal(12, (await context.Database.GetAppliedMigrationsAsync()).Count());
+            Assert.Equal(13, (await context.Database.GetAppliedMigrationsAsync()).Count());
         }
 
         var category = await new SqlCatalogStore(Factory).CreateAsync(
@@ -501,7 +501,7 @@ public sealed class SqlSalesGateFixture : IAsyncLifetime
     {
         var token = TestContext.Current.CancellationToken;
         var suffix = Guid.NewGuid().ToString("N")[..10].ToUpperInvariant();
-        var product = await new CreateCatalogProductHandler(new SqlCatalogStore(Factory)).HandleAsync(
+        var product = await new CreateCatalogProductHandler(new SqlCatalogStore(Factory), TestPermissionAuthorizer.AllowAll).HandleAsync(
             new CreateCatalogProductCommand(
                 name ?? $"Produit SAL{tag}",
                 $"Présentation SAL{tag}",

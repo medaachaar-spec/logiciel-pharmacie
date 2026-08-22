@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using Microsoft.EntityFrameworkCore;
 using Pharmacy.Application.Operations.Contracts;
 using Pharmacy.Application.Operations.Models;
+using Pharmacy.Application.Configuration;
 using Pharmacy.Application.Security;
 using Pharmacy.Application.Security.Contracts;
 using Pharmacy.Domain.Common;
@@ -40,7 +41,18 @@ public sealed class LocalDeviceDiagnostics : IDeviceDiagnostics
     private readonly IDbContextFactory<PharmacyDbContext> contextFactory;
     private readonly IPermissionAuthorizer authorizer;
     private readonly IBusinessAuditRecorder audit;
-    public LocalDeviceDiagnostics(IDbContextFactory<PharmacyDbContext> contextFactory, IPermissionAuthorizer authorizer, IBusinessAuditRecorder audit) { this.contextFactory = contextFactory; this.authorizer = authorizer; this.audit = audit; }
+    private readonly IReceiptPrintingPolicy? receiptPrintingPolicy;
+    public LocalDeviceDiagnostics(
+        IDbContextFactory<PharmacyDbContext> contextFactory,
+        IPermissionAuthorizer authorizer,
+        IBusinessAuditRecorder audit,
+        IReceiptPrintingPolicy? receiptPrintingPolicy = null)
+    {
+        this.contextFactory = contextFactory;
+        this.authorizer = authorizer;
+        this.audit = audit;
+        this.receiptPrintingPolicy = receiptPrintingPolicy;
+    }
 
     public async Task<Result<DeviceDiagnosticView>> CheckAsync(CancellationToken cancellationToken = default)
     {
@@ -63,7 +75,14 @@ public sealed class LocalDeviceDiagnostics : IDeviceDiagnostics
         items.Add(new("Sauvegarde locale", string.IsNullOrWhiteSpace(localBackup) ? "Chemin SQL par défaut" : Directory.Exists(localBackup) ? "Disponible" : "À créer", localBackup ?? "InstanceDefaultBackupPath", true));
         items.Add(new("Support externe", !string.IsNullOrWhiteSpace(external) && Directory.Exists(external) ? "Disponible" : "Non configuré/absent", external ?? "Aucun chemin", !string.IsNullOrWhiteSpace(external) && Directory.Exists(external)));
         items.Add(new("Scanner USB HID", "Mode clavier", "Suffixe Enter attendu ; test sans création métier", true));
-        items.Add(new("Imprimante ticket", "Simulateur", "80 mm abstrait ; certification physique en attente", true));
+        if (receiptPrintingPolicy?.ReceiptPrintingEnabled ?? true)
+        {
+            items.Add(new("Imprimante ticket", "Simulateur", "80 mm abstrait ; certification physique en attente", true));
+        }
+        else
+        {
+            items.Add(new("Impression tickets", "Désactivée", "Aucune imprimante requise pour vendre", true));
+        }
         items.Add(new("TPE", "Externe manuel", "Aucune donnée bancaire capturée", true));
         items.Add(new("UPS", "Contrôle manuel", "Aucun SDK de marque", false));
         items.Add(new("Application", "Disponible", typeof(LocalDeviceDiagnostics).Assembly.GetName().Version?.ToString() ?? "non versionnée", true));

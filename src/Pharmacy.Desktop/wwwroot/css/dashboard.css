@@ -194,7 +194,7 @@
 }
 
 .dashboard-bar-track > span { display: block; height: 100%; border-radius: inherit; background: var(--color-accent); }
-.dashboard-bars--employees .dashboard-bar-track > span { background: var(--color-information); }
+.dashboard-bars--employees .dashboard-bar-track > span { background: var(--pharmacy-primary); }
 
 .dashboard-expiry-list li {
     display: grid;

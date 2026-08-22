@@ -1,0 +1,19 @@
+<details class="operational-reference" title="@Value">
+    <summary aria-label="Référence @Value">@ShortValue</summary>
+    <code>@Value</code>
+</details>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Value { get; set; } = string.Empty;
+
+    private string ShortValue => Format(Value);
+
+    public static string Format(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return value.Length <= 24
+            ? value
+            : $"{value[..13]}…{value[^4..]}";
+    }
+}

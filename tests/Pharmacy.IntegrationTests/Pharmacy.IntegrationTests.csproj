@@ -45,5 +45,11 @@
              Link="BrandingCoordinator.cs" />
     <Compile Include="..\..\src\Pharmacy.Desktop\Components\Branding\BrandingThemePalette.cs"
              Link="BrandingThemePalette.cs" />
+    <Compile Include="..\..\src\Pharmacy.Desktop\Components\Branding\RuntimeWindowTitle.cs"
+             Link="RuntimeWindowTitle.cs" />
+    <Compile Include="..\..\src\Pharmacy.Desktop\Components\Configuration\ReceiptPrintingSettingsCoordinator.cs"
+             Link="ReceiptPrintingSettingsCoordinator.cs" />
+    <Compile Include="..\..\src\Pharmacy.Desktop\Components\Navigation\PermissionAwarePageDescription.cs"
+             Link="PermissionAwarePageDescription.cs" />
   </ItemGroup>
 </Project>

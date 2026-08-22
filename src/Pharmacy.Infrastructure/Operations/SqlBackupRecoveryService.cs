@@ -201,17 +201,23 @@ public sealed class SqlBackupRecoveryService : IBackupRecoveryService
             var migrations = await ScalarIntAsync(health, "SELECT COUNT(*) FROM dbo.__EFMigrationsHistory;", cancellationToken);
             var coreCritical = await ScalarIntAsync(health, "SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE (s.name=N'catalog' AND t.name=N'Products') OR (s.name=N'inventory' AND t.name=N'StockBalances') OR (s.name=N'sales' AND t.name=N'Sales') OR (s.name=N'security' AND t.name=N'Permissions');", cancellationToken);
             var brandingTable = await ScalarIntAsync(health, "SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE s.name=N'configuration' AND t.name=N'PharmacyBranding';", cancellationToken);
-            var critical = coreCritical + brandingTable;
+            var settingsTable = await ScalarIntAsync(health, "SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE s.name=N'configuration' AND t.name=N'ApplicationSettings';", cancellationToken);
+            var critical = coreCritical + brandingTable + settingsTable;
             string? pharmacyName = null;
             string? primaryColor = null;
             string? logoSha256 = null;
+            bool? receiptPrintingEnabled = null;
             if (brandingTable == 1)
             {
                 pharmacyName = await ScalarStringAsync(health, "SELECT PharmacyName FROM configuration.PharmacyBranding WHERE Id=1;", cancellationToken);
                 primaryColor = await ScalarStringAsync(health, "SELECT PrimaryColor FROM configuration.PharmacyBranding WHERE Id=1;", cancellationToken);
                 logoSha256 = await ScalarStringAsync(health, "SELECT COALESCE(CONVERT(varchar(64), HASHBYTES('SHA2_256', LogoContent), 2), '') FROM configuration.PharmacyBranding WHERE Id=1;", cancellationToken);
             }
-            if (migrations <= 0 || coreCritical != 4 || brandingTable is < 0 or > 1
+            if (settingsTable == 1)
+            {
+                receiptPrintingEnabled = await ScalarIntAsync(health, "SELECT CONVERT(int, ReceiptPrintingEnabled) FROM configuration.ApplicationSettings WHERE Id=1;", cancellationToken) == 1;
+            }
+            if (migrations <= 0 || coreCritical != 4 || brandingTable != 1 || settingsTable != 1
                 || brandingTable == 1 && (string.IsNullOrWhiteSpace(pharmacyName) || string.IsNullOrWhiteSpace(primaryColor)))
                 throw new InvalidOperationException("Le health check de restauration est incomplet.");
             await health.CloseAsync();
@@ -220,7 +226,8 @@ public sealed class SqlBackupRecoveryService : IBackupRecoveryService
             await audit.RecordSuccessAsync("backup", "RestoreTest", tempName, "backup.restore.test", request.OperationId, cancellationToken);
             return Result<RestoreTestView>.Success(new RestoreTestView(
                 request.OperationId, tempName, migrations, critical, true, true, clock.UtcNow,
-                pharmacyName, primaryColor, string.IsNullOrEmpty(logoSha256) ? null : logoSha256));
+                pharmacyName, primaryColor, string.IsNullOrEmpty(logoSha256) ? null : logoSha256,
+                receiptPrintingEnabled));
         }
         catch (Exception ex)
         {

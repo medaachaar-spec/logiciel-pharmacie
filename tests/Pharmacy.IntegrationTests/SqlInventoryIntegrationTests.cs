@@ -62,7 +62,7 @@ public sealed class SqlInventoryIntegrationTests
                 new CreateCatalogCategoryCommand("S11-TEST", "Catégorie test Inventory", DefaultTracksLots: true, DefaultTracksExpiry: true),
                 cancellationToken);
             Assert.True(category.IsSuccess);
-            var product = await new CreateCatalogProductHandler(catalogStore).HandleAsync(
+            var product = await new CreateCatalogProductHandler(catalogStore, TestPermissionAuthorizer.AllowAll).HandleAsync(
                 new CreateCatalogProductCommand(
                     "Produit lots Sprint 11", "Boîte test", category.Value.CategoryId,
                     "S11-INVENTORY-001", 10m, TracksLots: true, TracksExpiry: true),

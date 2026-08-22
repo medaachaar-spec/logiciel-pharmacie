@@ -458,7 +458,7 @@ public sealed class SqlPurchasingGateIntegrationTests(SqlPurchasingGateFixture f
     private async Task<ProductInfo> ProductAsync(string tag, bool tracksLots = false)
     {
         var code = Code("P" + tag);
-        var result = await new CreateCatalogProductHandler(new SqlCatalogStore(fixture.Factory)).HandleAsync(new(
+        var result = await new CreateCatalogProductHandler(new SqlCatalogStore(fixture.Factory), TestPermissionAuthorizer.AllowAll).HandleAsync(new(
             $"Produit QA {tag}", "Présentation QA", fixture.CategoryId, code, 20m,
             TracksLots: tracksLots, TracksExpiry: tracksLots), Token);
         Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);

@@ -1,5 +1,6 @@
 @page "/module/operations"
 @inject OperationsCoordinator Operations
+@inject Pharmacy.Application.Configuration.IReceiptPrintingPolicy ReceiptPrintingPolicy
 @implements IDisposable
 
 <PageTitle>Sauvegardes et outils</PageTitle>
@@ -10,7 +11,11 @@
     </header>
 
     <UiAlert Title="Validation matérielle encore requise" Variant="UiAlertVariant.Warning">
-        Le scanner, l’imprimante 80 mm, le TPE et l’onduleur doivent être vérifiés sur le matériel réel. Le logiciel ne saisit aucune donnée bancaire.
+        Le scanner, le TPE et l’onduleur doivent être vérifiés sur le matériel réel. Le logiciel ne saisit aucune donnée bancaire.
+        @if (ReceiptPrintingPolicy.ReceiptPrintingEnabled)
+        {
+            <span> L’imprimante 80 mm doit également être vérifiée.</span>
+        }
     </UiAlert>
     @if (!string.IsNullOrWhiteSpace(Operations.Error)) { <UiAlert Title="Opération refusée ou échouée" Variant="UiAlertVariant.Danger"><p>@Operations.Error</p></UiAlert> }
     @if (!string.IsNullOrWhiteSpace(Operations.Message)) { <UiAlert Title="Résultat" Variant="UiAlertVariant.Success"><p>@Operations.Message</p></UiAlert> }
@@ -55,7 +60,7 @@
     </section>
 
     <section class="catalog-panel" aria-labelledby="devices-title">
-        <div class="catalog-section-heading"><div><h2 id="devices-title">Diagnostic périphériques</h2></div><UiButton Variant="UiButtonVariant.Secondary" Disabled="@Operations.IsBusy" OnClick="@(_ => Operations.CheckDevicesAsync(lifetime.Token))">Exécuter le diagnostic</UiButton></div>
+        <div class="catalog-section-heading"><div><h2 id="devices-title">Diagnostic périphériques</h2><p>Impression tickets : @(ReceiptPrintingPolicy.ReceiptPrintingEnabled ? "Activée" : "Désactivée")</p></div><UiButton Variant="UiButtonVariant.Secondary" Disabled="@Operations.IsBusy" OnClick="@(_ => Operations.CheckDevicesAsync(lifetime.Token))">Exécuter le diagnostic</UiButton></div>
         @if (Operations.DeviceDiagnostic is null) { <UiEmptyState Title="Diagnostic non exécuté" Description="Le contrôle distingue explicitement simulateur, manuel, configuré et matériel non certifié." /> }
         else { <div class="operations-device-grid">@foreach (var item in Operations.DeviceDiagnostic.Items) { <article><UiBadge Text="@item.Status" Variant="@(item.IsReady ? UiBadgeVariant.Success : UiBadgeVariant.Warning)" /><h3>@item.Device</h3><p>@item.Detail</p></article> }</div> }
         <div class="operations-scanner"><label class="ui-field"><span class="ui-field__label">Scanner HID ou saisie manuelle</span><input class="ui-field__control" @onkeydown="ScannerKeyDown" @bind="scannerText" placeholder="Scannez ou saisissez un code" /></label><output aria-live="polite">@scannerResult</output></div>

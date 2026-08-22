@@ -2,17 +2,20 @@
 @inject SecurityCoordinator Security
 
 <header class="app-topbar">
-    <div class="app-topbar__heading">
-        <h2>@PageTitle</h2>
-        <p>@PageDescription</p>
-    </div>
-    <div class="app-topbar__context">
-        <div class="app-topbar__badges" aria-label="Rôles du compte">
-            @foreach (var role in VisibleRoles) { <span class="context-badge">@role</span> }
+    @if (ShowPageContext)
+    {
+        <div class="app-topbar__heading">
+            <h2>@PageTitle</h2>
+            <p>@PageDescription</p>
         </div>
+    }
+    <div class="app-topbar__context">
         <div class="app-topbar__account" aria-label="Compte courant">
             <span class="app-topbar__avatar" aria-hidden="true">@Initials</span>
-            <span><strong>@Session.User?.DisplayName</strong><small>@Session.User?.Login</small></span>
+            <span class="app-topbar__identity">
+                <strong>@Session.User?.DisplayName</strong>
+                <small>@RoleLabel</small>
+            </span>
             <button type="button" class="security-topbar-button" @onclick="LockAsync">Verrouiller</button>
             <button type="button" class="security-topbar-button" @onclick="LogoutAsync">Déconnexion</button>
         </div>
@@ -22,10 +25,12 @@
 @code {
     [Parameter, EditorRequired] public string PageTitle { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string PageDescription { get; set; } = string.Empty;
+    [Parameter] public bool ShowPageContext { get; set; } = true;
     private string Initials => string.Concat((Session.User?.DisplayName ?? "?").Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0])).ToUpperInvariant();
     private IEnumerable<string> VisibleRoles => (Session.User?.Roles ?? Array.Empty<string>())
         .Select(Security.RoleLabel)
         .Distinct(StringComparer.Ordinal);
+    private string RoleLabel => string.Join(" · ", VisibleRoles);
     private Task LockAsync() => Security.LockAsync();
     private Task LogoutAsync() => Security.LogoutAsync();
 }

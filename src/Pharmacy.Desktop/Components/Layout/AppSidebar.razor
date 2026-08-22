@@ -88,6 +88,8 @@
 
     private IEnumerable<IGrouping<AppNavigationGroup, AppNavigationItem>> GroupedItems => Items
         .Where(Allowed)
+        .Where(item => item.Id is "home" or "sales" or "catalog" or "inventory"
+            or "purchasing" or "customers" or "reporting" or "administration")
         .GroupBy(item => item.Group)
         .OrderBy(group => AppNavigationCatalog.GetGroupOrder(group.Key));
 

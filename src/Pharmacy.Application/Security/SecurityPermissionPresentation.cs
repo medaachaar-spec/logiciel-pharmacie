@@ -42,16 +42,16 @@ public static class SecurityPermissionPresentation
     {
         "sales" => "Ventes",
         "inventory" => "Stock",
-        "purchasing" => "Achats et fournisseurs",
+        "purchasing" => "Achats",
         "catalog" => "Produits",
         "customers" => "Clients",
         "cash" => "Caisse",
         "reports" => "Rapports",
-        "security" => "Employés et administration",
-        "audit" => "Journal d’activité",
+        "security" => "Sécurité",
+        "audit" => "Audit",
         "backup" => "Sauvegardes",
         "import" => "Imports",
-        "devices" => "Périphériques",
+        "devices" => "Matériel",
         _ => module
     };
 }

@@ -207,7 +207,9 @@ public sealed class EmployeeAccessControlTests : IClassFixture<SecurityGateSqlFi
     {
         var sidebar = DesktopText("Components", "Layout", "AppSidebar.razor");
         Assert.Contains("@foreach (var item in group)", sidebar, StringComparison.Ordinal);
-        Assert.Contains("Items\n        .Where(Allowed)\n        .GroupBy", sidebar, StringComparison.Ordinal);
+        Assert.Contains("Items\n        .Where(Allowed)", sidebar, StringComparison.Ordinal);
+        Assert.Contains(".Where(item => item.Id is", sidebar, StringComparison.Ordinal);
+        Assert.Contains(".GroupBy(item => item.Group)", sidebar, StringComparison.Ordinal);
     }
 
     [Fact]

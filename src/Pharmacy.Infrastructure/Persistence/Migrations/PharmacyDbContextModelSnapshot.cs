@@ -525,6 +525,40 @@ namespace Pharmacy.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Configuration.ApplicationSettingsEntity", b =>
+                {
+                    b.Property<long>("Id")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("ReceiptPrintingEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2(7)");
+
+                    b.HasKey("Id")
+                        .HasName("PK_configuration_ApplicationSettings");
+
+                    b.ToTable("ApplicationSettings", "configuration", t =>
+                        {
+                            t.HasCheckConstraint("CK_configuration_ApplicationSettings_Singleton", "[Id] = 1");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1L,
+                            ReceiptPrintingEnabled = false,
+                            UpdatedAtUtc = new DateTime(2026, 8, 22, 0, 0, 0, 0, DateTimeKind.Utc)
+                        });
+                });
+
             modelBuilder.Entity("Pharmacy.Infrastructure.Persistence.Entities.Configuration.PharmacyBrandingEntity", b =>
                 {
                     b.Property<long>("Id")

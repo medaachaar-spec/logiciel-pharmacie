@@ -3,7 +3,9 @@ using System.Text.RegularExpressions;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Pharmacy.Application.Catalog.Commands;
+using Pharmacy.Application.Customers.Commands;
 using Pharmacy.Application.Customers.Models;
+using Pharmacy.Application.Security;
 using Pharmacy.Application.Inventory.Commands;
 using Pharmacy.Application.Inventory.Contracts;
 using Pharmacy.Application.Sales.Catalog.Models;
@@ -51,7 +53,7 @@ public sealed class SqlCustomerCreditIntegrationTests
             {
                 await context.Database.MigrateAsync(token);
                 Assert.Empty(await context.Database.GetPendingMigrationsAsync(token));
-                Assert.Equal(12, (await context.Database.GetAppliedMigrationsAsync(token)).Count());
+                Assert.Equal(13, (await context.Database.GetAppliedMigrationsAsync(token)).Count());
             }
 
             var clock = new FixedClock(
@@ -374,6 +376,82 @@ public sealed class SqlCustomerCreditIntegrationTests
         }
     }
 
+    [Fact]
+    public async Task RBSELL020_UnauthorizedCustomerMutationsLeaveSqlUnchanged()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var server = ServerConnection();
+        var databaseName = TestDatabasePrefix + Guid.NewGuid().ToString("N")[..12];
+        ValidateTemporaryDatabaseName(databaseName);
+        var database = new SqlConnectionStringBuilder(server.ConnectionString)
+        {
+            InitialCatalog = databaseName,
+            ApplicationName = "Pharmacy.RBSELL020.Tests",
+            Pooling = false
+        };
+        await CreateDatabaseAsync(server.ConnectionString, databaseName);
+
+        try
+        {
+            var factory = new TestDbContextFactory(database.ConnectionString);
+            await using (var context = await factory.CreateDbContextAsync(token))
+            {
+                await context.Database.MigrateAsync(token);
+            }
+
+            var clock = new FixedClock(
+                new DateOnly(2026, 8, 22),
+                new DateTime(2026, 8, 22, 8, 0, 0, DateTimeKind.Utc));
+            var store = new SqlCustomerCreditCashStore(factory, clock);
+            var customer = await store.CreateAsync(
+                new CreateCustomerRequest(Guid.NewGuid(), "Client RBAC Seller", null, null, false), token);
+            Assert.True(customer.IsSuccess);
+
+            var beforeCustomers = await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM customers.Customers;");
+            var beforeLedger = await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM customers.CustomerLedgerEntries;");
+            var seller = new TestPermissionAuthorizer(
+                SecurityPermissions.CatalogView,
+                SecurityPermissions.InventoryView,
+                SecurityPermissions.CustomersView,
+                SecurityPermissions.SalesCreate,
+                SecurityPermissions.SalesViewHistory);
+            var commands = new CustomerCommandHandlers(store, store, seller);
+
+            var create = await commands.CreateAsync(
+                new CreateCustomerRequest(Guid.NewGuid(), "Création interdite", null, null, false), token);
+            var update = await commands.UpdateAsync(
+                new UpdateCustomerRequest(
+                    customer.Value.CustomerId, "Modification interdite", null, null,
+                    true, false, customer.Value.RowVersion), token);
+            var credit = await commands.UpdateAsync(
+                new UpdateCustomerRequest(
+                    customer.Value.CustomerId, customer.Value.FullName, null, null,
+                    true, true, customer.Value.RowVersion), token);
+            var payment = await commands.RegisterCreditPaymentAsync(
+                new RegisterCreditPaymentRequest(
+                    Guid.NewGuid(), customer.Value.CustomerId, 10m,
+                    SalePaymentMethod.Cash, false), token);
+
+            Assert.All(new[] { create, update, credit, payment }, result =>
+                Assert.Equal("security.authorization.denied", result.Error.Code));
+            Assert.Equal(beforeCustomers, await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM customers.Customers;"));
+            Assert.Equal(beforeLedger, await ScalarAsync<int>(database.ConnectionString, "SELECT COUNT(*) FROM customers.CustomerLedgerEntries;"));
+            Assert.Equal("Client RBAC Seller", await ScalarAsync<string>(
+                database.ConnectionString,
+                "SELECT FullName FROM customers.Customers WHERE Id=@id;",
+                new SqlParameter("@id", SqlDbType.BigInt) { Value = customer.Value.CustomerId }));
+            Assert.Equal(0, await ScalarAsync<int>(
+                database.ConnectionString,
+                "SELECT CONVERT(int, CreditAllowed) FROM customers.Customers WHERE Id=@id;",
+                new SqlParameter("@id", SqlDbType.BigInt) { Value = customer.Value.CustomerId }));
+        }
+        finally
+        {
+            SqlConnection.ClearAllPools();
+            await DropDatabaseAsync(server.ConnectionString, databaseName);
+        }
+    }
+
     private static async Task<(long ProductId, long LocationId)> CreateProductAndStockAsync(
         IDbContextFactory<PharmacyDbContext> factory,
         FixedClock clock,
@@ -383,7 +461,7 @@ public sealed class SqlCustomerCreditIntegrationTests
         var category = await catalogStore.CreateAsync(
             new CreateCatalogCategoryCommand("CRD-QA", "Crédit QA"), token);
         Assert.True(category.IsSuccess);
-        var product = await new CreateCatalogProductHandler(catalogStore).HandleAsync(
+        var product = await new CreateCatalogProductHandler(catalogStore, TestPermissionAuthorizer.AllowAll).HandleAsync(
             new CreateCatalogProductCommand(
                 "Produit CRD",
                 "Unité",

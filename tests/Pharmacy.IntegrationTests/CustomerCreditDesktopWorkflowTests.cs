@@ -19,8 +19,8 @@ public sealed class CustomerCreditDesktopWorkflowTests
     {
         var store = new BlockingCustomerStore();
         var coordinator = new CustomersCoordinator(
-            new CustomerQueryHandlers(store),
-            new CustomerCommandHandlers(store, store));
+            new CustomerQueryHandlers(store, TestPermissionAuthorizer.AllowAll),
+            new CustomerCommandHandlers(store, store, TestPermissionAuthorizer.AllowAll));
         await coordinator.SelectAsync(42, TestContext.Current.CancellationToken);
 
         var first = coordinator.RegisterPaymentAsync(
