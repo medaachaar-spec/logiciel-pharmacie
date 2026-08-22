@@ -87,6 +87,14 @@ public sealed class SqlBackupRecoveryService : IBackupRecoveryService
         Directory.CreateDirectory(configuration.Value.LocalDirectory);
 
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var existing = await context.BackupRecords.SingleOrDefaultAsync(
+            candidate => candidate.OperationId == request.OperationId,
+            cancellationToken);
+        if (existing is not null)
+        {
+            return ReplayCompletedBackup(existing, request, configuration.Value);
+        }
+
         var record = new BackupRecordEntity
         {
             OperationId = request.OperationId,
@@ -138,6 +146,37 @@ public sealed class SqlBackupRecoveryService : IBackupRecoveryService
             await AuditFailureQuietlyAsync("backup.create", request.OperationId, record.ErrorCode, cancellationToken);
             return Result<BackupExecutionView>.Failure(new Error(record.ErrorCode, "La sauvegarde n’a pas abouti ; aucune réussite n’a été déclarée."));
         }
+    }
+
+    private static Result<BackupExecutionView> ReplayCompletedBackup(
+        BackupRecordEntity record,
+        CreateBackupRequest request,
+        BackupConfigurationView configuration)
+    {
+        var existingCopyToExternal = !string.Equals(record.ExternalCopyStatus, "NotRequested", StringComparison.Ordinal);
+        if (!string.Equals(record.BackupType, request.Type.ToString(), StringComparison.Ordinal)
+            || existingCopyToExternal != request.CopyToExternal
+            || !string.Equals(record.Status, "Completed", StringComparison.Ordinal)
+            || record.CompletedAtUtc is null
+            || record.FileSize is null
+            || string.IsNullOrWhiteSpace(record.FileHash)
+            || !string.Equals(record.VerificationStatus, "VerifyOnlyPassed", StringComparison.Ordinal))
+        {
+            return Result<BackupExecutionView>.Failure(OperationsErrors.BackupOperationConflict);
+        }
+
+        var fullPath = SafeCombine(configuration.LocalDirectory, record.FileName);
+        if (fullPath is null || !File.Exists(fullPath))
+            return Result<BackupExecutionView>.Failure(OperationsErrors.BackupOperationConflict);
+
+        var file = new FileInfo(fullPath);
+        if (file.Length != record.FileSize.Value)
+            return Result<BackupExecutionView>.Failure(OperationsErrors.BackupOperationConflict);
+
+        var view = new BackupFileView(record.FileName, fullPath, request.Type, file.Length,
+            file.LastWriteTimeUtc, record.FileHash, record.VerificationStatus, record.ExternalCopyStatus);
+        return Result<BackupExecutionView>.Success(new BackupExecutionView(
+            request.OperationId, view, record.CreatedAtUtc, record.CompletedAtUtc.Value));
     }
 
     public async Task<Result<BackupFileView>> VerifyAsync(VerifyBackupRequest request, CancellationToken cancellationToken = default)

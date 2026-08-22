@@ -11,21 +11,21 @@ namespace Pharmacy.IntegrationTests;
 
 /// <summary>
 /// ZCODE-04A / ZC-004: CSV export completeness above the reporting row limit.
-/// Seeds 251 finalized sales inside one report period in a disposable SQL
-/// database, then invokes the REAL reporting/export workflow with the same
+/// Seeds boundary-sized sets of finalized sales inside one report period in a
+/// disposable SQL database, then invokes the REAL reporting/export workflow with the same
 /// default query the Desktop ReportingCoordinator builds
 /// (new ReportingQuery(period) => Limit defaults to 200).
-/// Invariant: a successful export must either contain every qualifying record
-/// or explicitly report truncation/paging.
+/// Invariant: a successful export contains every qualifying record.
 /// </summary>
 [Collection("Sprint 09 persistence serial")]
 public sealed class Zc04ReportingCsvExportTests
 {
     private const string OwnerPassword = "Zc04-Owner-Password-2026!";
-    private const int SeededSales = 251;
-
-    [Fact]
-    public async Task ZC04A04_CsvExportMustContainAllQualifyingSalesOrExplicitlyReportTruncation()
+    [Theory]
+    [InlineData(200)]
+    [InlineData(201)]
+    [InlineData(251)]
+    public async Task ZC04A04_CsvExportMustContainEveryQualifyingSale(int seededSales)
     {
         var token = TestContext.Current.CancellationToken;
         var server = Zc04.BuildServerConnection();
@@ -44,13 +44,13 @@ public sealed class Zc04ReportingCsvExportTests
                 factory, clock, "REP", quantity: 1000, token: token);
 
             var saleTimestamp = clock.UtcNow.AddMinutes(-30);
-            await SeedFinalizedSalesAsync(databaseConnection, saleTimestamp, SeededSales);
+            await SeedFinalizedSalesAsync(databaseConnection, saleTimestamp, seededSales);
 
             var qualifyingCount = await Zc04.ScalarAsync<int>(databaseConnection,
                 "SELECT COUNT(*) FROM sales.Sales WHERE CompletedAtUtc >= @from AND CompletedAtUtc < @to;",
                 new SqlParameter("@from", SqlDbType.DateTime2) { Value = saleTimestamp.AddHours(-1) },
                 new SqlParameter("@to", SqlDbType.DateTime2) { Value = saleTimestamp.AddHours(1) });
-            Assert.Equal(SeededSales, qualifyingCount);
+            Assert.Equal(seededSales, qualifyingCount);
 
             var reporting = new SqlReportingService(factory, owner.Authorizer, new Zc04.NoOpAuditRecorder(), clock);
 
@@ -69,20 +69,8 @@ public sealed class Zc04ReportingCsvExportTests
 
             var csvRows = CountCsvDataRows(export.Value.Content);
             var summaryCount = snapshot.Value.Summary.SaleCount;
-            var snapshotRows = snapshot.Value.Sales.Count;
-            var truncationReported =
-                export.Value.FileName.Contains("trunc", StringComparison.OrdinalIgnoreCase)
-                || export.Value.Content.AsMemory().Span.StartsWith("<!-- truncated"u8);
-
-            // INVARIANT: successful export must contain all qualifying records OR explicitly
-            // report truncation/paging. RED = silent 251 -> 200 truncation reported as success.
-            if (csvRows != qualifyingCount && !truncationReported)
-            {
-                Assert.Fail(
-                    "ZC-004 REPRODUCED: silent CSV truncation. " +
-                    $"Qualifying sales in period: {qualifyingCount}; summary-reported count: {summaryCount}; " +
-                    $"snapshot rows: {snapshotRows}; CSV data rows: {csvRows}; export reported success with no truncation signal.");
-            }
+            Assert.Equal(qualifyingCount, summaryCount);
+            Assert.Equal(qualifyingCount, csvRows);
         }
         finally
         {

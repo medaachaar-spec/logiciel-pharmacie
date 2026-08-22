@@ -10,11 +10,8 @@ namespace Pharmacy.IntegrationTests;
 /// ZCODE-04A / ZC-011: backup OperationId replay.
 /// Uses a disposable SQL database plus a temporary backup directory. The
 /// first CreateAsync with OperationId X must succeed; the second call with
-/// the SAME OperationId and the SAME logical request is observed.
-/// Invariant: retrying a successfully completed operation must either succeed
-/// idempotently (returning the completed state) or clearly report that the
-/// operation was already completed. A misleading generic failure caused by the
-/// unique OperationId index is REPRODUCED.
+/// the SAME OperationId and the SAME logical request must return that completed
+/// operation. A conflicting request with the same OperationId is rejected.
 /// </summary>
 [Collection("Sprint 09 persistence serial")]
 public sealed class Zc04BackupOperationIdReplayTests
@@ -60,6 +57,9 @@ public sealed class Zc04BackupOperationIdReplayTests
             Assert.True(File.Exists(firstPath));
 
             var second = await backups.CreateAsync(request, token);
+            Assert.True(second.IsSuccess, second.IsFailure ? second.Error.Code : null);
+            Assert.Equal(first.Value.Backup.FullPath, second.Value.Backup.FullPath);
+            Assert.Equal(first.Value.Backup.Sha256, second.Value.Backup.Sha256);
 
             var records = await Zc04.ScalarAsync<int>(databaseConnection,
                 "SELECT COUNT(*) FROM operations.BackupRecords WHERE OperationId=@operationId;",
@@ -72,24 +72,15 @@ public sealed class Zc04BackupOperationIdReplayTests
                 new SqlParameter("@operationId", SqlDbType.UniqueIdentifier) { Value = operationId });
             var backupFiles = Directory.GetFiles(backupDirectory, "*.bak");
 
-            // INVARIANT: an idempotent retry returns the completed state; a rejected retry
-            // clearly states the operation already completed. RED = the retry of a
-            // SUCCESSFUL backup is reported as a fresh failure (unique-key conflict),
-            // which teaches operators to distrust legitimate retries.
-            if (second.IsFailure)
-            {
-                var clearlyAlreadyCompleted = second.Error.Code.Contains("already", StringComparison.OrdinalIgnoreCase)
-                    || second.Error.Code.Contains("duplicate", StringComparison.OrdinalIgnoreCase)
-                    || second.Error.Code.Contains("completed", StringComparison.OrdinalIgnoreCase);
-                if (!clearlyAlreadyCompleted)
-                {
-                    Assert.Fail(
-                        "ZC-011 REPRODUCED: retrying a successfully completed backup with the same " +
-                        $"OperationId returned a misleading failure (error code '{second.Error.Code}', " +
-                        $"message '{second.Error.Message}'). BackupRecords for OperationId: {records} total, " +
-                        $"{completedRecords} Completed, {failedRecords} Failed; backup files on disk: {backupFiles.Length}.");
-                }
-            }
+            Assert.Equal(1, records);
+            Assert.Equal(1, completedRecords);
+            Assert.Equal(0, failedRecords);
+            Assert.Single(backupFiles);
+
+            var conflicting = await backups.CreateAsync(
+                request with { Type = SqlBackupType.Differential }, token);
+            Assert.True(conflicting.IsFailure);
+            Assert.Equal("backup.operation.conflict", conflicting.Error.Code);
         }
         finally
         {

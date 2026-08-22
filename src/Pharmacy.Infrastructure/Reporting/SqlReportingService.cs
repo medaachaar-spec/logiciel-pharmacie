@@ -37,6 +37,14 @@ public sealed class SqlReportingService : IReportingService
         ReportingQuery query,
         CancellationToken cancellationToken = default)
     {
+        return await GetSnapshotAsync(query, query.Limit, cancellationToken);
+    }
+
+    private async Task<Result<ReportingSnapshotView>> GetSnapshotAsync(
+        ReportingQuery query,
+        int? limit,
+        CancellationToken cancellationToken)
+    {
         var validation = ValidateQuery(query);
         if (validation is not null) return Result<ReportingSnapshotView>.Failure(validation);
         var authorization = authorizer.Authorize(SecurityPermissions.ReportsView);
@@ -61,7 +69,7 @@ public sealed class SqlReportingService : IReportingService
                     .Where(item => item.OriginalSaleId == sale.Id && item.Status == "Completed")
                     .Sum(item => (decimal?)item.RefundAmount) ?? 0m
             })
-            .Take(query.Limit)
+            .LimitForInteractiveView(limit)
             .ToArrayAsync(cancellationToken);
         var sales = saleData.Select(item => new SaleReportRow(
             item.Id, item.Reference, item.CompletedAtUtc, item.PaymentMethod.ToString(), item.LineCount,
@@ -82,7 +90,7 @@ public sealed class SqlReportingService : IReportingService
                     .Where(item => item.SaleLineId == line.Id && item.SaleReturn.Status == "Completed")
                     .Sum(item => (decimal?)item.LineTotal) ?? 0m
             })
-            .Take(query.Limit)
+            .LimitForInteractiveView(limit)
             .ToArrayAsync(cancellationToken);
         var productSales = lineData.Select(item => new ProductSalesReportRow(
             item.Id, item.CompletedAtUtc, item.Reference, item.ProductId,
@@ -106,7 +114,7 @@ public sealed class SqlReportingService : IReportingService
                                 && (balance.StockBatch.ExpiryDate == null || balance.StockBatch.ExpiryDate >= today))))
                     .Sum(balance => (long?)balance.AvailableQuantity) ?? 0L
             })
-            .Take(query.Limit)
+            .LimitForInteractiveView(limit)
             .ToArrayAsync(cancellationToken);
         var stock = stockData.Select(item => new StockReportRow(
             item.ProductId, item.Reference, item.Name, item.Quantity, item.MinimumStock,
@@ -124,7 +132,7 @@ public sealed class SqlReportingService : IReportingService
                 Quantity = batch.Balances.Sum(balance => (long?)balance.AvailableQuantity) ?? 0L
             })
             .Where(item => item.Quantity > 0)
-            .Take(query.Limit)
+            .LimitForInteractiveView(limit)
             .ToArrayAsync(cancellationToken);
         var expiry = expiryData.Select(item =>
         {
@@ -146,7 +154,7 @@ public sealed class SqlReportingService : IReportingService
                 Quantity = receipt.Lines.Sum(line => (long?)line.Quantity) ?? 0L,
                 Amount = receipt.Lines.Sum(line => (decimal?)(line.Quantity * line.UnitPurchasePrice)) ?? 0m
             })
-            .Take(query.Limit)
+            .LimitForInteractiveView(limit)
             .ToArrayAsync(cancellationToken);
         var purchasing = receiptData.Select(item => new PurchasingReportRow(
             item.Id, item.ReceiptNumber, item.ReceivedAtUtc, item.SupplierCode, item.SupplierName,
@@ -168,7 +176,7 @@ public sealed class SqlReportingService : IReportingService
                 Name = item.Product.Name, item.MovementType, item.Quantity, item.QuantityBefore,
                 item.QuantityAfter, item.Reason, item.SourceReference
             })
-            .Take(query.Limit)
+            .LimitForInteractiveView(limit)
             .ToArrayAsync(cancellationToken);
         var adjustments = movementData.Select(item => new InventoryAdjustmentReportRow(
             item.Id, item.OccurredAtUtc, item.ProductId, item.Reference, item.Name,
@@ -187,7 +195,7 @@ public sealed class SqlReportingService : IReportingService
                     .Where(entry => entry.EntryType == "CreditPayment" || entry.EntryType == "CreditAdjustmentDecrease" || entry.EntryType == "RefundImpact")
                     .Sum(entry => (decimal?)entry.Amount) ?? 0m
             })
-            .Take(query.Limit)
+            .LimitForInteractiveView(limit)
             .ToArrayAsync(cancellationToken);
         var customerCredit = customerData.Select(item => new CustomerCreditReportRow(
             item.Id, item.Reference, item.FullName, item.CreditAllowed,
@@ -204,7 +212,7 @@ public sealed class SqlReportingService : IReportingService
                 Quantity = item.Lines.Sum(line => (int?)line.Quantity) ?? 0,
                 Restocked = item.Lines.Where(line => line.StockDestination == "RestockApproved").Sum(line => (int?)line.Quantity) ?? 0
             })
-            .Take(query.Limit)
+            .LimitForInteractiveView(limit)
             .ToArrayAsync(cancellationToken);
         var returns = returnData.Select(item => new ReturnReportRow(
             item.Id, item.Reference, item.CompletedAtUtc, item.SaleReference, item.RefundMethod,
@@ -215,7 +223,7 @@ public sealed class SqlReportingService : IReportingService
             .OrderByDescending(item => item.OccurredAtUtc).ThenByDescending(item => item.Id)
             .Select(item => new CashReportRow(item.Id, item.OccurredAtUtc, item.EntryType,
                 item.Amount, item.SourceType, item.SourceReference))
-            .Take(query.Limit)
+            .LimitForInteractiveView(limit)
             .ToArrayAsync(cancellationToken);
 
         var payments = await context.Payments.AsNoTracking()
@@ -330,7 +338,9 @@ public sealed class SqlReportingService : IReportingService
         if (request.OperationId == Guid.Empty) return Result<CsvExportView>.Failure(ReportingErrors.InvalidOperationId);
         var authorization = authorizer.Authorize(SecurityPermissions.ReportsExport);
         if (authorization.IsFailure) return Result<CsvExportView>.Failure(authorization.Error);
-        var snapshot = await GetSnapshotAsync(request.Query, cancellationToken);
+        // The reporting screen is intentionally paged, but a CSV advertised as a
+        // complete export must query the whole requested dataset.
+        var snapshot = await GetSnapshotAsync(request.Query, limit: null, cancellationToken);
         if (snapshot.IsFailure) return Result<CsvExportView>.Failure(snapshot.Error);
 
         var (headers, rows) = CsvRows(request.Kind, snapshot.Value);
@@ -400,4 +410,10 @@ public sealed class SqlReportingService : IReportingService
              snapshot.Cash.Select(item => new[] { item.EntryId.ToString(CultureInfo.InvariantCulture), Date(item.OccurredAtUtc), item.EntryType, Number(item.Amount), item.SourceType, item.SourceReference })),
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
     };
+}
+
+internal static class ReportingQueryLimitExtensions
+{
+    public static IQueryable<T> LimitForInteractiveView<T>(this IQueryable<T> source, int? limit) =>
+        limit.HasValue ? source.Take(limit.Value) : source;
 }

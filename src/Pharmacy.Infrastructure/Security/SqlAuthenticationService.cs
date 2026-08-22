@@ -148,14 +148,35 @@ internal sealed class SqlAuthenticationService : IAuthenticationService, ISecuri
         {
             await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
             var user = await context.UserAccounts.SingleOrDefaultAsync(candidate => candidate.Id == current.UserId, cancellationToken);
-            if (user is null || passwordHasher.VerifyHashedPassword(user, user.PasswordHash, currentPassword) == PasswordVerificationResult.Failed)
+            var now = clock.UtcNow;
+            if (user is null || !user.IsActive)
             {
+                if (user is not null)
+                    await RecordPasswordChangeFailureAsync(context, user, current, now, "invalid_credentials", correlationId, cancellationToken);
                 return Result.Failure(SecurityErrors.InvalidCredentials);
             }
-            var now = clock.UtcNow;
+            if (user.LockedUntilUtc > now)
+            {
+                await RecordPasswordChangeFailureAsync(context, user, current, now, "locked", correlationId, cancellationToken);
+                return Result.Failure(SecurityErrors.AccountLocked);
+            }
+
+            if (passwordHasher.VerifyHashedPassword(user, user.PasswordHash, currentPassword) == PasswordVerificationResult.Failed)
+            {
+                user.FailedLoginCount = Math.Min(LocalSecurityRules.MaximumFailedLoginCount, user.FailedLoginCount + 1);
+                if (user.FailedLoginCount >= LocalSecurityRules.MaximumFailedLoginCount)
+                    user.LockedUntilUtc = now.Add(LocalSecurityRules.AccountLockoutDuration);
+                user.UpdatedAtUtc = now;
+                await RecordPasswordChangeFailureAsync(context, user, current, now,
+                    user.LockedUntilUtc > now ? "locked" : "invalid_credentials", correlationId, cancellationToken);
+                return Result.Failure(user.LockedUntilUtc > now ? SecurityErrors.AccountLocked : SecurityErrors.InvalidCredentials);
+            }
+
             user.PasswordHash = passwordHasher.HashPassword(user, newPassword);
             user.MustChangePassword = false;
             user.SecurityStamp = Guid.NewGuid();
+            user.FailedLoginCount = 0;
+            user.LockedUntilUtc = null;
             user.UpdatedAtUtc = now;
             context.AuthenticationEvents.Add(SecurityPersistenceSupport.AuthenticationEvent(
                 "PasswordChange", user.Id, user.NormalizedLogin, now, true, null, correlationId));
@@ -170,6 +191,23 @@ internal sealed class SqlAuthenticationService : IAuthenticationService, ISecuri
         {
             return Result.Failure(SecurityErrors.DatabaseUnavailable);
         }
+    }
+
+    private static async Task RecordPasswordChangeFailureAsync(
+        PharmacyDbContext context,
+        UserAccountEntity user,
+        UserSessionView current,
+        DateTime now,
+        string reason,
+        Guid correlationId,
+        CancellationToken cancellationToken)
+    {
+        context.AuthenticationEvents.Add(SecurityPersistenceSupport.AuthenticationEvent(
+            "PasswordChange", user.Id, user.NormalizedLogin, now, false, reason, correlationId));
+        context.AuditEvents.Add(SecurityPersistenceSupport.AuditEvent(
+            "Security", "security", "UserAccount", user.Id.ToString(), "password.change",
+            current.UserId, current.DisplayName, "Failure", now, null, correlationId, reason));
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<Result> RecoverPasswordAsync(

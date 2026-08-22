@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Pharmacy.Application.Security;
 using Pharmacy.Application.Security.Models;
 using Pharmacy.Application.Security.Services;
+using Pharmacy.Domain.Security;
 using Pharmacy.Infrastructure.Security;
 using Pharmacy.Infrastructure.Persistence;
 using Xunit;
@@ -352,21 +353,9 @@ public sealed class Zc04AdversarialSecurityTests
             var change = await sellerAuthentication.ChangePasswordAsync(
                 SellerPassword, "Zc04-New-Password-2026!", Guid.NewGuid(), token);
 
-            var hashChanged = await Zc04.ScalarAsync<int>(databaseConnection,
-                "SELECT COUNT(*) FROM security.AuthenticationEvents WHERE EventType=N'PasswordChange';");
-
-            // Behavior recorded per ZCODE-04A section 11: report exact behavior, no automatic
-            // release-blocking classification. The invariant asserted here is the conservative
-            // one: a disabled account must not be able to mutate its own credentials.
-            // RED = the change was accepted for a disabled account.
-            if (change.IsSuccess)
-            {
-                Assert.Fail(
-                    "ZC-013(A) REPRODUCED: disabled account changed its own password through an open session " +
-                    $"(PasswordChange events: {hashChanged}).");
-            }
-
             Assert.True(change.IsFailure);
+            Assert.Equal(0, await Zc04.ScalarAsync<int>(databaseConnection,
+                "SELECT COUNT(*) FROM security.AuthenticationEvents WHERE EventType=N'PasswordChange' AND WasSuccessful=1;"));
         }
         finally
         {
@@ -423,21 +412,15 @@ public sealed class Zc04AdversarialSecurityTests
 
             Assert.Equal(attempts, failures);
 
-            // INVARIANT: repeated wrong-current-password attempts must be mitigated by at
-            // least ONE of: lockout, failed-attempt counting, event auditing, throttling.
-            // RED = unlimited unlogged unthrottled password guessing through the
-            // ChangePassword surface (ZC-013(B) hardening gap).
-            var mitigated = failedLoginCount > 0
-                || (lockedUntil is not null && lockedUntil.Value > clock.UtcNow)
-                || failureEvents > 0
-                || auditFailures > 0;
-            if (!mitigated)
-            {
-                Assert.Fail(
-                    "ZC-013(B) REPRODUCED: 12 wrong-current-password attempts produced no lockout, " +
-                    $"no FailedLoginCount increment ({failedLoginCount}), no failure events ({failureEvents}) " +
-                    $"and no audit failures ({auditFailures}).");
-            }
+            Assert.Equal(LocalSecurityRules.MaximumFailedLoginCount, failedLoginCount);
+            Assert.NotNull(lockedUntil);
+            Assert.True(lockedUntil > clock.UtcNow);
+            Assert.Equal(attempts, failureEvents);
+            Assert.Equal(attempts, auditFailures);
+            Assert.Equal(0, await Zc04.ScalarAsync<int>(databaseConnection,
+                "SELECT COUNT(*) FROM security.AuthenticationEvents WHERE UsernameAttemptHash LIKE N'%totally-wrong-current-password%';"));
+            Assert.Equal(0, await Zc04.ScalarAsync<int>(databaseConnection,
+                "SELECT COUNT(*) FROM audit.AuditEvents WHERE ReasonCode LIKE N'%totally-wrong-current-password%';"));
         }
         finally
         {
