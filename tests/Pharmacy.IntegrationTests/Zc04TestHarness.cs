@@ -269,6 +269,10 @@ internal static class SeededSaleFactory
 {
     public sealed record SeededProduct(long ProductId, decimal UnitPrice, long LocationId);
 
+    public sealed record PreparedSaleExecution(
+        FinalizeSaleHandler Handler,
+        FinalizeSaleCommand Command);
+
     public static async Task<SeededProduct> SeedProductWithStockAsync(
         Zc04.Factory factory,
         Zc04.Zc04Clock clock,
@@ -351,5 +355,54 @@ internal static class SeededSaleFactory
         return await handler.HandleAsync(new FinalizeSaleCommand(
             Guid.NewGuid(), draft.Value.Id, added.Value.Version,
             SalePaymentMethod.Cash, total, false), token);
+    }
+
+    public static async Task<PreparedSaleExecution> PrepareSaleAsSessionAsync(
+        Zc04.Factory factory,
+        Zc04.Zc04Clock clock,
+        CurrentSecuritySession session,
+        SeededProduct seeded,
+        int quantity,
+        Guid operationId,
+        CancellationToken token = default,
+        IBusinessAuditRecorder? auditRecorder = null)
+    {
+        var catalogReader = new SqlProductCatalogReader(factory);
+        var availabilityReader = new SqlInventoryStockAvailabilityReader(factory, clock);
+        var draftStore = new InMemorySaleDraftStore();
+        var draft = await new CreateSaleDraftHandler(new InMemorySaleDraftIdGenerator(), draftStore)
+            .HandleAsync(token);
+        Assert.True(draft.IsSuccess, draft.IsFailure ? draft.Error.Code : null);
+        var added = await new AddProductToSaleDraftHandler(draftStore, catalogReader, availabilityReader)
+            .HandleAsync(new AddProductToSaleDraftCommand(
+                draft.Value.Id,
+                SellableProductLookup.ByProductId(ProductId.Create(seeded.ProductId).Value),
+                SaleQuantity.Create(quantity).Value,
+                draft.Value.Version), token);
+        Assert.True(added.IsSuccess, added.IsFailure ? added.Error.Code : null);
+
+        var authorizer = new PermissionAuthorizer(
+            session,
+            clock,
+            new SqlSecuritySessionValidator(factory));
+        var handler = new FinalizeSaleHandler(
+            new PrepareSaleFinalizationHandler(
+                draftStore,
+                availabilityReader,
+                new InMemorySaleFinalizationPreparationStore()),
+            new SqlSaleFinalizer(factory, clock),
+            authorizer,
+            auditRecorder ?? new Zc04.NoOpAuditRecorder(),
+            session);
+        var total = seeded.UnitPrice * quantity;
+        return new PreparedSaleExecution(
+            handler,
+            new FinalizeSaleCommand(
+                operationId,
+                draft.Value.Id,
+                added.Value.Version,
+                SalePaymentMethod.Cash,
+                total,
+                false));
     }
 }

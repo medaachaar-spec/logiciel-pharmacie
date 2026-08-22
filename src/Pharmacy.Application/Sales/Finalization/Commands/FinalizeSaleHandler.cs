@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Pharmacy.Application.Sales.Contracts;
 using Pharmacy.Application.Sales.Errors;
 using Pharmacy.Application.Sales.Models;
@@ -111,12 +112,17 @@ public sealed class FinalizeSaleHandler
             cancellationToken);
         if (finalized.IsSuccess && audit is not null)
         {
-            await audit.RecordSuccessAsync("sales", "Sale", finalized.Value.SaleId.ToString(),
-                "sale.finalize", command.OperationId, cancellationToken);
+            await RecordPostCommitAuditAsync(
+                audit,
+                "Sale",
+                finalized.Value.SaleId.ToString(),
+                "sale.finalize",
+                command.OperationId,
+                cancellationToken);
             if (command.SuspendedSale is not null)
             {
-                await audit.RecordSuccessAsync(
-                    "sales",
+                await RecordPostCommitAuditAsync(
+                    audit,
                     "SuspendedSale",
                     command.SuspendedSale.SuspendedSaleId.ToString(),
                     "sale.resume",
@@ -125,6 +131,35 @@ public sealed class FinalizeSaleHandler
             }
         }
         return finalized;
+    }
+
+    private static async Task RecordPostCommitAuditAsync(
+        IBusinessAuditRecorder audit,
+        string entityType,
+        string entityId,
+        string action,
+        Guid operationId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await audit.RecordSuccessAsync(
+                "sales",
+                entityType,
+                entityId,
+                action,
+                operationId,
+                cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            Trace.TraceWarning(
+                "Post-commit business audit failed non-fatally. OperationType={0}; OperationId={1}; OccurredAtUtc={2:O}; FailureClass={3}.",
+                action,
+                operationId.ToString("D"),
+                DateTime.UtcNow,
+                exception.GetType().Name);
+        }
     }
 
     private static Result<SalePaymentRequest> ValidatePayment(
