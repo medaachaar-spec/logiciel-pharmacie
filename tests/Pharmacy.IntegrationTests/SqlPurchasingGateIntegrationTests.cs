@@ -38,7 +38,7 @@ public sealed class SqlPurchasingGateIntegrationTests(SqlPurchasingGateFixture f
 
         var inactive = await commands.SetSupplierActivationAsync(new(supplier.SupplierId, false, supplier.RowVersion), Token);
         Assert.False(inactive.Value.IsActive);
-        var historical = await new PurchasingQueryHandlers(new SqlPurchasingReader(fixture.Factory)).GetSupplierAsync(supplier.SupplierId, Token);
+        var historical = await new PurchasingQueryHandlers(new SqlPurchasingReader(fixture.Factory), Security().Authorizer).GetSupplierAsync(supplier.SupplierId, Token);
         Assert.False(historical.Value.IsActive);
     }
 
@@ -405,7 +405,7 @@ public sealed class SqlPurchasingGateIntegrationTests(SqlPurchasingGateFixture f
         var commands = Commands();
         var scenario = await ConfirmedOrderAsync(commands, "RELOAD", [(10, 7m, true)]);
         var receipt = await ReceiveAsync(commands, scenario.Order, scenario.Products, [4], "RELOAD-1", useLots: true);
-        var rebuilt = new PurchasingQueryHandlers(new SqlPurchasingReader(fixture.CreateFactory()));
+        var rebuilt = new PurchasingQueryHandlers(new SqlPurchasingReader(fixture.CreateFactory()), Security().Authorizer);
         var supplier = await rebuilt.GetSupplierAsync(scenario.Supplier.SupplierId, Token);
         var order = await rebuilt.GetOrderAsync(scenario.Order.OrderId, Token);
         var loadedReceipt = await rebuilt.GetReceiptAsync(receipt.Value.ReceiptId, Token);
@@ -430,7 +430,7 @@ public sealed class SqlPurchasingGateIntegrationTests(SqlPurchasingGateFixture f
     }
 
     private CancellationToken Token => TestContext.Current.CancellationToken;
-    private PurchasingQueryHandlers Queries() => new(new SqlPurchasingReader(fixture.Factory));
+    private PurchasingQueryHandlers Queries() => new(new SqlPurchasingReader(fixture.Factory), Security().Authorizer);
 
     private PurchasingCommandHandlers Commands(IDbContextFactory<PharmacyDbContext>? factory = null)
     {

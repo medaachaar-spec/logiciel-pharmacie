@@ -371,6 +371,7 @@ public sealed class PharmacyBrandingSqlFixture : IAsyncLifetime
         var services = new ServiceCollection();
         services.AddPharmacySqlServerPersistence(databaseConnection);
         services.AddLocalSqlSecurity();
+        services.AddSingleton<ISecuritySessionValidator, SyntheticActiveSessionValidator>();
         services.AddSqlPharmacyBranding();
         services.AddSqlApplicationSettings();
         services.AddOperationalServices();
@@ -400,6 +401,7 @@ public sealed class PharmacyBrandingSqlFixture : IAsyncLifetime
         var services = new ServiceCollection();
         services.AddPharmacySqlServerPersistence(databaseConnection);
         services.AddLocalSqlSecurity();
+        services.AddSingleton<ISecuritySessionValidator, SyntheticActiveSessionValidator>();
         services.AddSqlPharmacyBranding();
         services.AddSqlApplicationSettings();
         services.AddOperationalServices();
@@ -414,6 +416,15 @@ public sealed class PharmacyBrandingSqlFixture : IAsyncLifetime
             now,
             now), now);
         return provider;
+    }
+
+    private sealed class SyntheticActiveSessionValidator : ISecuritySessionValidator
+    {
+        public Pharmacy.Domain.Common.Result ValidateActive(long userId) =>
+            userId > 0
+                ? Pharmacy.Domain.Common.Result.Success()
+                : Pharmacy.Domain.Common.Result.Failure(
+                    Pharmacy.Application.Security.Errors.SecurityErrors.PermissionDenied);
     }
 
     public async Task ResetAsync()

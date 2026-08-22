@@ -18,7 +18,21 @@ public partial class App : System.Windows.Application
 
         var services = new ServiceCollection();
         services.AddWpfBlazorWebView();
-        var databaseEndpoint = DesktopConnectionResolver.Resolve();
+        string? databaseEndpoint;
+        try
+        {
+            databaseEndpoint = DesktopConnectionResolver.Resolve();
+        }
+        catch (InvalidOperationException exception)
+        {
+            MessageBox.Show(
+                exception.Message,
+                "Logiciel Pharmacie — configuration SQL refusée",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            Shutdown(2);
+            return;
+        }
         services.AddCatalogBackedSales(databaseEndpoint);
 
 #if DEBUG

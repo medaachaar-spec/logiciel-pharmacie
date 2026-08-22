@@ -15,6 +15,7 @@ public static class SecurityServiceCollectionExtensions
         services.AddSingleton<ISecurityClock, SystemSecurityClock>();
         services.AddSingleton<ICurrentSecuritySession, CurrentSecuritySession>();
         services.AddSingleton<IRecoveryCodeGenerator, CryptographicRecoveryCodeGenerator>();
+        services.AddSingleton<ISecuritySessionValidator, SqlSecuritySessionValidator>();
         services.AddSingleton<IPermissionAuthorizer, PermissionAuthorizer>();
         services.AddSingleton<IPasswordHasher<UserAccountEntity>>(_ =>
             new PasswordHasher<UserAccountEntity>(Options.Create(new PasswordHasherOptions

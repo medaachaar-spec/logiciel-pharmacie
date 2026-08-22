@@ -234,6 +234,17 @@
         await Task.WhenAll(catalogTask, inventoryTask, purchasingTask);
         catalogDiagnostics = await catalogTask;
         inventoryDiagnostics = await inventoryTask;
-        purchasingDiagnostics = await purchasingTask;
+        var purchasingResult = await purchasingTask;
+        purchasingDiagnostics = purchasingResult.IsSuccess
+            ? purchasingResult.Value
+            : new PurchasingDiagnosticsView(
+                false,
+                false,
+                "Non disponible",
+                "Accès refusé",
+                0,
+                0,
+                0,
+                purchasingResult.Error.Code);
     }
 }

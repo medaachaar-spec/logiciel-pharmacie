@@ -455,6 +455,12 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
     {
         var authorization = authorizer.Authorize(SecurityPermissions.SecurityManageRoles, true);
         if (authorization.IsFailure) return Result<SecurityUserSummaryView>.Failure(authorization.Error);
+        var currentUser = session.User!;
+        if (request.UserId == currentUser.UserId
+            && !currentUser.Roles.Contains(SecurityRolePresets.OwnerCode, StringComparer.Ordinal))
+        {
+            return Result<SecurityUserSummaryView>.Failure(SecurityErrors.PermissionDenied);
+        }
         if (request.OperationId == Guid.Empty || request.UserId <= 0
             || request.RowVersion is not { Length: 8 } || request.Overrides is null
             || request.Overrides.Any(item => item.PermissionId <= 0 || !Enum.IsDefined(item.Effect))

@@ -31,6 +31,11 @@ public interface IPermissionAuthorizer
     Result Authorize(string permission, bool requireRecentReauthentication = false);
 }
 
+public interface ISecuritySessionValidator
+{
+    Result ValidateActive(long userId);
+}
+
 public interface IRecoveryCodeGenerator
 {
     IReadOnlyList<string> Generate(int count);

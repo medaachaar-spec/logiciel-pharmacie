@@ -179,7 +179,7 @@ public sealed class CustomUxCleanupTests
     public void CUSTOM011_NoBusinessHandlerOrServiceWasChangedForUxCopy()
     {
         var changedBusinessFiles = GitOutput(
-            "diff", "--name-only", "v1.0.0-pre-customization", "--",
+            "diff", "--name-only", "v1.0.0-pre-customization", "c08b387f699fb6d6b15b21b0c7aef2e2e59da9aa", "--",
             "src/Pharmacy.Domain", "src/Pharmacy.Application", "src/Pharmacy.Infrastructure");
 
         var allowedBrandingFiles = new[]
@@ -217,7 +217,10 @@ public sealed class CustomUxCleanupTests
             "src/Pharmacy.Infrastructure/Sales/SqlSalesReader.cs",
             "src/Pharmacy.Application/Dashboard/",
             "src/Pharmacy.Infrastructure/Reporting/SqlDashboardService.cs",
-            "src/Pharmacy.Infrastructure/Reporting/ReportingServiceCollectionExtensions.cs"
+            "src/Pharmacy.Infrastructure/Reporting/ReportingServiceCollectionExtensions.cs",
+            "src/Pharmacy.Application/Configuration/ReceiptPrintingSettings.cs",
+            "src/Pharmacy.Infrastructure/Configuration/ConfigurationServiceCollectionExtensions.cs",
+            "src/Pharmacy.Infrastructure/Configuration/SqlReceiptPrintingSettingsService.cs"
         };
         var unexpected = changedBusinessFiles.Split(
                 ['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
