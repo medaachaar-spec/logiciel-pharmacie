@@ -41,6 +41,7 @@ public sealed class SqlPilotLeastPrivilegeTests
         Assert.Contains("PharmacyAppRestoreTest", script, StringComparison.Ordinal);
         Assert.Contains("GRANT CREATE ANY DATABASE TO [PharmacyAppRestoreTest]", script, StringComparison.Ordinal);
         Assert.Contains("unexpected server permission", script, StringComparison.Ordinal);
+        Assert.Contains("NOT IN (N'CONNECT SQL', N'VIEW ANY DATABASE')", script, StringComparison.Ordinal);
         Assert.Contains("ALTER SERVER ROLE [dbcreator] ADD MEMBER", script, StringComparison.Ordinal);
         Assert.Contains("must be neither sysadmin nor dbcreator", script, StringComparison.Ordinal);
         Assert.Contains("Runtime user is db_owner", verifier, StringComparison.Ordinal);
@@ -64,6 +65,7 @@ public sealed class SqlPilotLeastPrivilegeTests
         Assert.Contains("Runtime identity must not be dbcreator", verifier, StringComparison.Ordinal);
         Assert.Contains("CREATE ANY DATABASE", verifier, StringComparison.Ordinal);
         Assert.Contains("unexpected direct server permission", verifier, StringComparison.Ordinal);
+        Assert.Contains("NOT IN (N'CONNECT SQL', N'VIEW ANY DATABASE')", verifier, StringComparison.Ordinal);
         Assert.Contains("Deployment user lacks db_owner on Pharmacy", verifier, StringComparison.Ordinal);
         Assert.Contains("N''PASS'' AS Result", verifier, StringComparison.Ordinal);
         Assert.DoesNotContain("CREATE LOGIN", verifier, StringComparison.OrdinalIgnoreCase);

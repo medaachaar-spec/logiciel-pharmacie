@@ -140,7 +140,7 @@ IF EXISTS
     SELECT 1 FROM sys.server_permissions
     WHERE grantee_principal_id = @RuntimeLoginId
       AND state IN ('G','W')
-      AND permission_name <> N'VIEW ANY DATABASE'
+      AND permission_name NOT IN (N'CONNECT SQL', N'VIEW ANY DATABASE')
 )
     THROW 51014, N'Runtime login has an unexpected direct server permission.', 1;
 
