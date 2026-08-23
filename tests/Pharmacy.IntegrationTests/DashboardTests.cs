@@ -134,8 +134,12 @@ public sealed class DashboardTests : IClassFixture<SecurityGateSqlFixture>
     {
         var scenario = await ScenarioAsync();
         var inventory = Success(await DashboardService(scenario.ManagerId, SecurityPermissions.InventoryView).GetInventoryAlertsAsync(20, Token));
+        var databaseToday = await DatabaseTodayAsync();
+        var expectedHorizonDays = DateOnly.FromDateTime(Now).AddDays(20).DayNumber - databaseToday.DayNumber;
         Assert.Equal(30, inventory.ExpiryHorizonDays);
-        Assert.Contains(inventory.ExpiryAlerts, item => item.DaysRemaining == 20);
+        Assert.Contains(inventory.ExpiryAlerts, item =>
+            item.DaysRemaining == expectedHorizonDays
+            && item.Status == ExpiryStatus(expectedHorizonDays));
         Assert.DoesNotContain(inventory.ExpiryAlerts, item => item.DaysRemaining == 60);
     }
 
@@ -144,9 +148,19 @@ public sealed class DashboardTests : IClassFixture<SecurityGateSqlFixture>
     {
         var scenario = await ScenarioAsync();
         var expiry = Success(await DashboardService(scenario.ManagerId, SecurityPermissions.InventoryView).GetInventoryAlertsAsync(20, Token)).ExpiryAlerts;
-        Assert.Contains(expiry, item => item.DaysRemaining < 0 && item.Status == "Périmé");
-        Assert.Contains(expiry, item => item.DaysRemaining == 5 && item.Status == "Très proche");
-        Assert.Contains(expiry, item => item.DaysRemaining == 20 && item.Status == "Dans l’horizon");
+        var databaseToday = await DatabaseTodayAsync();
+        var expectedExpiredDays = DateOnly.FromDateTime(Now).AddDays(-1).DayNumber - databaseToday.DayNumber;
+        var expectedNearDays = DateOnly.FromDateTime(Now).AddDays(5).DayNumber - databaseToday.DayNumber;
+        var expectedHorizonDays = DateOnly.FromDateTime(Now).AddDays(20).DayNumber - databaseToday.DayNumber;
+        Assert.Contains(expiry, item =>
+            item.DaysRemaining == expectedExpiredDays
+            && item.Status == ExpiryStatus(expectedExpiredDays));
+        Assert.Contains(expiry, item =>
+            item.DaysRemaining == expectedNearDays
+            && item.Status == ExpiryStatus(expectedNearDays));
+        Assert.Contains(expiry, item =>
+            item.DaysRemaining == expectedHorizonDays
+            && item.Status == ExpiryStatus(expectedHorizonDays));
     }
 
     [Fact]
@@ -472,6 +486,13 @@ public sealed class DashboardTests : IClassFixture<SecurityGateSqlFixture>
         await fixture.ScalarAsync<int>("SELECT COUNT(*) FROM sales.SaleLineAllocations;"),
         await fixture.ScalarAsync<int>("SELECT COUNT(*) FROM customers.CustomerLedgerEntries;"),
         await fixture.ScalarAsync<int>("SELECT COUNT(*) FROM inventory.StockBalances;"));
+
+    private async Task<DateOnly> DatabaseTodayAsync() =>
+        DateOnly.FromDateTime(await fixture.ScalarAsync<DateTime>(
+            "SELECT CONVERT(date, SYSUTCDATETIME());"));
+
+    private static string ExpiryStatus(int daysRemaining) =>
+        daysRemaining < 0 ? "Périmé" : daysRemaining <= 7 ? "Très proche" : "Dans l’horizon";
 
     private static DashboardSalesView EmptySales() => new(
         new DashboardPeriod(Now.Date.AddDays(-6), Now.Date.AddDays(1)),

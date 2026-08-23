@@ -85,4 +85,9 @@ public static class SecurityPermissions
         DevicesConfigure,
         SecurityViewEmployeeActivity
     };
+
+    public static IReadOnlySet<string> OwnerExclusive { get; } = new HashSet<string>(StringComparer.Ordinal)
+    {
+        BackupRestore
+    };
 }

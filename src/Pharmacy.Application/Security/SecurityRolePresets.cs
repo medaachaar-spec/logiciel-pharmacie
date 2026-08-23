@@ -7,7 +7,7 @@ public static class SecurityRolePresets
     public const string SellerCode = "SELLER";
 
     public static IReadOnlyList<string> ManagerPermissions { get; } =
-        SecurityPermissions.All.Where(code => code != SecurityPermissions.BackupRestore).ToArray();
+        SecurityPermissions.All.Where(code => !SecurityPermissions.OwnerExclusive.Contains(code)).ToArray();
 
     public static IReadOnlyList<string> SellerPermissions { get; } =
     [

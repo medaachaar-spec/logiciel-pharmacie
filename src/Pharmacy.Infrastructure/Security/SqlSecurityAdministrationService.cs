@@ -5,6 +5,7 @@ using Pharmacy.Application.Security;
 using Pharmacy.Application.Security.Contracts;
 using Pharmacy.Application.Security.Errors;
 using Pharmacy.Application.Security.Models;
+using Pharmacy.Application.Security.Services;
 using Pharmacy.Domain.Common;
 using Pharmacy.Domain.Security;
 using Pharmacy.Infrastructure.Persistence;
@@ -104,6 +105,7 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
     {
         var authorization = authorizer.Authorize(SecurityPermissions.SecurityManageRoles, true);
         if (authorization.IsFailure) return Result<SecurityRoleView>.Failure(authorization.Error);
+        var actorIsOwner = CurrentActorIsOwner();
         if (request.OperationId == Guid.Empty
             || !LocalSecurityRules.IsRoleCodeValid(request.Code)
             || !LocalSecurityRules.IsRoleNameValid(request.Name))
@@ -128,6 +130,11 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
                     {
                         return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityRoleView>>(
                             Result<SecurityRoleView>.Failure(SecurityErrors.InvalidPermissionSelection), false);
+                    }
+                    if (!actorIsOwner && ContainsOwnerExclusivePermission(permissions.Select(item => item.Code)))
+                    {
+                        return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityRoleView>>(
+                            Result<SecurityRoleView>.Failure(SecurityErrors.PermissionDenied), false);
                     }
 
                     var role = new RoleEntity
@@ -172,6 +179,7 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
     {
         var authorization = authorizer.Authorize(SecurityPermissions.SecurityManageRoles, true);
         if (authorization.IsFailure) return Result<SecurityRoleView>.Failure(authorization.Error);
+        var actorIsOwner = CurrentActorIsOwner();
         if (request.OperationId == Guid.Empty || request.RoleId <= 0
             || !LocalSecurityRules.IsRoleNameValid(request.Name)
             || request.RowVersion is not { Length: 8 })
@@ -211,6 +219,11 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
                     {
                         return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityRoleView>>(
                             Result<SecurityRoleView>.Failure(SecurityErrors.InvalidPermissionSelection), false);
+                    }
+                    if (!actorIsOwner && ContainsOwnerExclusivePermission(permissions.Select(item => item.Code)))
+                    {
+                        return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityRoleView>>(
+                            Result<SecurityRoleView>.Failure(SecurityErrors.PermissionDenied), false);
                     }
 
                     var previousCodes = role.RolePermissions.Select(join => join.Permission.Code)
@@ -263,6 +276,7 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
     {
         var authorization = authorizer.Authorize(SecurityPermissions.SecurityManageUsers, true);
         if (authorization.IsFailure) return Result<SecurityUserSummaryView>.Failure(authorization.Error);
+        var actorIsOwner = CurrentActorIsOwner();
         var policy = SecurityPersistenceSupport.ValidatePassword(request.InitialPassword);
         if (policy.IsFailure) return Result<SecurityUserSummaryView>.Failure(policy.Error);
         if (request.OperationId == Guid.Empty
@@ -282,13 +296,20 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
                 async context =>
                 {
                     var roleIds = request.RoleIds.Distinct().ToArray();
-                    var roles = await context.Roles.Where(role => roleIds.Contains(role.Id) && role.IsActive).ToArrayAsync(cancellationToken);
+                    var roles = await context.Roles
+                        .Include(role => role.RolePermissions)
+                        .ThenInclude(join => join.Permission)
+                        .Where(role => roleIds.Contains(role.Id) && role.IsActive)
+                        .ToArrayAsync(cancellationToken);
                     if (roles.Length != roleIds.Length)
                         return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
                             Result<SecurityUserSummaryView>.Failure(SecurityErrors.InvalidRoleSelection), false);
                     if (roles.Any(role => role.Code == SecurityRolePresets.OwnerCode))
                         return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
                             Result<SecurityUserSummaryView>.Failure(SecurityErrors.SystemRoleProtected), false);
+                    if (!actorIsOwner && roles.Any(IsOwnerEquivalentRole))
+                        return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
+                            Result<SecurityUserSummaryView>.Failure(SecurityErrors.PermissionDenied), false);
                     var now = clock.UtcNow;
                     var user = new UserAccountEntity
                     {
@@ -333,6 +354,7 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
     {
         var authorization = authorizer.Authorize(SecurityPermissions.SecurityManageUsers, true);
         if (authorization.IsFailure) return Result<SecurityUserSummaryView>.Failure(authorization.Error);
+        var actorIsOwner = CurrentActorIsOwner();
         if (!request.IsActive && request.UserId == session.User?.UserId)
             return Result<SecurityUserSummaryView>.Failure(SecurityErrors.PermissionDenied);
         if (request.OperationId == Guid.Empty || request.UserId <= 0 || request.RowVersion is not { Length: 8 })
@@ -349,6 +371,9 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
                         return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
                             Result<SecurityUserSummaryView>.Failure(SecurityErrors.UserNotFound), false);
                     context.Entry(user).Property(entity => entity.RowVersion).OriginalValue = request.RowVersion;
+                    if (request.IsActive && !actorIsOwner && IsOwnerEquivalentUser(user))
+                        return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
+                            Result<SecurityUserSummaryView>.Failure(SecurityErrors.PermissionDenied), false);
                     if (!request.IsActive && user.UserRoles.Any(item => item.Role.Code == SecurityRolePresets.OwnerCode))
                     {
                         var activeOwnerCount = await context.UserRoles.CountAsync(item =>
@@ -387,6 +412,7 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
     {
         var authorization = authorizer.Authorize(SecurityPermissions.SecurityManageRoles, true);
         if (authorization.IsFailure) return Result<SecurityUserSummaryView>.Failure(authorization.Error);
+        var actorIsOwner = CurrentActorIsOwner();
         if (request.OperationId == Guid.Empty || request.UserId <= 0
             || request.RowVersion is not { Length: 8 } || request.RoleIds is null || request.RoleIds.Count == 0)
             return Result<SecurityUserSummaryView>.Failure(SecurityErrors.InvalidRoleSelection);
@@ -402,7 +428,11 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
                             Result<SecurityUserSummaryView>.Failure(SecurityErrors.UserNotFound), false);
                     context.Entry(user).Property(entity => entity.RowVersion).OriginalValue = request.RowVersion;
                     var roleIds = request.RoleIds.Distinct().ToArray();
-                    var roles = await context.Roles.Where(role => roleIds.Contains(role.Id) && role.IsActive).ToArrayAsync(cancellationToken);
+                    var roles = await context.Roles
+                        .Include(role => role.RolePermissions)
+                        .ThenInclude(join => join.Permission)
+                        .Where(role => roleIds.Contains(role.Id) && role.IsActive)
+                        .ToArrayAsync(cancellationToken);
                     if (roles.Length != roleIds.Length || request.UserId == session.User?.UserId && roles.All(role => role.Code != SecurityRolePresets.OwnerCode))
                         return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
                             Result<SecurityUserSummaryView>.Failure(SecurityErrors.PermissionDenied), false);
@@ -412,6 +442,9 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
                     if (ownerAssignmentChanged)
                         return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
                             Result<SecurityUserSummaryView>.Failure(SecurityErrors.SystemRoleProtected), false);
+                    if (!actorIsOwner && roles.Any(IsOwnerEquivalentRole))
+                        return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
+                            Result<SecurityUserSummaryView>.Failure(SecurityErrors.PermissionDenied), false);
                     if (previousRoleCodes.Contains(SecurityRolePresets.OwnerCode)
                         && roles.All(role => role.Code != SecurityRolePresets.OwnerCode))
                     {
@@ -456,6 +489,7 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
         var authorization = authorizer.Authorize(SecurityPermissions.SecurityManageRoles, true);
         if (authorization.IsFailure) return Result<SecurityUserSummaryView>.Failure(authorization.Error);
         var currentUser = session.User!;
+        var actorIsOwner = CurrentActorIsOwner();
         if (request.UserId == currentUser.UserId
             && !currentUser.Roles.Contains(SecurityRolePresets.OwnerCode, StringComparer.Ordinal))
         {
@@ -488,6 +522,33 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
                     if (permissions.Count != permissionIds.Length)
                         return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
                             Result<SecurityUserSummaryView>.Failure(SecurityErrors.InvalidPermissionSelection), false);
+
+                    if (!actorIsOwner)
+                    {
+                        var roleGrants = user.UserRoles.Where(join => join.Role.IsActive)
+                            .SelectMany(join => join.Role.RolePermissions)
+                            .Select(join => join.Permission.Code);
+                        var previousOverrides = user.PermissionOverrides.Select(item =>
+                            new KeyValuePair<string, SecurityPermissionOverrideEffect>(
+                                item.Permission.Code,
+                                Enum.Parse<SecurityPermissionOverrideEffect>(item.Effect, ignoreCase: false)));
+                        var requestedOverrides = request.Overrides.Select(item =>
+                            new KeyValuePair<string, SecurityPermissionOverrideEffect>(
+                                permissions[item.PermissionId].Code,
+                                item.Effect));
+                        var previousEffective = EffectivePermissionResolver.Resolve(roleGrants, previousOverrides);
+                        var requestedEffective = EffectivePermissionResolver.Resolve(roleGrants, requestedOverrides);
+                        var explicitlyAllowsOwnerExclusive = request.Overrides.Any(item =>
+                            item.Effect == SecurityPermissionOverrideEffect.Allow
+                            && SecurityPermissions.OwnerExclusive.Contains(permissions[item.PermissionId].Code));
+                        var exposesOwnerExclusive = SecurityPermissions.OwnerExclusive.Any(code =>
+                            !previousEffective.Contains(code) && requestedEffective.Contains(code));
+                        if (explicitlyAllowsOwnerExclusive || exposesOwnerExclusive)
+                        {
+                            return new SecurityPersistenceSupport.TransactionOutcome<Result<SecurityUserSummaryView>>(
+                                Result<SecurityUserSummaryView>.Failure(SecurityErrors.PermissionDenied), false);
+                        }
+                    }
 
                     var isOwner = user.UserRoles.Any(item => item.Role.Code == SecurityRolePresets.OwnerCode);
                     var protectedPermissionIds = permissions.Values
@@ -560,17 +621,22 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
     {
         var authorization = authorizer.Authorize(SecurityPermissions.SecurityManageUsers, true);
         if (authorization.IsFailure) return Result<RecoveryCodeBatchView>.Failure(authorization.Error);
+        var actorIsOwner = CurrentActorIsOwner();
         try
         {
             return await SecurityPersistenceSupport.ExecuteSerializableAsync(
                 contextFactory,
                 async context =>
                 {
-                    var user = await context.UserAccounts.Include(entity => entity.RecoveryCodes)
+                    var user = await SecurityPersistenceSupport.UserGraph(context)
+                        .Include(entity => entity.RecoveryCodes)
                         .SingleOrDefaultAsync(entity => entity.Id == userId, cancellationToken);
                     if (user is null)
                         return new SecurityPersistenceSupport.TransactionOutcome<Result<RecoveryCodeBatchView>>(
                             Result<RecoveryCodeBatchView>.Failure(SecurityErrors.UserNotFound), false);
+                    if (!actorIsOwner && IsOwnerEquivalentUser(user))
+                        return new SecurityPersistenceSupport.TransactionOutcome<Result<RecoveryCodeBatchView>>(
+                            Result<RecoveryCodeBatchView>.Failure(SecurityErrors.PermissionDenied), false);
                     var now = clock.UtcNow;
                     foreach (var existing in user.RecoveryCodes.Where(code => code.UsedAtUtc is null)) existing.UsedAtUtc = now;
                     var codes = recoveryCodeGenerator.Generate(RecoveryCodeCount);
@@ -633,6 +699,22 @@ internal sealed class SqlSecurityAdministrationService : ISecurityAdministration
             role.Id, role.Code, role.Name, role.Description, role.IsSystemRole, role.IsActive,
             Array.AsReadOnly(permissions), role.RowVersion);
     }
+
+    private bool CurrentActorIsOwner() =>
+        session.User?.Roles.Contains(SecurityRolePresets.OwnerCode, StringComparer.Ordinal) == true;
+
+    private static bool IsOwnerEquivalentRole(RoleEntity role) =>
+        role.Code == SecurityRolePresets.OwnerCode
+        || ContainsOwnerExclusivePermission(role.RolePermissions.Select(join => join.Permission.Code));
+
+    private static bool IsOwnerEquivalentUser(UserAccountEntity user) =>
+        user.UserRoles.Any(join => IsOwnerEquivalentRole(join.Role))
+        || user.PermissionOverrides.Any(item =>
+            item.Effect == nameof(SecurityPermissionOverrideEffect.Allow)
+            && SecurityPermissions.OwnerExclusive.Contains(item.Permission.Code));
+
+    private static bool ContainsOwnerExclusivePermission(IEnumerable<string> permissionCodes) =>
+        permissionCodes.Any(SecurityPermissions.OwnerExclusive.Contains);
 
     private static AuditEventDetailEntity PermissionAuditDetail(string fieldName, string? oldValue, string? newValue) => new()
     {
