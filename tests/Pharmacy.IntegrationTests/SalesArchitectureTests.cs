@@ -127,7 +127,7 @@ public sealed class SalesArchitectureTests
     }
 
     [Fact]
-    public void Check63_RepositoryContainsOnlyApprovedSqlFilesThroughSprint17()
+    public void Check63_RepositoryContainsOnlyApprovedSqlFiles()
     {
         var sqlFiles = Directory
             .EnumerateFiles(RepositoryRoot, "*.sql", SearchOption.AllDirectories)
@@ -152,6 +152,8 @@ public sealed class SalesArchitectureTests
                 "database/scripts/005_sales_persistence_v01_idempotent.sql",
                 "database/scripts/006_cash_customers_credit_returns_v01_idempotent.sql",
                 "database/scripts/007_security_rbac_audit_v01_idempotent.sql",
+                "database/scripts/008_pilot_least_privilege_idempotent.sql",
+                "database/verification/verify_pilot_least_privilege.sql",
                 "database/verification/verify_sprint09_schema.sql",
                 "database/verification/verify_sprint10_catalog.sql",
                 "database/verification/verify_sprint11_inventory.sql",
